@@ -1,0 +1,355 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts.signalwriter</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.mts.signalwriter</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">signalwriter.py</span>
+<span class="sd">---------------</span>
+
+<span class="sd">signal writer class</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;SignalWriter&#39;</span><span class="p">]</span>
+
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">splitext</span>
+<span class="kn">from</span> <span class="nn">struct</span> <span class="kn">import</span> <span class="n">pack</span>
+<span class="kn">from</span> <span class="nn">zlib</span> <span class="kn">import</span> <span class="n">compress</span>
+<span class="kn">from</span> <span class="nn">csv</span> <span class="kn">import</span> <span class="n">DictWriter</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span><span class="p">,</span> <span class="n">PY2</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">BSIG_HDR</span><span class="p">,</span> <span class="n">BSIG_FTR</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">,</span> <span class="n">SIG_NAME</span><span class="p">,</span> <span class="n">SIG_TYPE</span><span class="p">,</span> <span class="n">SIG_ARRAYLEN</span><span class="p">,</span> <span class="n">SIG_OFFSET</span><span class="p">,</span> <span class="n">SIG_SAMPLES</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<span class="k">class</span> <span class="nc">CsvWriter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;CSV writer class&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="o">**</span><span class="n">xargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        set default values</span>
+
+<span class="sd">        :param str fp: file or file pointer to write to</span>
+<span class="sd">        :param xargs: extra arguments to csv.DictWriter()</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="n">fp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span> <span class="o">=</span> <span class="n">xargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;exc&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span> <span class="o">=</span> <span class="n">xargs</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s1">&#39;write&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span> <span class="k">if</span> <span class="n">PY2</span> <span class="k">else</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;Error while trying to open file, corrupted?&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">signal</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a signal, being a numpy array</span>
+
+<span class="sd">        :param str name: name of signal</span>
+<span class="sd">        :param numpy.array signal: signal to be added</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span> <span class="o">=</span> <span class="p">[{}</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_len</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">)</span> <span class="ow">or</span> <span class="n">signal</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;signals are not of same length or shape!&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_len</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">signal</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;finishes up file write operation&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">writer</span> <span class="o">=</span> <span class="n">DictWriter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+                            <span class="n">delimiter</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;delim&#39;</span><span class="p">,</span> <span class="s1">&#39;;&#39;</span><span class="p">),</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">writerows</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;An error occured while closing the file.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: file info&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;dlm: &#39;</span><span class="si">%s</span><span class="s2">&#39;, signals: </span><span class="si">%d</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">signal_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: all names which are known at a time in a list&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_len</span> <span class="k">else</span> <span class="p">[]</span>
+
+
+<span class="k">class</span> <span class="nc">BsigWriter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;bsig writer class&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        open a bsig for writing</span>
+
+<span class="sd">        :param str fp: file to use, can be a file pointer to an already open file or a name of file</span>
+<span class="sd">        :param dict kwargs: please see SignalWriter doc</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="n">fp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;exc&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sig_frmt</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;b&#39;</span><span class="p">:</span> <span class="mi">32776</span><span class="p">,</span> <span class="s1">&#39;h&#39;</span><span class="p">:</span> <span class="mi">32784</span><span class="p">,</span> <span class="s1">&#39;l&#39;</span><span class="p">:</span> <span class="mi">32800</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s1">&#39;H&#39;</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+                          <span class="s1">&#39;L&#39;</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span> <span class="s1">&#39;q&#39;</span><span class="p">:</span> <span class="mi">32832</span><span class="p">,</span> <span class="s1">&#39;Q&#39;</span><span class="p">:</span> <span class="mi">64</span><span class="p">,</span> <span class="s1">&#39;f&#39;</span><span class="p">:</span> <span class="mi">36880</span><span class="p">,</span> <span class="s1">&#39;d&#39;</span><span class="p">:</span> <span class="mi">36896</span><span class="p">}</span>
+
+        <span class="c1"># valid values: 2^12 ... 2^16</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_block_size</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;block_size&#39;</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_size</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">17</span><span class="p">)),</span> <span class="s2">&quot;block_size wrong!&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_v2</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;v2format&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_v2</span><span class="p">,</span> <span class="nb">bool</span><span class="p">),</span> <span class="s2">&quot;type of v2format wrong!&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s1">&#39;write&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;Error while trying to open file, corrupted?&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># write global header</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="n">BSIG_HDR</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">2</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_v2</span> <span class="k">else</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># add name and signal immediatelly now.</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">sdata</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;sigdict&#39;</span><span class="p">,</span> <span class="p">{})):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">sdata</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">signal</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a signal, being a numpy array</span>
+
+<span class="sd">        :param str name: name of signal</span>
+<span class="sd">        :param numpy.array signal: signal to be added</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">signal_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">)</span>
+        <span class="n">array_len</span> <span class="o">=</span> <span class="n">signal</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span> <span class="k">if</span> <span class="n">signal_len</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">array_len</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">signal</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+        <span class="n">offsets</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">block_sz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_size</span> <span class="o">//</span> <span class="n">signal</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">itemsize</span>  <span class="c1"># self._sigfrmt[signal.dtype.char][1]</span>
+        <span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">pack</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">char</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">signal</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span> <span class="o">+</span> <span class="n">block_sz</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">compress</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">offsets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">tell</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;I&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="n">block_sz</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="n">SIG_NAME</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="n">SIG_SAMPLES</span><span class="p">:</span> <span class="n">signal_len</span><span class="p">,</span> <span class="n">SIG_ARRAYLEN</span><span class="p">:</span> <span class="n">array_len</span><span class="p">,</span>
+                                  <span class="n">SIG_OFFSET</span><span class="p">:</span> <span class="n">offsets</span><span class="p">,</span> <span class="n">SIG_TYPE</span><span class="p">:</span> <span class="n">signal</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">char</span><span class="p">})</span>
+
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;finish up file write operation&quot;&quot;&quot;</span>
+        <span class="c1"># write offsets</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">signal</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;I&#39;</span><span class="p">,</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">[</span><span class="n">SIG_OFFSET</span><span class="p">]),</span> <span class="n">signal</span><span class="p">[</span><span class="n">SIG_SAMPLES</span><span class="p">]])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;L&#39;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_v2</span> <span class="k">else</span> <span class="s1">&#39;Q&#39;</span><span class="p">,</span> <span class="n">signal</span><span class="p">[</span><span class="n">SIG_OFFSET</span><span class="p">])</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">-</span> <span class="n">offset</span>
+
+        <span class="c1"># write signal desc</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">signal</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;H&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">signal</span><span class="p">[</span><span class="n">SIG_NAME</span><span class="p">]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="n">signal</span><span class="p">[</span><span class="n">SIG_NAME</span><span class="p">]</span> <span class="k">if</span> <span class="n">PY2</span> <span class="k">else</span> <span class="p">[</span><span class="nb">bytes</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">signal</span><span class="p">[</span><span class="n">SIG_NAME</span><span class="p">]])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;I&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">signal</span><span class="p">[</span><span class="n">SIG_ARRAYLEN</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sig_frmt</span><span class="p">[</span><span class="n">signal</span><span class="p">[</span><span class="n">SIG_TYPE</span><span class="p">]]])</span>  <span class="c1"># array length &amp; type</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">-</span> <span class="n">header</span>
+
+        <span class="c1"># write file header</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;I&#39;</span><span class="p">,</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_block_size</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">offset</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>  <span class="c1"># write internal version (unused) &amp; compression flag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_sig</span><span class="p">(</span><span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="n">BSIG_FTR</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;An error occured while closing the file.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: file info&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;bsig3: &#39;</span><span class="si">%s</span><span class="s2">&#39;, signals: </span><span class="si">%d</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">signal_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return list: all signal names which are known in a list&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="n">SIG_NAME</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_signal_data</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_write_sig</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stype</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;write packed signal data of given type&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pack</span><span class="p">(</span><span class="n">stype</span><span class="p">,</span> <span class="n">d</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">pack</span><span class="p">(</span><span class="n">stype</span><span class="p">,</span> <span class="n">data</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exc</span><span class="p">(</span><span class="s2">&quot;An error occured while unpacking binary data.&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SignalWriter"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.signalwriter.SignalWriter">[docs]</a><span class="k">class</span> <span class="nc">SignalWriter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    MAIN Class for Signal File Write. (\\*.bsig)</span>
+
+<span class="sd">    Example 1::</span>
+
+<span class="sd">        import numpy as np</span>
+<span class="sd">        from hpc import Signal, SignalException</span>
+
+<span class="sd">        # EXAMPLE 1 (just write some)</span>
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;, mode=&#39;w&#39;) as sw:</span>
+<span class="sd">            sw.append(&#39;Time stamp&#39;, np.array([0, 1, 2, 3, 4, 5, 6, 7]))</span>
+<span class="sd">            sw.append(&#39;Cycle counter&#39;, np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32))</span>
+
+<span class="sd">    EXAMPLE 2::</span>
+
+<span class="sd">        # reorganize</span>
+<span class="sd">        bsig_in_file, bsig_out_file = &#39;Snapshot_201x.x.y_at_h.m.s_FCT.bsig&#39;, &#39;Snapshot_201x.x.y_at_h.m.s_all.bsig&#39;</span>
+<span class="sd">        sig_list = [&#39;MTS.Timestamp&#39;, &#39;MTS.Cyclecounter&#39;, &#39;SIM VFB.FCTVehicle.HEAD.Header.uiStructSize&#39;, ...]</span>
+
+<span class="sd">        with Signal(bsig_in_file) as sin, Signal(bsig_out_file, mode=&#39;w&#39;) as sout:</span>
+<span class="sd">            for sig in sig_list:</span>
+<span class="sd">                sout.append(sig, sin[sig])</span>
+
+<span class="sd">    EXAMPLE 3::</span>
+
+<span class="sd">        # CSV</span>
+<span class="sd">        with Signal(&#39;Snapshot_xyz.csv&#39;, mode=&#39;w&#39;) as sw:</span>
+<span class="sd">            sw.append(&#39;signal 1&#39;, np.array([0, 1, 2, 3, 4, 5, 6, .....]))</span>
+<span class="sd">            ...</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SignalWriter.__init__"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.signalwriter.SignalWriter.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        open the binary file by its name, supported formats: bsig2, csv, txt</span>
+
+<span class="sd">        :param str filename: path/to/file.name</span>
+<span class="sd">        :param dict kwargs: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *type* (``str``): type of file can set explicitly, set to &#39;bsig&#39; will force it to be a bsig</span>
+<span class="sd">            * *v2format* (``bool``): used by bsig writer to force format to 2nd version</span>
+<span class="sd">            * *sigdict* (``dict``): signal dictionary to immediatelly write</span>
+<span class="sd">            * *block_size* (``int``): set buffer block size of bsigs, default: 4096 (4kb)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fp</span> <span class="o">=</span> <span class="n">filename</span>
+        <span class="n">ftype</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">splitext</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s1">&#39;write&#39;</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="n">filename</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;.bsig&#39;</span><span class="p">,</span> <span class="s1">&#39;.bin&#39;</span><span class="p">,</span> <span class="s1">&#39;.tstp&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">ftype</span> <span class="o">==</span> <span class="s1">&#39;bsig&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span> <span class="o">=</span> <span class="n">BsigWriter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">splitext</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="s1">&#39;write&#39;</span><span class="p">)</span>
+                      <span class="k">else</span> <span class="n">filename</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;.csv&#39;</span> <span class="ow">or</span> <span class="n">ftype</span> <span class="o">==</span> <span class="s1">&#39;csv&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span> <span class="o">=</span> <span class="n">CsvWriter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fp</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;exc&quot;</span><span class="p">](</span><span class="s2">&quot;unsupported file format, you can force one !&quot;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;being able to use with statement&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close down file&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<div class="viewcode-block" id="SignalWriter.close"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.signalwriter.SignalWriter.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close file&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: the type and number of signals&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_writer</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SignalWriter.append"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.signalwriter.SignalWriter.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">signal</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a signal to file, numpy array required!</span>
+
+<span class="sd">        :param str name: name of signal to be added</span>
+<span class="sd">        :param numpy.array signal: signal to be added</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">signal</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">signal_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return list: all signal names which are known in a list&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_writer</span><span class="o">.</span><span class="n">signal_names</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

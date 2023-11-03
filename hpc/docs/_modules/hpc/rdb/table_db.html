@@ -1,0 +1,310 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb.table_db</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.rdb.table_db</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">table_db.py</span>
+<span class="sd">-----------</span>
+
+<span class="sd">    providing table dictionary for being able to copy / sync a whole table keeping auto-increment keys intact</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sqlite3</span> <span class="kn">import</span> <span class="n">Binary</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>  <span class="c1"># pylint: disable=E0401</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">StringIO</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+
+<span class="c1"># - HPC imports --------------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">hpc.rdb.base</span> <span class="kn">import</span> <span class="n">BaseDB</span><span class="p">,</span> <span class="n">BaseDbException</span>
+<span class="kn">from</span> <span class="nn">hpc.core.md5</span> <span class="kn">import</span> <span class="n">create_from_string</span>
+
+
+<span class="c1"># - classes / functions ------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="TableDict"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.TableDict">[docs]</a><span class="k">class</span> <span class="nc">TableDict</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    I&#39;m a dict, holding primary keys from source table and on missing keys, new entries are copied</span>
+<span class="sd">    to destination and it&#39;s primary key is saved and returned</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TableDict.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.TableDict.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src_db</span><span class="p">,</span> <span class="n">dst_db</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create new instance</span>
+
+<span class="sd">        :param BaseDB src_db: source database connection</span>
+<span class="sd">        :param BaseDB dst_db: destination database connection</span>
+<span class="sd">        :param str table: table which this dict refers to</span>
+<span class="sd">        :param \**dict kwargs: lookup dictionaries from other DbDict&#39;s which are used to replace values from source.</span>
+<span class="sd">                               keys are column names and it&#39;s values are lookup dictionaries</span>
+<span class="sd">        :keyword kwargs:</span>
+<span class="sd">            * *dontcare* ``list`` -- do not take care about given column details, if they do not match exactly,</span>
+<span class="sd">                                     this is needed as some Oracle tables are not designed well</span>
+<span class="sd">            * *recurse*  -- TODO: fill out what&#39;s this</span>
+<span class="sd">            * *defaults* ``dict`` -- explicit default values for different columns</span>
+<span class="sd">            * *pkey* ``str`` -- primary key of table if not defined in db</span>
+<span class="sd">            * *lob* ``memoryfile`` -- list of bytes as stored in db fields</span>
+<span class="sd">        :raises BaseDbException: no primary key defined and no found</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">dict</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_table</span> <span class="o">=</span> <span class="n">table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dontcare</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dontcare&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="s2">&quot;recurse&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;recurse&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_defaults</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;defaults&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lookup</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">src_db</span><span class="o">.</span><span class="n">columns</span><span class="p">(</span><span class="n">table</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="s2">&quot;pkey&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;pkey&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span> <span class="o">=</span> <span class="n">src_db</span><span class="o">.</span><span class="n">primary_key</span><span class="p">(</span><span class="n">table</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">BaseDbException</span><span class="p">(</span><span class="s2">&quot;primary key not found&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># self._pkey = None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># self._pkey = self._pkey[0]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span> <span class="o">=</span> <span class="n">src_db</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2"> FROM </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lobs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;lob&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_src</span> <span class="o">=</span> <span class="n">src_db</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span> <span class="o">=</span> <span class="n">dst_db</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;my name&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> dict: </span><span class="si">%s</span><span class="s2">; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">))</span>
+
+<div class="viewcode-block" id="TableDict.keys"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.TableDict.keys">[docs]</a>    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;keys we have&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span></div>
+
+    <span class="k">def</span> <span class="fm">__missing__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        copy data from source table to destination</span>
+
+<span class="sd">        :param ``int`` item: primary key value</span>
+<span class="sd">        :returns: number of entries added to db</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        :raises AttributeError: error if no primary key is defined</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;no primary key existing, use copy()!&quot;</span><span class="p">)</span>
+
+        <span class="n">vals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_src</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2"> FROM </span><span class="si">%s</span><span class="s2"> WHERE </span><span class="si">%s</span><span class="s2"> = :pkey&quot;</span>
+                              <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">),</span> <span class="n">pkey</span><span class="o">=</span><span class="n">item</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lookup</span><span class="p">):</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="n">vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="p">[</span><span class="n">vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]]</span>
+            <span class="k">elif</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_defaults</span><span class="p">:</span>
+                <span class="n">vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_defaults</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+
+        <span class="n">updates</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="n">vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dontcare</span><span class="p">}</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">updates</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lobs</span><span class="p">:</span>
+                    <span class="n">updates</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conv_lob</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+
+            <span class="n">nkey</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="p">(</span><span class="s2">&quot;INSERT INTO </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) VALUES(</span><span class="si">%s</span><span class="s2">) RETURNING </span><span class="si">%s</span><span class="s2">&quot;</span>
+                             <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">updates</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+                                <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;:A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">updates</span><span class="p">))]),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">),</span>
+                             <span class="o">**</span><span class="p">{</span><span class="s2">&quot;A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">updates</span><span class="o">.</span><span class="n">values</span><span class="p">())})</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_iex</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">lobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">updates</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lobs</span><span class="p">]</span>
+                <span class="n">nkey</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2"> FROM </span><span class="si">%s</span><span class="s2"> WHERE </span><span class="si">%s</span><span class="s2">&quot;</span>
+                                 <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span>
+                                    <span class="s2">&quot; AND &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;IS NULL&quot;</span> <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;= :A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)))</span>
+                                                  <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">updates</span><span class="o">.</span><span class="n">items</span><span class="p">())</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lobs</span><span class="p">])),</span>
+                                 <span class="o">**</span><span class="p">{</span><span class="s2">&quot;A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">:</span> <span class="n">x</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">updates</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+                                    <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lobs</span> <span class="ow">and</span> <span class="n">x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">})[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_sex</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;cannot copy entry: [</span><span class="si">%s</span><span class="s2">] from table </span><span class="si">%s</span><span class="s2">&quot;</span>
+                                     <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">]),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="p">[</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="n">nkey</span>
+        <span class="k">return</span> <span class="n">nkey</span>
+
+<div class="viewcode-block" id="TableDict.value"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.TableDict.value">[docs]</a>    <span class="k">def</span> <span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">col</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get a specific item from column by key</span>
+
+<span class="sd">        :param ``str`` key: filter value for selection</span>
+<span class="sd">        :param ``str`` col: column to filter on</span>
+<span class="sd">        :returns: items found in table</span>
+<span class="sd">        :rtype: list of lists</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2"> FROM </span><span class="si">%s</span><span class="s2"> WHERE </span><span class="si">%s</span><span class="s2"> = :val&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span><span class="p">),</span> <span class="n">val</span><span class="o">=</span><span class="n">key</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="TableDict.sync"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.TableDict.sync">[docs]</a>    <span class="k">def</span> <span class="nf">sync</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">casesens</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">where</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        copy data from a non-indexed table such as a mapping table to destination.</span>
+<span class="sd">        I was too lazy to get into deepcopy, which might be interesting here...</span>
+
+<span class="sd">        :param ``boolean`` casesens: take care of case sensitivity of column names</span>
+<span class="sd">        :param ``str`` where: additional where clause</span>
+<span class="sd">        :return: number of copied rows</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s1">&#39;&quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">]</span> <span class="k">if</span> <span class="n">casesens</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">)</span>
+        <span class="n">lobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lobs</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src</span><span class="o">.</span><span class="n">executex</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">{}</span><span class="s2"> FROM </span><span class="si">{}{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span>
+                                                                 <span class="s2">&quot; WHERE </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">where</span><span class="p">)</span> <span class="k">if</span> <span class="n">where</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)):</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">lobs</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">vals</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">lobs</span><span class="p">:</span>
+                        <span class="n">vals</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conv_lob</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lookup</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                    <span class="n">vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="p">[</span><span class="n">vals</span><span class="p">[</span><span class="n">idx</span><span class="p">]]</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cnt</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="p">(</span><span class="s2">&quot;INSERT INTO </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) VALUES(</span><span class="si">%s</span><span class="s2">)&quot;</span>
+                                 <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cols</span><span class="p">),</span>
+                                    <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;:A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">))])),</span>
+                                 <span class="o">**</span><span class="p">{</span><span class="s2">&quot;A</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">k</span><span class="p">:</span> <span class="n">l</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">vals</span><span class="p">)})</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+                <span class="k">pass</span>  <span class="c1"># seems record is already</span>
+
+        <span class="k">return</span> <span class="n">cnt</span></div>
+
+    <span class="k">def</span> <span class="nf">_conv_lob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lob</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        convert lob 4 destination</span>
+
+<span class="sd">        :param ``memoryview`` lob: list of bytes as stored in source db</span>
+<span class="sd">        :return: bytes to be copied</span>
+<span class="sd">        :rtype: memoryview</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">lob</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Binary</span><span class="p">(</span><span class="n">lob</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+        <span class="n">blob</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="o">.</span><span class="n">mkvar</span><span class="p">(</span><span class="s1">&#39;blob&#39;</span><span class="p">)</span>
+        <span class="n">blob</span><span class="o">.</span><span class="n">setvalue</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">lob</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">blob</span></div>
+
+
+<div class="viewcode-block" id="FixDict"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.FixDict">[docs]</a><span class="k">class</span> <span class="nc">FixDict</span><span class="p">(</span><span class="n">TableDict</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;specific TableDict for DMT_FILES / CAT_DMT_FILES which is taking care of both&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="FixDict.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.FixDict.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create new table dict</span>
+
+<span class="sd">        :param \*tuple args: arguments forwarded to hpc.rdb.table_db.TableDict</span>
+<span class="sd">        :param \**dict kwargs: additonal arguments forwarded to hpc.rdb.table_db.TableDict</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">TableDict</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__missing__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        copy data from source table to destination</span>
+
+<span class="sd">        :param ``int`` item: id to search for</span>
+<span class="sd">        :return: item</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        :raises AttributeError: error if no primary key was defined during initialization</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pkey</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;no primary key existing, use copy()!&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">item</span></div>
+
+
+<div class="viewcode-block" id="CfgDict"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.table_db.CfgDict">[docs]</a><span class="k">class</span> <span class="nc">CfgDict</span><span class="p">(</span><span class="n">TableDict</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;interim solution to be able to merge back old sqlites without bin&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__missing__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add item if it&#39;s not in db</span>
+
+<span class="sd">        :param ``int`` item: value to check</span>
+<span class="sd">        :return: id of added item</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cfg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_src</span><span class="p">(</span><span class="s2">&quot;SELECT CFG FROM HPC_SIMCFG WHERE CFGID = :cid&quot;</span><span class="p">,</span> <span class="n">cid</span><span class="o">=</span><span class="n">item</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">cfghsh</span> <span class="o">=</span> <span class="n">create_from_string</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+
+        <span class="n">nkey</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="p">(</span><span class="s2">&quot;SELECT CFGID FROM HPC_SIMCFG WHERE CFGHASH = :chsh OR &quot;</span>
+                         <span class="s2">&quot;(CFGHASH IS NULL AND CFG=:cfg)&quot;</span><span class="p">,</span> <span class="n">chsh</span><span class="o">=</span><span class="n">cfghsh</span><span class="p">,</span> <span class="n">cfg</span><span class="o">=</span><span class="n">cfg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">nkey</span><span class="p">:</span>
+            <span class="n">nkey</span> <span class="o">=</span> <span class="n">nkey</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nkey</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_SIMCFG (CFGHASH, CFGBIN) VALUES(:chsh, :cbin) RETURNING CFGID&quot;</span><span class="p">,</span>
+                             <span class="n">chsh</span><span class="o">=</span><span class="n">cfghsh</span><span class="p">,</span> <span class="n">cbin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_dst</span><span class="o">.</span><span class="n">stream2blob</span><span class="p">(</span><span class="n">StringIO</span><span class="p">(</span><span class="n">cfg</span><span class="p">),</span> <span class="kc">False</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="p">[</span><span class="n">item</span><span class="p">]</span> <span class="o">=</span> <span class="n">nkey</span>
+        <span class="k">return</span> <span class="n">nkey</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

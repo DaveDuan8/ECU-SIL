@@ -1,0 +1,150 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.registry</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.registry</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">registry.py</span>
+<span class="sd">-----------</span>
+
+<span class="sd">windows registry wrapper to make our live easier</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=W0611</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">platform</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">count</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+
+<span class="n">MSWIN</span> <span class="o">=</span> <span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span>
+<span class="k">if</span> <span class="n">MSWIN</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">winreg</span> <span class="kn">import</span> <span class="n">OpenKey</span><span class="p">,</span> <span class="n">CloseKey</span><span class="p">,</span> <span class="n">QueryValueEx</span><span class="p">,</span> <span class="n">EnumValue</span><span class="p">,</span> <span class="n">EnumKey</span><span class="p">,</span> <span class="n">KEY_READ</span><span class="p">,</span> <span class="n">KEY_ALL_ACCESS</span><span class="p">,</span> \
+        <span class="n">HKEY_LOCAL_MACHINE</span><span class="p">,</span> <span class="n">HKEY_CLASSES_ROOT</span><span class="p">,</span> <span class="n">HKEY_CURRENT_USER</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">KEY_READ</span> <span class="o">=</span> <span class="n">HKEY_CLASSES_ROOT</span> <span class="o">=</span> <span class="n">HKEY_LOCAL_MACHINE</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="n">RegKeyNotFoundError</span> <span class="o">=</span> <span class="ne">WindowsError</span> <span class="k">if</span> <span class="n">PY2</span> <span class="k">else</span> <span class="ne">FileNotFoundError</span>
+
+
+<span class="c1"># - functions / classes ------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="WinReg"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.registry.WinReg">[docs]</a><span class="k">class</span> <span class="nc">WinReg</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;windows registry wrapper&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="WinReg.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.registry.WinReg.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">subkey</span><span class="p">,</span> <span class="n">access</span><span class="o">=</span><span class="n">KEY_READ</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        copy src to dst with some arguments</span>
+
+<span class="sd">        :param str key: registry base key</span>
+<span class="sd">        :param str subkey: key to open</span>
+<span class="sd">        :param int access: access permission</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_key</span> <span class="o">=</span> <span class="n">OpenKey</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">subkey</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">access</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_key</span> <span class="o">=</span> <span class="n">OpenKey</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">subkey</span><span class="p">,</span> <span class="n">access</span><span class="o">=</span><span class="n">access</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_items</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;support with statement&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close the key&quot;&quot;&quot;</span>
+        <span class="n">CloseKey</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">)</span>
+
+<div class="viewcode-block" id="WinReg.get"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.registry.WinReg.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;get the key value&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">QueryValueEx</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">,</span> <span class="n">item</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="n">RegKeyNotFoundError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default</span></div>
+
+<div class="viewcode-block" id="WinReg.items"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.registry.WinReg.items">[docs]</a>    <span class="k">def</span> <span class="nf">items</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        iterate over my items, except internals</span>
+
+<span class="sd">        :return: list of key/values</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_items</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_items</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_items</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">count</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">EnumValue</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">,</span> <span class="n">i</span><span class="p">)[:</span><span class="mi">2</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_items</span></div>
+
+    <span class="n">iteritems</span> <span class="o">=</span> <span class="n">items</span>
+
+<div class="viewcode-block" id="WinReg.keys"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.registry.WinReg.keys">[docs]</a>    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        iterate over my (sub-)keys, except internals</span>
+
+<span class="sd">        :return: list of key/values</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">count</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">EnumKey</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_keys</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

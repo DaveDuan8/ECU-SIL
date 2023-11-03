@@ -1,0 +1,464 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.dicts</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.dicts</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">dicts.py</span>
+<span class="sd">--------</span>
+
+<span class="sd">core module holding specific dictionaries for Job environment settings and a default dict specific</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">version_info</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">unlink</span><span class="p">,</span> <span class="n">environ</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">exists</span>
+<span class="kn">from</span> <span class="nn">simplejson</span> <span class="kn">import</span> <span class="n">dump</span><span class="p">,</span> <span class="n">load</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span><span class="p">,</span> <span class="n">PY2</span>
+
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">StringTypes</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,)</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.md5</span> <span class="kn">import</span> <span class="n">create_from_string</span>
+<span class="kn">from</span> <span class="nn">..version</span> <span class="kn">import</span> <span class="n">VERSION</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">WRAP_EXE</span><span class="p">,</span> <span class="n">BSIG_CHK</span><span class="p">,</span> <span class="n">CNCL_CMD</span><span class="p">,</span> <span class="n">USR_EXMAP</span> <span class="o">=</span> <span class="s2">&quot;wrapexe&quot;</span><span class="p">,</span> <span class="s2">&quot;bsig_check&quot;</span><span class="p">,</span> <span class="s2">&quot;cncl_cmd&quot;</span><span class="p">,</span> <span class="s2">&quot;exit_map&quot;</span>
+<span class="n">NOTIFY_START</span><span class="p">,</span> <span class="n">NOTIFY_STOP</span> <span class="o">=</span> <span class="s2">&quot;notify_on_start&quot;</span><span class="p">,</span> <span class="s2">&quot;notify_on_completion&quot;</span>
+<span class="n">TOUT_DIR</span><span class="p">,</span> <span class="n">TLOG_DIR</span> <span class="o">=</span> <span class="s2">&quot;out_dir&quot;</span><span class="p">,</span> <span class="s2">&quot;log_dir&quot;</span>
+
+<span class="n">TASK_DEFAULTS</span> <span class="o">=</span> <span class="p">{</span><span class="n">NOTIFY_START</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="n">NOTIFY_STOP</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="n">WRAP_EXE</span><span class="p">:</span> <span class="p">[],</span> <span class="n">TOUT_DIR</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="n">TLOG_DIR</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">BSIG_CHK</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="n">CNCL_CMD</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="n">USR_EXMAP</span><span class="p">:</span> <span class="p">{}}</span>
+
+
+<span class="c1"># - classes / functions ------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="JobDict"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict">[docs]</a><span class="k">class</span> <span class="nc">JobDict</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;interfacing local HPC sqlite DB&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="JobDict.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init essentials</span>
+
+<span class="sd">        :param kwargs: optional arguments</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_task</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sub_idx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_lst</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fname</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fp&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;mode&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">==</span> <span class="s1">&#39;r&#39;</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fname</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                <span class="n">json</span> <span class="o">=</span> <span class="n">load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="n">json</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">]</span>  <span class="c1"># job dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cfg</span> <span class="o">=</span> <span class="n">json</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">]</span>  <span class="c1"># config dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span> <span class="o">=</span> <span class="n">json</span><span class="p">[</span><span class="s2">&quot;tsk&quot;</span><span class="p">]</span>  <span class="c1"># task dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span> <span class="o">=</span> <span class="n">json</span><span class="p">[</span><span class="s2">&quot;stk&quot;</span><span class="p">]</span>  <span class="c1"># sub task dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wrp&quot;</span><span class="p">)</span>  <span class="c1"># wrap dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pri</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;prios&quot;</span><span class="p">)</span>  <span class="c1"># priority dict</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">v</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]]</span>
+
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">v</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">=</span> <span class="s1">&#39;w&#39;</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;masterid&quot;</span><span class="p">:</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MASTERID&quot;</span><span class="p">),</span> <span class="s2">&quot;orig_loc&quot;</span><span class="p">:</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ORIG_LOC&quot;</span><span class="p">)})</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cfg</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># config dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># task dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># sub task dict</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sth</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># sub task hashed lookup</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># wrapper&#39;s list</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pri</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># priority dict</span></div>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: number of tasks we have</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">subtask_len</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: length of subtasks</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;with JobEnv(...) as job&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close db at least&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>  <span class="c1"># an exception never happens :), well, maybe when testing intended</span>
+            <span class="k">return</span>
+
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fname</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">==</span> <span class="s1">&#39;w&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">fname</span><span class="p">):</span>
+                <span class="n">unlink</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                <span class="n">dump</span><span class="p">({</span><span class="s2">&quot;job&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">,</span> <span class="s2">&quot;cfg&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cfg</span><span class="p">,</span> <span class="s2">&quot;tsk&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">,</span> <span class="s2">&quot;stk&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="p">,</span> <span class="s2">&quot;wrp&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="p">,</span>
+                      <span class="s2">&quot;ver&quot;</span><span class="p">:</span> <span class="n">VERSION</span><span class="p">,</span> <span class="s2">&quot;prios&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pri</span><span class="p">},</span> <span class="n">fp</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">close</span> <span class="o">=</span> <span class="fm">__exit__</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        support a call, so that we could set the task and iterate, e.g.</span>
+
+<span class="sd">        with JobEnv(...) as job:</span>
+<span class="sd">            for item in job(1):  # iterate over all subtasks of taskid 1</span>
+<span class="sd">                print item.taskid, item.subtaskid</span>
+
+<span class="sd">            for item in job:  # iterate over all tasks and subtasks</span>
+<span class="sd">                print item.taskid, item.subtaskid</span>
+
+<span class="sd">        :param int task: set the task to iterate over</span>
+<span class="sd">        :return: self</span>
+<span class="sd">        :rtype: self</span>
+<span class="sd">        :raises IndexError: once task item is not found</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">task</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="nb">int</span><span class="p">(</span><span class="n">task</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_task</span> <span class="o">=</span> <span class="n">task</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;no such task: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">task</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;iterate over subtasks&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sub_idx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_lst</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_task</span><span class="p">][</span><span class="s1">&#39;stk&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+<div class="viewcode-block" id="JobDict.next"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.next">[docs]</a>    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: next subtask information</span>
+<span class="sd">        :rtype: dict</span>
+<span class="sd">        :raises StopIteration: once iteration is at its end</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sub_lst</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_task</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># reset when iteration finishes</span>
+            <span class="k">raise</span> <span class="ne">StopIteration</span>
+
+        <span class="n">subid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_lst</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_sub_idx</span><span class="p">]</span>
+        <span class="n">stk</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">subid</span><span class="p">)]</span>
+        <span class="n">space</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="n">subid</span><span class="o">=</span><span class="n">subid</span><span class="p">,</span> <span class="o">**</span><span class="n">stk</span><span class="p">)</span>
+        <span class="n">space</span><span class="o">.</span><span class="n">simcfg</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stk</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">])</span>  <span class="c1"># pylint: disable=W0201</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sub_idx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">space</span></div>
+
+    <span class="k">if</span> <span class="n">version_info</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="fm">__next__</span> <span class="o">=</span> <span class="nb">next</span>
+
+<div class="viewcode-block" id="JobDict.append"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a subtask</span>
+
+<span class="sd">        :keyword kwargs: details about the subtask</span>
+<span class="sd">        :return: index of subtask and re-usage flag</span>
+<span class="sd">        :rtype: tuple</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cfg</span><span class="p">,</span> <span class="n">hsh</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;simcfg&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">cfg</span><span class="p">:</span>
+            <span class="n">cfg</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+            <span class="n">hsh</span> <span class="o">=</span> <span class="n">create_from_string</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">cfg</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cfg</span><span class="p">[</span><span class="n">hsh</span><span class="p">]</span> <span class="o">=</span> <span class="n">cfg</span>
+        <span class="n">wrp</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">wrp</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_wrap</span><span class="p">(</span><span class="n">wrp</span><span class="p">)</span>
+
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hsh</span>
+        <span class="n">hsh</span> <span class="o">=</span> <span class="n">create_from_string</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">hsh</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sth</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sth</span><span class="p">[</span><span class="n">hsh</span><span class="p">],</span> <span class="kc">True</span>
+
+        <span class="n">stno</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stk</span><span class="p">[</span><span class="n">stno</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sth</span><span class="p">[</span><span class="n">hsh</span><span class="p">]</span> <span class="o">=</span> <span class="n">stno</span>
+
+        <span class="k">return</span> <span class="n">stno</span><span class="p">,</span> <span class="kc">False</span></div>
+
+<div class="viewcode-block" id="JobDict.add"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.add">[docs]</a>    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a task</span>
+
+<span class="sd">        :keyword kwargs: details about the task</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">taskno</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;taskno&quot;</span><span class="p">)</span>
+        <span class="n">wrp</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">wrp</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_wrap</span><span class="p">(</span><span class="n">wrp</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">[</span><span class="n">taskno</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span></div>
+
+    <span class="k">def</span> <span class="nf">_add_wrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrap</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;add a wrap item&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">wrap</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wrap</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_wrp</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+<div class="viewcode-block" id="JobDict.task"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.task">[docs]</a>    <span class="k">def</span> <span class="nf">task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;get task items&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">TASK_DEFAULTS</span><span class="p">:</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="n">TASK_DEFAULTS</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tsk</span><span class="p">[</span><span class="n">task</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;get job attribute&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">prios</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return priorities&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pri</span>
+
+    <span class="nd">@prios</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">prios</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set the prio dict&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pri</span> <span class="o">=</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="JobDict.job_rel"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.JobDict.job_rel">[docs]</a>    <span class="k">def</span> <span class="nf">job_rel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set job release command&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">[</span><span class="s2">&quot;job_rel_cmd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div></div>
+
+
+<div class="viewcode-block" id="DefDict"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.DefDict">[docs]</a><span class="k">class</span> <span class="nc">DefDict</span><span class="p">(</span><span class="nb">dict</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;I&#39;m a default space dict, but with my own getattr method.&quot;&quot;&quot;</span>
+
+    <span class="n">__defs__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;_default&#39;</span><span class="p">,</span> <span class="s1">&#39;_hasdflt&#39;</span><span class="p">,</span> <span class="s1">&#39;_nondef&#39;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="DefDict.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.DefDict.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init with any parameter</span>
+
+<span class="sd">        :param args: only default name is supported as first unnamed argument</span>
+<span class="sd">        :param kwargs: *default*: value if not specified, *nondef*: value returned not for those withing here</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_default&quot;</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_hasdflt&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;default&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_default&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;default&quot;</span><span class="p">))</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_hasdflt&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_default&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_hasdflt&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+        <span class="nb">dict</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_nondef&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;nondef&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="nb">dict</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">dict</span><span class="p">):</span>  <span class="c1"># args must be strings, but also allow e.g. int as keys</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="bp">self</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        my formated representation</span>
+
+<span class="sd">        :return: string representation</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">{}</span><span class="s2"> default: </span><span class="si">{}</span><span class="s2">, dict=</span><span class="si">{}</span><span class="s2">&gt;&quot;</span>\
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hasdflt</span> <span class="k">else</span> <span class="s2">&quot;(none)&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">items</span><span class="p">()]))</span>
+
+    <span class="fm">__repr__</span> <span class="o">=</span> <span class="fm">__str__</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get the value from item</span>
+
+<span class="sd">        :param object value: item to find</span>
+<span class="sd">        :return: value for item</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">value</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        set an inner attribute</span>
+
+<span class="sd">        :param object key: key</span>
+<span class="sd">        :param object value: value</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="fm">__missing__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        in case a key is missing, return default</span>
+
+<span class="sd">        :param object item: item to find inside _nondef</span>
+<span class="sd">        :return: default if in _default</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        :raises AttributeError: in case item is not in _nondef</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hasdflt</span> <span class="ow">and</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DefDict</span><span class="o">.</span><span class="n">__defs__</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default</span>
+
+        <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+<div class="viewcode-block" id="DefDict.get"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.DefDict.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;get an item&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span> <span class="ow">and</span> <span class="bp">self</span><span class="p">[</span><span class="n">item</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="n">item</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="DefDict.items"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.DefDict.items">[docs]</a>    <span class="k">def</span> <span class="nf">items</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        iterate over my items, except internals</span>
+
+<span class="sd">        :return: iterator</span>
+<span class="sd">        :rtype: iterator</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">i</span><span class="p">,</span> <span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">]</span></div>
+
+    <span class="n">iteritems</span> <span class="o">=</span> <span class="n">items</span>
+
+<div class="viewcode-block" id="DefDict.keys"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.DefDict.keys">[docs]</a>    <span class="k">def</span> <span class="nf">keys</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        implement keys not to return</span>
+
+<span class="sd">        :return: keys</span>
+<span class="sd">        :rtype: dict_keys</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">dict</span><span class="o">.</span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DefDict</span><span class="o">.</span><span class="n">__defs__</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">i</span></div>
+
+    <span class="fm">__iter__</span> <span class="o">=</span> <span class="n">keys</span></div>
+
+
+<div class="viewcode-block" id="toint"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.toint">[docs]</a><span class="k">def</span> <span class="nf">toint</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    convert text to int, take only starting numbers</span>
+
+<span class="sd">    :param str text: input text</span>
+<span class="sd">    :return: int from text</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">number</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="o">==</span> <span class="s2">&quot;min&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="o">==</span> <span class="s2">&quot;max&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="n">mul</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">]:</span>
+                <span class="n">mul</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;-&#39;</span> <span class="k">else</span> <span class="mi">1</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="n">number</span> <span class="o">=</span> <span class="n">v</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="n">number</span> <span class="o">+</span> <span class="n">v</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">number</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="n">mul</span> <span class="o">*</span> <span class="n">number</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="tointlist"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.dicts.tointlist">[docs]</a><span class="k">def</span> <span class="nf">tointlist</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    flatten inter array</span>
+
+<span class="sd">    :param list x: e.g. [min..-10,0,5,10..max]</span>
+<span class="sd">    :return: integer values from</span>
+<span class="sd">    :rtype: list[int] | iterable</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;,&#39;</span> <span class="ow">in</span> <span class="n">x</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">toint</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="s2">&quot;..&quot;</span> <span class="ow">in</span> <span class="n">x</span><span class="p">:</span>
+            <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;..&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">xrange</span><span class="p">(</span><span class="n">toint</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">toint</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># pylint: disable=E0602</span>
+            <span class="k">return</span> <span class="nb">range</span><span class="p">(</span><span class="n">toint</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="n">toint</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">toint</span><span class="p">(</span><span class="n">x</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="s2">&quot;__iter__&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">toint</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">x</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">x</span></div>
+
+
+<span class="c1"># def memoize(func):</span>
+<span class="c1">#     &quot;&quot;&quot;memorize a functions output from input =&gt; https://www.python-course.eu/python3_memoization.php&quot;&quot;&quot;</span>
+<span class="c1">#     memo = {}</span>
+<span class="c1">#</span>
+<span class="c1">#     def helper(x):</span>
+<span class="c1">#         &quot;&quot;&quot;help&quot;&quot;&quot;</span>
+<span class="c1">#         if x not in memo:</span>
+<span class="c1">#             memo[x] = func(x)</span>
+<span class="c1">#         return memo[x]</span>
+<span class="c1">#     return helper</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

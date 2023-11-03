@@ -1,0 +1,328 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.submit_ww</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.submit_ww</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">submit_ww.py</span>
+<span class="sd">-------------</span>
+
+<span class="sd">function(s) to submit jobs to HPC clusters to different sites</span>
+
+<span class="sd">the submit_ww is used to submit a master job that is delivered to different sites depending on the storage location</span>
+<span class="sd">of the recordings to run. Parameters for this script are:</span>
+
+<span class="sd">    - git repo url of submit folder, use git@github-am.geo.conti.de:...</span>
+<span class="sd">    - collection name (no bpl) of rec files</span>
+<span class="sd">    - Python version to execute (Python36 or Python27_64)</span>
+<span class="sd">    - email address to sent job info to (optional, default: user account of submitter)</span>
+
+<span class="sd">The folder to submit must be stored in an own git repository open for Jenkins account to read.</span>
+<span class="sd">Jenkins user has stored ssh keys on the servers, so best use git@github-am:... when passing the url.</span>
+<span class="sd">The structure is similar to the normally created HPC input folder 1_Input and must contain:</span>
+
+<span class="sd">  - hpc folder (best: git repo ADAS/HPC_two linked as sub package)</span>
+<span class="sd">  - mts folder  (normally a simulation is executed, can be left out)</span>
+<span class="sd">  - mts_measurement folder</span>
+<span class="sd">  - applications to execute in the job&#39;s task(s), can be stored in an own folder</span>
+
+<span class="sd">(find an example at git@github-am.geo.conti.de:uidv8815/hpc_submit_example)</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># first tests with params:</span>
+<span class="c1"># git@github-am.geo.conti.de:uidv8815/HPC_submit_example.git -c HPC_ww_submit_test -p submit\submit_example.py</span>
+<span class="c1"># -v Python36</span>
+
+<span class="c1"># - Python imports ----------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">exit</span> <span class="k">as</span> <span class="n">sysexit</span><span class="p">,</span> <span class="n">platform</span><span class="p">,</span> <span class="n">path</span> <span class="k">as</span> <span class="n">syspath</span><span class="p">,</span> <span class="n">argv</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">abspath</span><span class="p">,</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">getenv</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">match</span><span class="p">,</span> <span class="n">IGNORECASE</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="kn">import</span> <span class="n">ArgumentParser</span><span class="p">,</span> <span class="n">RawDescriptionHelpFormatter</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="k">if</span> <span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">win32com.client</span> <span class="kn">import</span> <span class="n">GetObject</span><span class="p">,</span> <span class="n">Dispatch</span>
+
+<span class="c1"># - HPC imports --------------------------------------------------------------------------------------------------------</span>
+<span class="n">HPC_FOLDER</span> <span class="o">=</span> <span class="n">abspath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;..&quot;</span><span class="p">))</span>
+<span class="k">if</span> <span class="n">HPC_FOLDER</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">syspath</span><span class="p">:</span>
+    <span class="n">syspath</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">HPC_FOLDER</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">hpc.core</span> <span class="kn">import</span> <span class="n">UID_NAME</span>
+<span class="kn">from</span> <span class="nn">hpc.core.tds</span> <span class="kn">import</span> <span class="n">LOC_HEAD_MAP</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">WW_SUBMIT_SRV_MAP</span><span class="p">,</span> <span class="n">PRODUCTION_HEADS</span>
+<span class="kn">from</span> <span class="nn">hpc.rdb.base</span> <span class="kn">import</span> <span class="n">BaseDB</span><span class="p">,</span> <span class="n">BaseDbException</span>
+<span class="kn">from</span> <span class="nn">hpc.core.tds</span> <span class="kn">import</span> <span class="n">LOCATION</span>
+<span class="kn">from</span> <span class="nn">hpc.bpl.base</span> <span class="kn">import</span> <span class="n">Bpl</span>
+
+<span class="n">JENKINS_URL</span> <span class="o">=</span> <span class="s2">&quot;https://lu00209vma.cw01.contiwan.com:8443&quot;</span>
+<span class="n">SUBMIT_TOKEN</span> <span class="o">=</span> <span class="s1">&#39;HPC_SUBMIT_TEST&#39;</span>
+<span class="n">PROJECT_NAME</span> <span class="o">=</span> <span class="s1">&#39;HPC_submit&#39;</span>
+<span class="n">COLL_DB</span> <span class="o">=</span> <span class="s2">&quot;VGA_PWR&quot;</span>
+<span class="n">USER_ID</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="se">\\</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USERDOMAIN&quot;</span><span class="p">),</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USERNAME&quot;</span><span class="p">))</span>
+<span class="n">HTTP_RETURN_CODES</span> <span class="o">=</span> <span class="p">{</span><span class="mi">500</span><span class="p">:</span> <span class="s1">&#39;server does not respond - network problem or server down&#39;</span>
+                          <span class="s1">&#39; - or found an error in the parameters.</span><span class="se">\n</span><span class="s1">&#39;</span>
+                          <span class="s1">&#39;    Please check on the Jenkins server what parameters are allowed for HPC_submit job.&#39;</span><span class="p">,</span>
+                     <span class="mi">403</span><span class="p">:</span> <span class="s1">&#39;SERVER PROBLEM with authentication, please contact HPC development team&#39;</span><span class="p">,</span>
+                     <span class="mi">404</span><span class="p">:</span> <span class="s1">&#39;SERVER PROBLEM - Jenkins job not available, please contact HPC development team&#39;</span><span class="p">,</span>
+                     <span class="mi">405</span><span class="p">:</span> <span class="s2">&quot;SERVER PROBLEM - Jenkins job can&#39;t be executed, please contact HPC development team&quot;</span><span class="p">}</span>
+<span class="c1"># map share name to location name for production sites</span>
+<span class="n">HPC_STORAGE_HEADS</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">((</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">LOC_HEAD_MAP</span><span class="p">[</span><span class="n">l</span><span class="p">][</span><span class="mi">0</span><span class="p">]][</span><span class="mi">2</span><span class="p">],</span> <span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">LOC_HEAD_MAP</span>
+                         <span class="k">if</span> <span class="n">LOC_HEAD_MAP</span><span class="p">[</span><span class="n">l</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">PRODUCTION_HEADS</span><span class="p">)</span>
+
+<span class="n">PRODUCTION_SITES</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">loc</span> <span class="k">for</span> <span class="n">loc</span> <span class="ow">in</span> <span class="n">LOC_HEAD_MAP</span> <span class="k">if</span> <span class="n">LOC_HEAD_MAP</span><span class="p">[</span><span class="n">loc</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">PRODUCTION_HEADS</span><span class="p">])</span>
+
+
+<span class="c1"># - classes / functions -----------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="get_locations"><a class="viewcode-back" href="../../hpc.html#hpc.submit_ww.get_locations">[docs]</a><span class="k">def</span> <span class="nf">get_locations</span><span class="p">(</span><span class="n">bpl_name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    List all locations where rec files are stored.</span>
+
+<span class="sd">    Use bpl entries to get locations, only files on local file shares listed in.</span>
+
+<span class="sd">    :param str bpl_name: name for the collection as generated with TDSM or bpl path/filename</span>
+<span class="sd">    :return: short site names (&#39;LND&#39;, &#39;ABH&#39; etc.)</span>
+<span class="sd">    :rtype: list</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">locs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">bpl_name</span><span class="p">,</span> <span class="n">db</span><span class="o">=</span><span class="n">COLL_DB</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">PRODUCTION_SITES</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ent</span> <span class="ow">in</span> <span class="n">bpl</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">loc</span><span class="p">,</span> <span class="n">heads</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">LOC_HEAD_MAP</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">heads</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">PRODUCTION_HEADS</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">([</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)</span><span class="se">\\\\</span><span class="si">%s</span><span class="se">\\</span><span class="s2">.*&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ent</span><span class="p">),</span> <span class="n">IGNORECASE</span><span class="p">)</span>
+                                                         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">heads</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="mi">0</span><span class="p">]]):</span>
+                    <span class="n">locs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">loc</span><span class="p">)</span>
+                    <span class="k">break</span>
+    <span class="k">return</span> <span class="n">locs</span></div>
+
+
+<div class="viewcode-block" id="submit_ww"><a class="viewcode-back" href="../../hpc.html#hpc.submit_ww.submit_ww">[docs]</a><span class="k">def</span> <span class="nf">submit_ww</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">coll</span><span class="p">,</span> <span class="n">prog</span><span class="p">,</span> <span class="n">pyver</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    submit a master job</span>
+
+<span class="sd">    checking the passed collection for sites where the recordings are stored,</span>
+<span class="sd">    then sending the submit request to the Jenkins servers at these sites</span>
+
+<span class="sd">    mandatory parameters:</span>
+<span class="sd">    - repo: git repository to check out with sources for the HPC job</span>
+<span class="sd">    - coll: collection of rec files to process</span>
+<span class="sd">    - prog: HPC job submit script to define the tasks and programs to execute</span>
+<span class="sd">    - pyver: Python version to use</span>
+
+<span class="sd">    optional arguments:</span>
+<span class="sd">    - email to send submit status status to (default: user&#39;s address), complete mail addr., sep. with &#39;;&#39;</span>
+
+<span class="sd">    code::</span>
+
+<span class="sd">        repo = &quot;git@github-am.geo.conti.de:ADAS/my_submit_folders.git&quot;</span>
+<span class="sd">        coll = &quot;EBA_Swiss_tunnel_crashes&quot;</span>
+<span class="sd">        prog = &quot;path\\submit.py vers=&#39;2.3.31&#39;&quot;</span>
+<span class="sd">        pyver = &quot;Python36&quot;</span>
+
+<span class="sd">        res = submit_ww(repo, coll, path, prog, pyver)</span>
+
+
+<span class="sd">    :param str repo:  url of the git repo to check out</span>
+<span class="sd">    :param str coll:  collection name of rec files as stored in DB or path/name of bpl file</span>
+<span class="sd">    :param str prog:  path\program to call to submit the job on the sites</span>
+<span class="sd">    :param str pyver: Python version: Python36 or Python27_64</span>
+<span class="sd">    :param kwargs: additional keyword arguments</span>
+
+<span class="sd">    :keyword \*kwargs:</span>
+<span class="sd">        * *email*  (``str``): opt. emails to send submit info to (default: user), complete mail addr., sep. with &#39;;&#39;</span>
+<span class="sd">        * *location* (``str``): opt. hidden option for testing</span>
+
+<span class="sd">    :return: number of failed submits</span>
+<span class="sd">    :rtype: int</span>
+
+<span class="sd">    :raises AssertException: if no collection is passed</span>
+<span class="sd">    :raises BaseDbException: if wrong masterid is returned from BaseDb</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">err</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">email</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;email&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">email</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">nres</span> <span class="o">=</span> <span class="n">Dispatch</span><span class="p">(</span><span class="n">dispatch</span><span class="o">=</span><span class="s2">&quot;NameTranslate&quot;</span><span class="p">)</span>
+            <span class="n">nres</span><span class="o">.</span><span class="n">Set</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">UID_NAME</span><span class="p">)</span>
+            <span class="n">email</span> <span class="o">=</span> <span class="n">GetObject</span><span class="p">(</span><span class="s2">&quot;LDAP://&quot;</span> <span class="o">+</span> <span class="n">nres</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s2">&quot;mail&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">email</span> <span class="o">=</span> <span class="s2">&quot;@&quot;</span>
+
+    <span class="k">assert</span> <span class="n">coll</span><span class="p">,</span> <span class="s2">&quot;a collection or bpl must be given&quot;</span>
+
+    <span class="n">orig_loc</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;orig_loc&#39;</span><span class="p">)</span>
+    <span class="c1"># careful with changing list of sites for orig_loc:</span>
+    <span class="c1">#   if it doesn&#39;t match setting in Jenkins projects HPC_submit you might receive error 500 without further details</span>
+    <span class="k">if</span> <span class="n">orig_loc</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">orig_loc</span> <span class="o">=</span> <span class="n">LOCATION</span>
+    <span class="k">assert</span> <span class="n">orig_loc</span> <span class="ow">in</span> <span class="n">WW_SUBMIT_SRV_MAP</span><span class="p">,</span> \
+        <span class="s1">&#39;target location </span><span class="si">%s</span><span class="s1"> not available for WW Submits, &#39;</span> \
+        <span class="s1">&#39;either set valid location or start from a valid HPC site: </span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">orig_loc</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">WW_SUBMIT_SRV_MAP</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+    <span class="c1"># get locations where files of collections are stored</span>
+    <span class="c1"># option: set locations for testing only! (deactivate this option when ww submit is stable?)</span>
+    <span class="n">kwloc</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;location&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kwloc</span><span class="p">:</span>
+        <span class="n">locs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">kwloc</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># this should be the only usage in production!!!</span>
+        <span class="n">locs</span> <span class="o">=</span> <span class="n">get_locations</span><span class="p">(</span><span class="n">coll</span><span class="p">)</span>
+
+    <span class="c1"># test for correct locations, breaks if rec file from not supported site in collection</span>
+    <span class="c1"># we use list of all HPC locations even if one (like SHA currently) does not provide a submit server</span>
+    <span class="c1">#   so we can at least submit to the other sites. A not known site (e.g. from opt. -l) should cause an exception.</span>
+    <span class="k">assert</span> <span class="n">locs</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">LOC_HEAD_MAP</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;DEV&quot;</span><span class="p">])),</span> \
+        <span class="s2">&quot;illegal locations are used: &quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">locs</span><span class="p">)</span> <span class="o">+</span> \
+        <span class="s2">&quot;, allowed location names are: &quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">LOC_HEAD_MAP</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+    <span class="c1"># ok, we have valid locations extracted from the collection,</span>
+    <span class="c1"># now we can start to deliver submit builds to the different servers</span>
+    <span class="c1"># 1.) get a new, valid masterid using query &quot;select hpc_masterid_seq.nextval from dual&quot;</span>
+    <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="s1">&#39;HPC&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+        <span class="n">masterid</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT HPC_ADMIN.HPC_MASTERID_SEQ.nextval from dual&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">masterid</span> <span class="o">=</span> <span class="n">masterid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BaseDbException</span><span class="p">(</span><span class="s2">&quot;a unique master job id could not be requested from Oracle HPC DB&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;deploy submits for masterjob with MASTERID </span><span class="si">%s</span><span class="s2">:&quot;</span> <span class="o">%</span> <span class="n">masterid</span><span class="p">)</span>
+    <span class="c1"># 2.) trigger submit builds at the submit servers</span>
+    <span class="c1">#loop through agents</span>
+    <span class="k">for</span> <span class="n">agent_name</span> <span class="ow">in</span> <span class="n">locs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;start HPC submit in </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">agent_name</span><span class="p">)</span>
+        <span class="n">job_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">/job/</span><span class="si">{1}</span><span class="s2">/buildWithParameters&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">JENKINS_URL</span><span class="p">,</span> <span class="n">PROJECT_NAME</span><span class="p">)</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;token&#39;</span><span class="p">:</span> <span class="n">SUBMIT_TOKEN</span><span class="p">,</span>
+                  <span class="s1">&#39;GIT_REPO&#39;</span><span class="p">:</span> <span class="n">repo</span><span class="p">,</span>
+                  <span class="s1">&#39;COLLECTION&#39;</span><span class="p">:</span> <span class="n">coll</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+                  <span class="s1">&#39;PROGRAM_NAME&#39;</span><span class="p">:</span> <span class="n">prog</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+                  <span class="s1">&#39;PY_VERSION&#39;</span><span class="p">:</span> <span class="n">pyver</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+                  <span class="s1">&#39;EMAIL_TO&#39;</span><span class="p">:</span> <span class="n">email</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+                  <span class="s1">&#39;USERID&#39;</span><span class="p">:</span> <span class="n">USER_ID</span><span class="p">,</span>
+                  <span class="s1">&#39;ORIG_LOC&#39;</span><span class="p">:</span> <span class="n">orig_loc</span><span class="p">,</span>
+                  <span class="s1">&#39;MASTERID&#39;</span><span class="p">:</span> <span class="n">masterid</span><span class="p">,</span>
+                  <span class="s1">&#39;NODE&#39;</span> <span class="p">:</span> <span class="n">agent_name</span>
+                  <span class="p">}</span>
+
+        <span class="c1"># POST request to build on Jenkins (in example not all params used, defaults in Jenkins project):</span>
+        <span class="c1"># curl -vs http://uud9x2nw:8080/job/HPC_submit/buildWithParameters?token=HPC_SUBMIT_TEST</span>
+        <span class="c1"># \&amp;GIT_REPO=&quot;https://github-am.geo.conti.de/uidv8815/HPC_submit_example.git&quot;\&amp;START_PATH=&quot;submit&quot;</span>
+        <span class="c1"># \&amp;EMAIL_ADDRESS=&quot;uidv8815&quot;</span>
+        <span class="c1">#</span>
+        <span class="c1"># returns (also as json return):</span>
+        <span class="c1">#     &lt; HTTP/1.1 201 Created</span>
+        <span class="c1">#     &lt; Date: Tue, 09 Jun 2020 18:09:39 GMT</span>
+        <span class="c1">#     &lt; X-Content-Type-Options: nosniff</span>
+        <span class="c1">#     &lt; Location: http://uud9x2nw:8080/queue/item/25229/</span>
+        <span class="c1">#     &lt; Content-Length: 0</span>
+        <span class="c1">#     &lt; Server: Jetty(9.4.27.v20200227)</span>
+        <span class="c1">#</span>
+        <span class="c1"># to get the build number send GET request:</span>
+        <span class="c1">#     curl -v GET http://uud9x2nw:8080/queue/item/25229/api/json</span>
+        <span class="c1"># return includes an &#39;executable&#39; section if build is not queued anymore</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">req</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">job_url</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;content-type&#39;</span><span class="p">:</span> <span class="s1">&#39;application/json&#39;</span><span class="p">})</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Network/Windoze problem: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;201&quot;</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  Jenkins build is triggered and queued on </span><span class="si">{0}</span><span class="s2">/job/</span><span class="si">{1}</span><span class="s2">/ for cluster/agent </span><span class="si">{2}</span><span class="s2">&quot;</span>
+                  <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">JENKINS_URL</span><span class="p">,</span> <span class="n">PROJECT_NAME</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;NODE&#39;</span><span class="p">)))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  Failed to trigger the Jenkins build at </span><span class="si">{}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">  </span><span class="si">{}</span><span class="s2">&quot;</span>
+                  <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">job_url</span><span class="p">,</span>
+                          <span class="n">HTTP_RETURN_CODES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">status_code</span><span class="p">,</span> <span class="s2">&quot;server returned code </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">req</span><span class="o">.</span><span class="n">status_code</span><span class="p">))))</span>
+            <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="s2">&quot;HPC&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+                <span class="n">hpc</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_ADMIN.HPC_MASTERJOB (MASTERID, NODEID, STATUS) &quot;</span>
+                            <span class="s2">&quot;VALUES(:mid, (SELECT NODEID FROM HPC_NODE WHERE NODENAME = :loc), :stat)&quot;</span><span class="p">,</span>
+                            <span class="n">mid</span><span class="o">=</span><span class="n">masterid</span><span class="p">,</span> <span class="n">loc</span><span class="o">=</span><span class="n">agent_name</span><span class="p">,</span> <span class="n">stat</span><span class="o">=</span><span class="s2">&quot;failed to submit&quot;</span><span class="p">)</span>
+            <span class="n">err</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;all sites triggered, follow the execution on &#39;http://hpcportal.conti.de/masterjobs with id: </span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">masterid</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  in case of high load on one Jenkins server the master job table will be updated with some delay </span><span class="se">\n</span><span class="s2">&quot;</span>
+          <span class="s2">&quot;  until the submit could be executed there (just reload the page until all queued jobs appear).&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">err</span></div>
+
+
+<span class="c1"># - main --------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../hpc.html#hpc.submit_ww.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    just calling the operation and saving the result</span>
+
+<span class="sd">    :param dict args: arguments to parse and pass to submit_ww</span>
+<span class="sd">    :return: number of errors as returned by submit_ww</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">opts</span> <span class="o">=</span> <span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">,</span> <span class="n">formatter_class</span><span class="o">=</span><span class="n">RawDescriptionHelpFormatter</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="n">dest</span><span class="o">=</span><span class="s2">&quot;repo&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;url of git repository of submit folder, best use git@github-am...&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-c&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;coll&quot;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                      <span class="n">help</span><span class="o">=</span><span class="s2">&quot;collection as created with TDSM or path/name of bpl file&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-p&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;prog&quot;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;path</span><span class="se">\\</span><span class="s2">name of submit script rel. to 1_Input&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-v&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;pyver&quot;</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;version of used Python&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-e&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;email&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                      <span class="n">help</span><span class="o">=</span><span class="s2">&quot;email addresses for submit and execution info (one str, sep. by &#39;;&#39;)&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;orig_loc&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                      <span class="n">help</span><span class="o">=</span><span class="s2">&quot;origin HPC share site where to store the results (ABH, BLR, LND)&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-l&quot;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;location&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;locations for first tests (sep. by &#39; &#39;) &quot;</span>
+                                                                       <span class="s2">&quot;do not use in production (remove opt)&quot;</span><span class="p">)</span>
+    <span class="c1"># opts.add_argument(&quot;-&quot;)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">submit_ww</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;repo&#39;</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;coll&#39;</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;prog&#39;</span><span class="p">),</span> <span class="n">args</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;pyver&#39;</span><span class="p">),</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">sysexit</span><span class="p">(</span><span class="n">main</span><span class="p">(</span><span class="kc">None</span> <span class="k">if</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">else</span> <span class="p">[</span><span class="s1">&#39;-h&#39;</span><span class="p">]))</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

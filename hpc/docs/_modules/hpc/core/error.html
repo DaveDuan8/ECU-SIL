@@ -1,0 +1,277 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.error</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.error</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">error.py</span>
+<span class="sd">--------</span>
+
+<span class="sd">This module contains error handling class and defines for all HPC errors.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">_getframe</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">basename</span>
+
+<span class="c1"># - HPC error codes ----------------------------------------------------------------------------------------------------</span>
+<span class="c1"># they need to be aligned with DB entries: HPC_EXITCODES</span>
+<span class="n">ERR_OK</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">ERR_UNSPECIFIED</span> <span class="o">=</span> <span class="mi">1</span>
+
+<span class="c1"># - application specific error codes -----------------------------------------------------------------------------------</span>
+<span class="n">ERR_PYTHON_UNSPECIFIED_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="c1"># more custom error codes are 201 to 219</span>
+<span class="c1"># ERR_PSEUDO_SKIPON = 256</span>
+
+<span class="c1"># - HPC internal error codes</span>
+<span class="n">ERR_HPC_UNSPECIFIED_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">ERR_HPC_APPLICATION_NOT_LOCAL</span> <span class="o">=</span> <span class="mi">21</span>
+<span class="n">ERR_HPC_WRONG_ARG</span> <span class="o">=</span> <span class="mi">22</span>
+<span class="n">ERR_HPC_USER_CANCEL_TASK_DETECTED</span> <span class="o">=</span> <span class="mi">23</span>
+<span class="n">ERR_HPC_DATABASE</span> <span class="o">=</span> <span class="mi">24</span>
+<span class="n">ERR_HPC_PID_INVALID</span> <span class="o">=</span> <span class="mi">26</span>
+<span class="n">ERR_HPC_INTERNAL_ERROR</span> <span class="o">=</span> <span class="mi">27</span>
+<span class="n">ERR_HPC_CYCLIC_ADMIN_JOB_FAILED</span> <span class="o">=</span> <span class="mi">28</span>
+<span class="n">ERR_HPC_APPLICATION_NOT_FOUND</span> <span class="o">=</span> <span class="mi">29</span>
+<span class="n">ERR_HPC_SCRIPT_MALFUNCTION</span> <span class="o">=</span> <span class="mi">30</span>
+<span class="n">ERR_HPC_LOW_DISK_SPACE</span> <span class="o">=</span> <span class="mi">31</span>
+
+<span class="c1"># - application specific error codes -----------------------------------------------------------------------------------</span>
+<span class="n">ERR_APPLICATION_UNSPECIFIED_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">40</span>
+<span class="n">ERR_APPLICATION_CPU_IDLE</span> <span class="o">=</span> <span class="mi">41</span>
+<span class="n">ERR_APPLICATION_IO_IDLE</span> <span class="o">=</span> <span class="mi">42</span>
+<span class="n">ERR_APPLICATION_PRN_IDLE</span> <span class="o">=</span> <span class="mi">43</span>
+<span class="n">ERR_APPLICATION_TIMEOUT</span> <span class="o">=</span> <span class="mi">46</span>
+<span class="c1"># ERR_APPLICATION_IPV4_RETRANSMITRATE = 47</span>
+<span class="c1"># ERR_APPLICATION_IPV6_RETRANSMITRATE = 48</span>
+<span class="n">ERR_APPLICATION_HANG</span> <span class="o">=</span> <span class="mi">49</span>
+<span class="n">ERR_APPLICATION_WRAPPER</span> <span class="o">=</span> <span class="mi">50</span>
+<span class="n">ERR_APPLICATION_LOW_MEM</span> <span class="o">=</span> <span class="mi">51</span>
+<span class="n">ERR_APPLICATION_LOW_CPU</span> <span class="o">=</span> <span class="mi">52</span>
+<span class="n">ERR_APPLICATION_HIGH_MEM</span> <span class="o">=</span> <span class="mi">53</span>
+<span class="n">ERR_APPLICATION_FATAL</span> <span class="o">=</span> <span class="mi">54</span>
+
+<span class="c1"># - floating point exceptions ------------------------------------------------------------------------------------------</span>
+<span class="n">ERR_APP_FP_EXCEPTION_INVALID_OP</span> <span class="o">=</span> <span class="mi">60</span>
+<span class="n">ERR_APP_FP_EXCEPTION_DIVISION_BY_ZERO</span> <span class="o">=</span> <span class="mi">61</span>
+<span class="n">ERR_APP_FP_EXCEPTION_OVERFLOW</span> <span class="o">=</span> <span class="mi">62</span>
+<span class="n">ERR_APP_FP_EXCEPTION_UNDERFLOW</span> <span class="o">=</span> <span class="mi">63</span>
+<span class="n">ERR_APP_FP_EXCEPTION_INEXACT</span> <span class="o">=</span> <span class="mi">64</span>
+<span class="n">ERR_APP_FP_EXCEPTION_DENORMAL_OP</span> <span class="o">=</span> <span class="mi">65</span>
+<span class="n">ERR_APP_FP_EXCEPTION_STACK_CHECK</span> <span class="o">=</span> <span class="mi">66</span>
+
+<span class="c1"># - crash exceptions ---------------------------------------------------------------------------------------------------</span>
+<span class="n">ERR_APP_CRASH_ACCESS_VIOLATION</span> <span class="o">=</span> <span class="mi">70</span>
+<span class="n">ERR_APP_CRASH_INVALID_PARAMETER</span> <span class="o">=</span> <span class="mi">71</span>
+<span class="n">ERR_APP_CRASH_ARRAY_BOUNDS_EXCEEDED</span> <span class="o">=</span> <span class="mi">72</span>
+<span class="n">ERR_APP_CRASH_BREAKPOINT</span> <span class="o">=</span> <span class="mi">73</span>
+<span class="n">ERR_APP_CRASH_FLT_DIVIDE_BY_ZERO</span> <span class="o">=</span> <span class="mi">74</span>
+<span class="n">ERR_APP_CRASH_FLT_INVALID_OPERATION</span> <span class="o">=</span> <span class="mi">75</span>
+<span class="n">ERR_APP_CRASH_GUARD_PAGE</span> <span class="o">=</span> <span class="mi">76</span>
+<span class="n">ERR_APP_CRASH_ILLEGAL_INSTRUCTION</span> <span class="o">=</span> <span class="mi">77</span>
+<span class="n">ERR_APP_CRASH_INT_DIVIDE_BY_ZERO</span> <span class="o">=</span> <span class="mi">78</span>
+<span class="n">ERR_APP_CRASH_INT_OVERFLOW</span> <span class="o">=</span> <span class="mi">79</span>
+<span class="n">ERR_APP_CRASH_INVALID_HANDLE</span> <span class="o">=</span> <span class="mi">80</span>
+<span class="n">ERR_APP_CRASH_PRIV_INSTRUCTION</span> <span class="o">=</span> <span class="mi">81</span>
+<span class="n">ERR_APP_CRASH_SINGLE_STEP</span> <span class="o">=</span> <span class="mi">82</span>
+<span class="n">ERR_APP_CRASH_STACK_BUFFER_OVERRUN</span> <span class="o">=</span> <span class="mi">83</span>
+<span class="n">ERR_APP_CRASH_FATAL_APP_EXIT</span> <span class="o">=</span> <span class="mi">84</span>
+<span class="n">ERR_APP_CRASH_THREAD_ACTIVATION_CONTEXT</span> <span class="o">=</span> <span class="mi">85</span>
+
+<span class="c1"># 350 - 399 error codes are for log errors</span>
+<span class="n">ERR_APP_EXC_NEAR_SCAN_PEAK_ERROR</span> <span class="o">=</span> <span class="mi">90</span>
+<span class="n">ERR_APP_EXC_FAR_SCAN_PEAK_ERROR</span> <span class="o">=</span> <span class="mi">91</span>
+<span class="n">ERR_APP_EXC_PEAK_ERROR_AT_POSITION</span> <span class="o">=</span> <span class="mi">92</span>
+<span class="n">ERR_APP_EXC_ACCESS_VIOLATION</span> <span class="o">=</span> <span class="mi">93</span>
+<span class="n">ERR_APP_EXC_INCONSISTENT_DATA_STRUCTURE</span> <span class="o">=</span> <span class="mi">94</span>
+<span class="n">ERR_APP_EXC_CONFIG_OF_MO_MISSING</span> <span class="o">=</span> <span class="mi">95</span>
+<span class="n">ERR_APP_EXC_MO_CODE_ERROR</span> <span class="o">=</span> <span class="mi">96</span>
+<span class="n">ERR_APP_EXC_BMW_RADOME_CORRECTION</span> <span class="o">=</span> <span class="mi">97</span>
+<span class="n">ERR_APP_EXC_UNKNOWN_EXCEPTION</span> <span class="o">=</span> <span class="mi">98</span>
+<span class="n">ERR_APP_EXC_UNHANDLED_EXCEPTION</span> <span class="o">=</span> <span class="mi">99</span>
+
+<span class="c1"># this indicates an exception that was NOT covered with the previous ones and is completely new</span>
+<span class="n">ERR_APP_EXC_UNKNOWN</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="n">ERR_APP_ERR_NETWORK_UNAVAILABLE</span> <span class="o">=</span> <span class="mi">110</span>
+<span class="n">ERR_APP_ERR_RECORDING_CORRUPT</span> <span class="o">=</span> <span class="mi">111</span>
+<span class="n">ERR_APP_BSIG_CORRUPT</span> <span class="o">=</span> <span class="mi">112</span>
+<span class="n">ERR_APP_BSIG_DURATION_DIFFERS</span> <span class="o">=</span> <span class="mi">113</span>
+<span class="n">ERR_APP_BSIG_TIME_JUMPS</span> <span class="o">=</span> <span class="mi">114</span>
+<span class="n">ERR_APP_BSIG_MISSING</span> <span class="o">=</span> <span class="mi">115</span>
+
+<span class="c1"># - MTS application specific error codes -------------------------------------------------------------------------------</span>
+<span class="n">ERR_MTS_UNSPECIFIED_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">120</span>
+<span class="n">ERR_MTS_CRASH_DUMP_FOUND</span> <span class="o">=</span> <span class="mi">121</span>
+<span class="n">ERR_MTS_CORRUPT_XLOG_FOUND</span> <span class="o">=</span> <span class="mi">122</span>
+<span class="n">ERR_MTS_BLOCKED_TERMINATED_CACHING_THREAD_FOUND</span> <span class="o">=</span> <span class="mi">123</span>
+<span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span> <span class="o">=</span> <span class="mi">124</span>
+<span class="n">ERR_MTS_UNKNOWN_ERROR</span> <span class="o">=</span> <span class="mi">125</span>
+<span class="n">ERR_MTS_LOG_EXCEPTION_FOUND</span> <span class="o">=</span> <span class="mi">126</span>
+<span class="n">ERR_MTS_LOG_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">127</span>
+<span class="n">ERR_MTS_LOG_ALERT_FOUND</span> <span class="o">=</span> <span class="mi">128</span>
+<span class="n">ERR_MTS_LOG_WARNING_FOUND</span> <span class="o">=</span> <span class="mi">129</span>
+<span class="n">ERR_MTS_LOG_INFO_FOUND</span> <span class="o">=</span> <span class="mi">130</span>
+<span class="n">ERR_MTS_LOG_DEBUG_FOUND</span> <span class="o">=</span> <span class="mi">131</span>
+<span class="n">ERR_MTS_CORRUPT_CRASH_FOUND</span> <span class="o">=</span> <span class="mi">132</span>
+<span class="n">ERR_MTS_OLD_DLL_DETECTED</span> <span class="o">=</span> <span class="mi">133</span>
+<span class="n">ERR_MTS_MEM_LEAK_FOUND</span> <span class="o">=</span> <span class="mi">134</span>
+<span class="n">ERR_MTS_NO_XLOG_AVAILABLE</span> <span class="o">=</span> <span class="mi">135</span>
+<span class="n">ERR_MTS_ERR_SIDE_BY_SIDE</span> <span class="o">=</span> <span class="mi">136</span>
+<span class="n">ERR_MTS_READ_CONFIG</span> <span class="o">=</span> <span class="mi">137</span>
+<span class="n">ERR_MTS_READ_REC_FAILED</span> <span class="o">=</span> <span class="mi">138</span>
+<span class="n">ERR_MTS_RECOVERING_DATA</span> <span class="o">=</span> <span class="mi">139</span>
+<span class="n">ERR_MTS_REPORT_ERROR</span> <span class="o">=</span> <span class="mi">140</span>
+<span class="n">ERR_MTS_OUTPUT_CREATED</span> <span class="o">=</span> <span class="mi">141</span>
+<span class="n">ERR_MTS_GPU_EXEC</span> <span class="o">=</span> <span class="mi">142</span>
+<span class="n">ERR_MTS_INVALID_BLOCK</span> <span class="o">=</span> <span class="mi">143</span>
+<span class="n">ERR_MTS_LOW_VIRT_MEM</span> <span class="o">=</span> <span class="mi">144</span>
+<span class="n">ERR_MTS_NO_ERRLOG</span> <span class="o">=</span> <span class="mi">145</span>
+<span class="n">ERR_MTS_MERGE_REC</span> <span class="o">=</span> <span class="mi">146</span>
+
+<span class="c1"># - IT environment specific error codes --------------------------------------------------------------------------------</span>
+<span class="n">ERR_INFRASTRUCTURE_UNSPECIFIC_ERROR_FOUND</span> <span class="o">=</span> <span class="mi">150</span>
+<span class="n">ERR_INFRASTRUCTURE_FAILED_TO_COPY_DATA</span> <span class="o">=</span> <span class="mi">152</span>
+<span class="n">ERR_INFRASTRUCTURE_RECORDING_UNAVAILABLE</span> <span class="o">=</span> <span class="mi">155</span>
+<span class="n">ERR_INFRASTRUCTURE_DATA_OUTPUT_OVERWRITE</span> <span class="o">=</span> <span class="mi">156</span>
+<span class="n">ERR_INFRASTRUCTURE_RECORDING_ARCHIVED</span> <span class="o">=</span> <span class="mi">157</span>
+<span class="n">ERR_INFRASTRUCTURE_FAILED_TO_CREATE_DATA</span> <span class="o">=</span> <span class="mi">158</span>
+<span class="n">ERR_INFRASTRUCTURE_GPU_EXEC</span> <span class="o">=</span> <span class="mi">159</span>
+
+<span class="c1"># - MTS mapping tables</span>
+<span class="c1"># also review MTS_exitcode.txt</span>
+<span class="n">MTS_LOOKUP_EXITCODE</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="n">ERR_MTS_REPORT_ERROR</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="n">ERR_MTS_NO_ERRLOG</span><span class="p">,</span>
+                       <span class="mi">4</span><span class="p">:</span> <span class="n">ERR_MTS_READ_REC_FAILED</span><span class="p">,</span> <span class="mi">5</span><span class="p">:</span> <span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span><span class="p">,</span>
+                       <span class="mi">6</span><span class="p">:</span> <span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span><span class="p">,</span> <span class="mi">7</span><span class="p">:</span> <span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span><span class="p">,</span>
+                       <span class="mi">8</span><span class="p">:</span> <span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span><span class="p">,</span> <span class="mi">9</span><span class="p">:</span> <span class="n">ERR_MTS_REPORT_ERROR</span><span class="p">,</span>
+                       <span class="mi">10</span><span class="p">:</span> <span class="n">ERR_MTS_APPLICATION_ERR_DETECTED</span><span class="p">,</span> <span class="o">-</span><span class="mi">306</span><span class="p">:</span> <span class="n">ERR_APPLICATION_HANG</span><span class="p">,</span>
+                       <span class="o">-</span><span class="mi">1073741819</span><span class="p">:</span> <span class="n">ERR_APP_CRASH_ACCESS_VIOLATION</span><span class="p">,</span> <span class="o">-</span><span class="mi">1073741818</span><span class="p">:</span> <span class="n">ERR_MTS_UNKNOWN_ERROR</span><span class="p">,</span>
+                       <span class="n">ERR_APPLICATION_CPU_IDLE</span><span class="p">:</span> <span class="n">ERR_APPLICATION_CPU_IDLE</span><span class="p">,</span>
+                       <span class="n">ERR_APPLICATION_IO_IDLE</span><span class="p">:</span> <span class="n">ERR_APPLICATION_IO_IDLE</span><span class="p">,</span>
+                       <span class="n">ERR_APPLICATION_TIMEOUT</span><span class="p">:</span> <span class="n">ERR_APPLICATION_TIMEOUT</span><span class="p">,</span>
+                       <span class="n">ERR_APPLICATION_HANG</span><span class="p">:</span> <span class="n">ERR_APPLICATION_HANG</span><span class="p">}</span>
+<span class="n">MTS_LOOKUP_EXITMSG</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;normal exit&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;normal exit&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="s2">&quot;error or exception happened&quot;</span><span class="p">,</span>
+                      <span class="mi">3</span><span class="p">:</span> <span class="s2">&quot;initialization of error monitor&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="s2">&quot;reading recording failed&quot;</span><span class="p">,</span>
+                      <span class="mi">5</span><span class="p">:</span> <span class="s2">&quot;compatibility error&quot;</span><span class="p">,</span> <span class="mi">6</span><span class="p">:</span> <span class="s2">&quot;AllowMultipleInstances in not enabled&quot;</span><span class="p">,</span>
+                      <span class="mi">7</span><span class="p">:</span> <span class="s2">&quot;exception happened&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">:</span> <span class="s2">&quot;alert, error or exception happened&quot;</span><span class="p">,</span>
+                      <span class="mi">9</span><span class="p">:</span> <span class="s2">&quot;warning, alert, error or exception happened&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">:</span> <span class="s2">&quot;error with a specific error code&quot;</span><span class="p">,</span>
+                      <span class="n">ERR_APPLICATION_CPU_IDLE</span><span class="p">:</span> <span class="s2">&quot;CPU was idle&quot;</span><span class="p">,</span> <span class="n">ERR_APPLICATION_IO_IDLE</span><span class="p">:</span> <span class="s2">&quot;I/O was idle&quot;</span><span class="p">,</span>
+                      <span class="n">ERR_APPLICATION_TIMEOUT</span><span class="p">:</span> <span class="s2">&quot;application timed out&quot;</span><span class="p">,</span>
+                      <span class="n">ERR_APPLICATION_HANG</span><span class="p">:</span> <span class="s2">&quot;application didn&#39;t react&quot;</span><span class="p">,</span>
+                      <span class="o">-</span><span class="mi">306</span><span class="p">:</span> <span class="s2">&quot;application hang&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1073741819</span><span class="p">:</span> <span class="s2">&quot;crash due to access violation&quot;</span><span class="p">,</span>
+                      <span class="o">-</span><span class="mi">1073741818</span><span class="p">:</span> <span class="s2">&quot;unknown error happened&quot;</span><span class="p">}</span>
+
+<span class="c1"># - map old exit codes to let users know about transition</span>
+<span class="n">EXIT_MAP</span> <span class="o">=</span> <span class="p">{</span><span class="mi">20</span><span class="p">:</span> <span class="o">-</span><span class="mi">200</span><span class="p">,</span> <span class="mi">21</span><span class="p">:</span> <span class="o">-</span><span class="mi">201</span><span class="p">,</span> <span class="mi">22</span><span class="p">:</span> <span class="o">-</span><span class="mi">202</span><span class="p">,</span> <span class="mi">23</span><span class="p">:</span> <span class="o">-</span><span class="mi">203</span><span class="p">,</span> <span class="mi">24</span><span class="p">:</span> <span class="o">-</span><span class="mi">205</span><span class="p">,</span> <span class="mi">26</span><span class="p">:</span> <span class="o">-</span><span class="mi">207</span><span class="p">,</span> <span class="mi">27</span><span class="p">:</span> <span class="o">-</span><span class="mi">208</span><span class="p">,</span> <span class="mi">28</span><span class="p">:</span> <span class="o">-</span><span class="mi">210</span><span class="p">,</span> <span class="mi">29</span><span class="p">:</span> <span class="o">-</span><span class="mi">211</span><span class="p">,</span> <span class="mi">30</span><span class="p">:</span> <span class="o">-</span><span class="mi">299</span><span class="p">,</span>
+            <span class="mi">40</span><span class="p">:</span> <span class="o">-</span><span class="mi">300</span><span class="p">,</span> <span class="mi">41</span><span class="p">:</span> <span class="o">-</span><span class="mi">301</span><span class="p">,</span> <span class="mi">42</span><span class="p">:</span> <span class="o">-</span><span class="mi">302</span><span class="p">,</span> <span class="mi">46</span><span class="p">:</span> <span class="o">-</span><span class="mi">303</span><span class="p">,</span> <span class="mi">47</span><span class="p">:</span> <span class="o">-</span><span class="mi">304</span><span class="p">,</span> <span class="mi">48</span><span class="p">:</span> <span class="o">-</span><span class="mi">305</span><span class="p">,</span> <span class="mi">49</span><span class="p">:</span> <span class="o">-</span><span class="mi">306</span><span class="p">,</span> <span class="mi">51</span><span class="p">:</span> <span class="o">-</span><span class="mi">308</span><span class="p">,</span> <span class="mi">52</span><span class="p">:</span> <span class="o">-</span><span class="mi">309</span><span class="p">,</span> <span class="mi">60</span><span class="p">:</span> <span class="o">-</span><span class="mi">310</span><span class="p">,</span>
+            <span class="mi">61</span><span class="p">:</span> <span class="o">-</span><span class="mi">311</span><span class="p">,</span> <span class="mi">62</span><span class="p">:</span> <span class="o">-</span><span class="mi">312</span><span class="p">,</span> <span class="mi">63</span><span class="p">:</span> <span class="o">-</span><span class="mi">313</span><span class="p">,</span> <span class="mi">64</span><span class="p">:</span> <span class="o">-</span><span class="mi">314</span><span class="p">,</span> <span class="mi">65</span><span class="p">:</span> <span class="o">-</span><span class="mi">315</span><span class="p">,</span> <span class="mi">66</span><span class="p">:</span> <span class="o">-</span><span class="mi">316</span><span class="p">,</span> <span class="mi">70</span><span class="p">:</span> <span class="o">-</span><span class="mi">320</span><span class="p">,</span> <span class="mi">71</span><span class="p">:</span> <span class="o">-</span><span class="mi">321</span><span class="p">,</span> <span class="mi">72</span><span class="p">:</span> <span class="o">-</span><span class="mi">322</span><span class="p">,</span> <span class="mi">73</span><span class="p">:</span> <span class="o">-</span><span class="mi">323</span><span class="p">,</span>
+            <span class="mi">74</span><span class="p">:</span> <span class="o">-</span><span class="mi">324</span><span class="p">,</span> <span class="mi">75</span><span class="p">:</span> <span class="o">-</span><span class="mi">325</span><span class="p">,</span> <span class="mi">76</span><span class="p">:</span> <span class="o">-</span><span class="mi">326</span><span class="p">,</span> <span class="mi">77</span><span class="p">:</span> <span class="o">-</span><span class="mi">327</span><span class="p">,</span> <span class="mi">78</span><span class="p">:</span> <span class="o">-</span><span class="mi">328</span><span class="p">,</span> <span class="mi">79</span><span class="p">:</span> <span class="o">-</span><span class="mi">329</span><span class="p">,</span> <span class="mi">80</span><span class="p">:</span> <span class="o">-</span><span class="mi">330</span><span class="p">,</span> <span class="mi">81</span><span class="p">:</span> <span class="o">-</span><span class="mi">331</span><span class="p">,</span> <span class="mi">82</span><span class="p">:</span> <span class="o">-</span><span class="mi">332</span><span class="p">,</span> <span class="mi">83</span><span class="p">:</span> <span class="o">-</span><span class="mi">333</span><span class="p">,</span>
+            <span class="mi">84</span><span class="p">:</span> <span class="o">-</span><span class="mi">334</span><span class="p">,</span> <span class="mi">85</span><span class="p">:</span> <span class="o">-</span><span class="mi">335</span><span class="p">,</span> <span class="mi">90</span><span class="p">:</span> <span class="o">-</span><span class="mi">350</span><span class="p">,</span> <span class="mi">91</span><span class="p">:</span> <span class="o">-</span><span class="mi">351</span><span class="p">,</span> <span class="mi">92</span><span class="p">:</span> <span class="o">-</span><span class="mi">352</span><span class="p">,</span> <span class="mi">93</span><span class="p">:</span> <span class="o">-</span><span class="mi">353</span><span class="p">,</span> <span class="mi">94</span><span class="p">:</span> <span class="o">-</span><span class="mi">354</span><span class="p">,</span> <span class="mi">95</span><span class="p">:</span> <span class="o">-</span><span class="mi">355</span><span class="p">,</span> <span class="mi">96</span><span class="p">:</span> <span class="o">-</span><span class="mi">356</span><span class="p">,</span> <span class="mi">97</span><span class="p">:</span> <span class="o">-</span><span class="mi">357</span><span class="p">,</span>
+            <span class="mi">98</span><span class="p">:</span> <span class="o">-</span><span class="mi">358</span><span class="p">,</span> <span class="mi">99</span><span class="p">:</span> <span class="o">-</span><span class="mi">359</span><span class="p">,</span> <span class="mi">100</span><span class="p">:</span> <span class="o">-</span><span class="mi">399</span><span class="p">,</span> <span class="mi">110</span><span class="p">:</span> <span class="o">-</span><span class="mi">360</span><span class="p">,</span> <span class="mi">111</span><span class="p">:</span> <span class="o">-</span><span class="mi">361</span><span class="p">,</span> <span class="mi">112</span><span class="p">:</span> <span class="o">-</span><span class="mi">370</span><span class="p">,</span> <span class="mi">113</span><span class="p">:</span> <span class="o">-</span><span class="mi">371</span><span class="p">,</span> <span class="mi">120</span><span class="p">:</span> <span class="o">-</span><span class="mi">10000</span><span class="p">,</span> <span class="mi">121</span><span class="p">:</span> <span class="o">-</span><span class="mi">401</span><span class="p">,</span>
+            <span class="mi">123</span><span class="p">:</span> <span class="o">-</span><span class="mi">403</span><span class="p">,</span> <span class="mi">124</span><span class="p">:</span> <span class="o">-</span><span class="mi">404</span><span class="p">,</span> <span class="mi">125</span><span class="p">:</span> <span class="o">-</span><span class="mi">405</span><span class="p">,</span> <span class="mi">126</span><span class="p">:</span> <span class="o">-</span><span class="mi">412</span><span class="p">,</span> <span class="mi">127</span><span class="p">:</span> <span class="o">-</span><span class="mi">414</span><span class="p">,</span> <span class="mi">128</span><span class="p">:</span> <span class="o">-</span><span class="mi">413</span><span class="p">,</span> <span class="mi">129</span><span class="p">:</span> <span class="o">-</span><span class="mi">416</span><span class="p">,</span> <span class="mi">130</span><span class="p">:</span> <span class="o">-</span><span class="mi">417</span><span class="p">,</span> <span class="mi">131</span><span class="p">:</span> <span class="o">-</span><span class="mi">418</span><span class="p">,</span>
+            <span class="mi">132</span><span class="p">:</span> <span class="o">-</span><span class="mi">419</span><span class="p">,</span> <span class="mi">133</span><span class="p">:</span> <span class="o">-</span><span class="mi">420</span><span class="p">,</span> <span class="mi">134</span><span class="p">:</span> <span class="o">-</span><span class="mi">421</span><span class="p">,</span> <span class="mi">135</span><span class="p">:</span> <span class="o">-</span><span class="mi">422</span><span class="p">,</span> <span class="mi">136</span><span class="p">:</span> <span class="o">-</span><span class="mi">423</span><span class="p">,</span> <span class="mi">137</span><span class="p">:</span> <span class="o">-</span><span class="mi">424</span><span class="p">,</span> <span class="mi">138</span><span class="p">:</span> <span class="o">-</span><span class="mi">425</span><span class="p">,</span> <span class="mi">139</span><span class="p">:</span> <span class="o">-</span><span class="mi">426</span><span class="p">,</span> <span class="mi">150</span><span class="p">:</span> <span class="o">-</span><span class="mi">500</span><span class="p">,</span>
+            <span class="mi">152</span><span class="p">:</span> <span class="o">-</span><span class="mi">502</span><span class="p">,</span> <span class="mi">155</span><span class="p">:</span> <span class="o">-</span><span class="mi">506</span><span class="p">,</span> <span class="mi">156</span><span class="p">:</span> <span class="o">-</span><span class="mi">507</span><span class="p">,</span> <span class="mi">157</span><span class="p">:</span> <span class="o">-</span><span class="mi">508</span><span class="p">,</span> <span class="mi">158</span><span class="p">:</span> <span class="o">-</span><span class="mi">509</span><span class="p">,</span> <span class="mi">159</span><span class="p">:</span> <span class="o">-</span><span class="mi">510</span><span class="p">}</span>
+
+<span class="c1"># - more defaults ------------------------------------------------------------------------------------------------------</span>
+<span class="n">UNFAILING_EXITCODES</span> <span class="o">=</span> <span class="p">[</span><span class="n">ERR_OK</span><span class="p">,</span> <span class="n">ERR_HPC_DATABASE</span><span class="p">,</span> <span class="n">ERR_APPLICATION_LOW_MEM</span><span class="p">,</span> <span class="n">ERR_APPLICATION_LOW_CPU</span><span class="p">,</span>
+                       <span class="n">ERR_APP_EXC_NEAR_SCAN_PEAK_ERROR</span><span class="p">,</span> <span class="n">ERR_APP_EXC_FAR_SCAN_PEAK_ERROR</span><span class="p">,</span>
+                       <span class="n">ERR_APP_EXC_PEAK_ERROR_AT_POSITION</span><span class="p">,</span> <span class="n">ERR_APP_EXC_INCONSISTENT_DATA_STRUCTURE</span><span class="p">,</span>
+                       <span class="n">ERR_APP_EXC_CONFIG_OF_MO_MISSING</span><span class="p">,</span> <span class="n">ERR_APP_EXC_MO_CODE_ERROR</span><span class="p">,</span> <span class="n">ERR_APP_EXC_BMW_RADOME_CORRECTION</span><span class="p">,</span>
+                       <span class="n">ERR_APP_BSIG_CORRUPT</span><span class="p">,</span> <span class="n">ERR_APP_BSIG_DURATION_DIFFERS</span><span class="p">,</span> <span class="n">ERR_APP_BSIG_TIME_JUMPS</span><span class="p">,</span>
+                       <span class="n">ERR_APP_BSIG_MISSING</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_WARNING_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_INFO_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_DEBUG_FOUND</span><span class="p">,</span>
+                       <span class="n">ERR_INFRASTRUCTURE_DATA_OUTPUT_OVERWRITE</span><span class="p">,</span> <span class="n">ERR_MTS_OLD_DLL_DETECTED</span><span class="p">]</span>
+
+<span class="n">SKIP_EXITCODES</span> <span class="o">=</span> <span class="p">[</span><span class="n">ERR_MTS_READ_REC_FAILED</span><span class="p">,</span> <span class="n">ERR_INFRASTRUCTURE_RECORDING_ARCHIVED</span><span class="p">]</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="HpcError"><a class="viewcode-back" href="../../../hpc.core.html#hpc.HpcError">[docs]</a><span class="k">class</span> <span class="nc">HpcError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Exception Class for all HPC Exceptions.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HpcError.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.HpcError.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">errno</span><span class="o">=</span><span class="n">ERR_HPC_UNSPECIFIED_ERROR_FOUND</span><span class="p">,</span> <span class="n">dpth</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        HPC error class</span>
+
+<span class="sd">        :param str msg:   message to announce</span>
+<span class="sd">        :param int errno: related error number</span>
+<span class="sd">        :param int dpth:  starting frame depth for error trace, increase by 1 for each subclass level of `HpcError`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="ne">Exception</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">_getframe</span><span class="p">(</span><span class="n">dpth</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_msg</span> <span class="o">=</span> <span class="n">msg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_errno</span> <span class="o">=</span> <span class="n">errno</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; (</span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2"> (line </span><span class="si">%d</span><span class="s2">) attr: </span><span class="si">%s</span><span class="s2">&quot;</span> \
+                      <span class="o">%</span> <span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">errno</span><span class="p">,</span> <span class="n">basename</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_filename</span><span class="p">),</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_lineno</span><span class="p">,</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_name</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: our own string representation</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">message</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;raw message of myself without the traceback overhead&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_msg</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: error number of exception</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_errno</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

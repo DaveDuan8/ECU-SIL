@@ -1,0 +1,207 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts.bsig_check</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.mts.bsig_check</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">bsig_check.py</span>
+<span class="sd">-------------</span>
+
+<span class="sd">check for bsig files and whether they are corrupt or having 0 length or no signal at all,</span>
+<span class="sd">used by command line tool bsig_check and starter.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - Python imports ----------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">walk</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">abspath</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">exists</span><span class="p">,</span> <span class="n">isdir</span><span class="p">,</span> <span class="n">splitext</span>
+<span class="kn">from</span> <span class="nn">fnmatch</span> <span class="kn">import</span> <span class="n">fnmatch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># - HPC imports -------------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..core.exitcodes</span> <span class="kn">import</span> <span class="n">ExitCodes</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="n">ERR_APP_BSIG_CORRUPT</span><span class="p">,</span> <span class="n">ERR_APP_BSIG_DURATION_DIFFERS</span><span class="p">,</span> <span class="n">ERR_APP_BSIG_TIME_JUMPS</span><span class="p">,</span> \
+    <span class="n">ERR_APP_BSIG_MISSING</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">DummyLogger</span>
+<span class="kn">from</span> <span class="nn">.signal</span> <span class="kn">import</span> <span class="n">Signal</span>
+
+<span class="c1"># - defines -----------------------------------------------------------------------------------------------------------</span>
+<span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="s2">&quot;bsig check:&quot;</span>
+<span class="n">TIME_SIGS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;MTS.Package.TimeStamp&quot;</span><span class="p">,</span> <span class="s2">&quot;AbsoluteTimestamp&quot;</span><span class="p">]</span>
+
+
+<span class="c1"># - classes / functions -----------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="bsig_check"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.bsig_check.bsig_check">[docs]</a><span class="k">def</span> <span class="nf">bsig_check</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0914,R0915,R1260</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    check all bsigs for given folder or just one</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *bsigs* (``list | str``): input folder or file to check bsig file from or a bsig file directly</span>
+<span class="sd">        * *logger* (``Logger``): use logger given, if done so</span>
+<span class="sd">        * *rectms* (``list``): expected recording begin and end timestamp</span>
+<span class="sd">        * *recdiff* (``int``): allowed recording difference, default: 10%</span>
+<span class="sd">        * *exit_prio* (``ExitCode``): exit code priorizer, instance of ExitCode, default: None</span>
+
+<span class="sd">    :return: error found</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;logger&quot;</span><span class="p">,</span> <span class="n">DummyLogger</span><span class="p">(</span><span class="kc">True</span><span class="p">))</span>
+    <span class="n">infiles</span> <span class="o">=</span> <span class="n">abspath</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;bsigs&quot;</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">infiles</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">ERR_OK</span>
+
+    <span class="k">if</span> <span class="n">isdir</span><span class="p">(</span><span class="n">infiles</span><span class="p">):</span>
+        <span class="n">baselen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">infiles</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">bsigs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">exts</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bsig_ext&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;.bsig&quot;</span><span class="p">])</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span><span class="p">)</span> <span class="ow">in</span> <span class="n">walk</span><span class="p">(</span><span class="n">infiles</span><span class="p">):</span>
+            <span class="n">bsigs</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">abspath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span>
+                          <span class="k">if</span> <span class="n">splitext</span><span class="p">(</span><span class="n">f</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">exts</span>
+                          <span class="ow">and</span> <span class="ow">not</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s2">&quot;Export*.bsig&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s2">&quot;*_tstp.bsig&quot;</span><span class="p">)])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">baselen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">infiles</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">bsigs</span> <span class="o">=</span> <span class="p">[</span><span class="n">infiles</span><span class="p">]</span>
+
+    <span class="n">exitcode</span> <span class="o">=</span> <span class="n">ExitCodes</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exit_prio&quot;</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">bsigs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;quantity OK: </span><span class="si">%d</span><span class="s2"> files available.&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bsigs</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;quantity NOK: no bsig at all!&quot;</span><span class="p">)</span>
+        <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_MISSING</span><span class="p">)</span>
+
+    <span class="n">errcnt</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">bsig</span> <span class="ow">in</span> <span class="n">bsigs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;processing </span><span class="si">%s</span><span class="s2"> ...&quot;</span><span class="p">,</span> <span class="n">bsig</span><span class="p">[</span><span class="n">baselen</span><span class="p">:])</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="n">bsig</span><span class="p">,</span> <span class="n">delim</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sig</span><span class="p">:</span>
+                <span class="n">timesig</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">TIME_SIGS</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sig</span><span class="o">.</span><span class="n">signal_names</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">timesig</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># pylint: disable=R1702</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;not any time signal found: &#39;</span><span class="si">%s</span><span class="s2">&#39;!&quot;</span><span class="p">,</span> <span class="s2">&quot;&#39;, &#39;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">TIME_SIGS</span><span class="p">))</span>
+                    <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_CORRUPT</span><span class="p">)</span>
+                    <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sig</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">sig</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;bsig contains </span><span class="si">%d</span><span class="s2"> signals or of zero length!&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sig</span><span class="p">))</span>
+                    <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_CORRUPT</span><span class="p">)</span>
+                    <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+
+                <span class="c1"># check recording length</span>
+                <span class="n">mts</span> <span class="o">=</span> <span class="n">sig</span><span class="p">[</span><span class="n">timesig</span><span class="p">]</span>
+                <span class="n">rectms</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rectms&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cmdline&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="ow">and</span> <span class="n">rectms</span><span class="p">:</span>
+                    <span class="n">rectms</span> <span class="o">=</span> <span class="p">[[</span><span class="n">rectms</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">rectms</span><span class="p">[</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">rectms</span><span class="p">),</span> <span class="mi">2</span><span class="p">)]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">rectms</span><span class="p">:</span>
+                    <span class="n">rectms</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+
+                <span class="n">sigdiff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">mts</span><span class="p">))</span>
+                <span class="n">sigavg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">average</span><span class="p">(</span><span class="n">sigdiff</span><span class="p">)</span> <span class="o">*</span> <span class="mf">3.</span>
+                <span class="n">diffidxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">sigdiff</span> <span class="o">&gt;</span> <span class="n">sigavg</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;bsig contains </span><span class="si">%d</span><span class="s2"> signals of length </span><span class="si">%d</span><span class="s2">: OK&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sig</span><span class="p">),</span> <span class="n">sig</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rectms</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">diffidxs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">diffidxs</span> <span class="o">&gt;</span> <span class="mi">23</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">diffidxs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">14</span><span class="p">:</span>
+                        <span class="n">dfs</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">diffidxs</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">7</span><span class="p">]])</span> <span class="o">+</span> <span class="s2">&quot;, ..., &quot;</span> \
+                              <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">diffidxs</span><span class="p">[</span><span class="o">-</span><span class="mi">7</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">dfs</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">diffidxs</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;we have </span><span class="si">%d</span><span class="s2"> section(s) and detected </span><span class="si">%d</span><span class="s2"> time jump(s) &gt; </span><span class="si">%.0f</span><span class="s2"> @ pos </span><span class="si">%s</span><span class="s2">!&quot;</span><span class="p">,</span>
+                                 <span class="nb">len</span><span class="p">(</span><span class="n">rectms</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">diffidxs</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">sigavg</span><span class="p">,</span> <span class="n">dfs</span><span class="p">)</span>
+                    <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_TIME_JUMPS</span><span class="p">)</span>
+                    <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rectms</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;currently not possible to check bsigs with sections...&quot;</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">rectms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="c1"># for idx, sec in enumerate(rectms):</span>
+                <span class="c1">#     beg, end = mts[diffidxs[idx]], mts[diffidxs[idx + 1] - 1]</span>
+                <span class="c1">#     dur, seclen = end - beg, sec[1] - sec[0]</span>
+                <span class="n">beg</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">sec</span> <span class="o">=</span> <span class="n">mts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">mts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">rectms</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">dur</span><span class="p">,</span> <span class="n">seclen</span> <span class="o">=</span> <span class="n">end</span> <span class="o">-</span> <span class="n">beg</span><span class="p">,</span> <span class="n">sec</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">sec</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> (end) - </span><span class="si">%d</span><span class="s2"> (begin) = </span><span class="si">%d</span><span class="s2"> (duration)&quot;</span><span class="p">,</span> <span class="n">timesig</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">beg</span><span class="p">,</span> <span class="n">dur</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">seclen</span> <span class="o">!=</span> <span class="mf">0.</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;database timestamp: </span><span class="si">%d</span><span class="s2"> (end) - </span><span class="si">%d</span><span class="s2"> (begin) = </span><span class="si">%d</span><span class="s2"> (duration)&quot;</span><span class="p">,</span>
+                                <span class="n">sec</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sec</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">seclen</span><span class="p">)</span>
+                    <span class="n">diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">dur</span> <span class="o">*</span> <span class="mf">100.</span> <span class="o">/</span> <span class="n">seclen</span> <span class="o">-</span> <span class="mf">100.</span><span class="p">)</span>
+                    <span class="n">maxdiff</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;recdiff&quot;</span><span class="p">,</span> <span class="mf">10.</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">diff</span> <span class="o">&gt;</span> <span class="n">maxdiff</span><span class="p">:</span>  <span class="c1"># 10% difference (default)</span>
+                        <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_DURATION_DIFFERS</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;mts timestamp differs more than </span><span class="si">%.1f%%</span><span class="s2">: </span><span class="si">%.1f%%</span><span class="s2"> =&gt; bad!&quot;</span><span class="p">,</span> <span class="n">maxdiff</span><span class="p">,</span> <span class="n">diff</span><span class="p">)</span>
+                        <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;section duration diff is within </span><span class="si">%.1f%%</span><span class="s2"> range: </span><span class="si">%.1f%%</span><span class="s2"> =&gt; good.&quot;</span><span class="p">,</span> <span class="n">maxdiff</span><span class="p">,</span> <span class="n">diff</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;DB has invalid timestamps: </span><span class="si">%d</span><span class="s2"> (end) - </span><span class="si">%d</span><span class="s2"> (begin)!&quot;</span><span class="p">,</span> <span class="n">sec</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">sec</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> is broken (</span><span class="si">%s</span><span class="s2">)!&quot;</span><span class="p">,</span> <span class="n">bsig</span><span class="p">[</span><span class="n">baselen</span><span class="p">:],</span> <span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+            <span class="n">exitcode</span><span class="p">(</span><span class="n">ERR_APP_BSIG_CORRUPT</span><span class="p">)</span>
+            <span class="n">errcnt</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cmdline&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">errcnt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;quality OK: all files have proper size / are readable&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;quality NOK: </span><span class="si">%d</span><span class="s2"> file(s) processed, </span><span class="si">%d</span><span class="s2"> errors found!&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bsigs</span><span class="p">),</span> <span class="n">errcnt</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">bsigs</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;done, processing </span><span class="si">%d</span><span class="s2"> file(s) where </span><span class="si">%d</span><span class="s2"> errors encountered&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bsigs</span><span class="p">),</span> <span class="n">errcnt</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;returning </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exitcode</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">exitcode</span><span class="o">.</span><span class="n">error</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

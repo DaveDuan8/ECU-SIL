@@ -1,0 +1,278 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sched.sched_rest</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sched.sched_rest</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">sched_rest.py</span>
+<span class="sd">-------------</span>
+
+<span class="sd">taken kindly from https://github-am.geo.conti.de/ADAS/DS-SCP/blob/master/Dalib_DataAdminLibrary/src/infrastructure/</span>
+<span class="sd">onprem/hpc_rest_submit.py</span>
+
+<span class="sd">overview: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560258(v=vs.85)</span>
+<span class="sd">from xml: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560266(v=vs.85)</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import modules -----------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span><span class="p">,</span> <span class="n">time</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">Element</span><span class="p">,</span> <span class="n">SubElement</span><span class="p">,</span> <span class="n">tostring</span><span class="p">,</span> <span class="n">fromstring</span>
+<span class="kn">from</span> <span class="nn">requests</span> <span class="kn">import</span> <span class="n">request</span>
+<span class="kn">from</span> <span class="nn">requests.auth</span> <span class="kn">import</span> <span class="n">HTTPBasicAuth</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">LOGINNAME</span><span class="p">,</span> <span class="n">UID_NAME</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">suppress_warnings</span><span class="p">,</span> <span class="n">HpcPassword</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">server_path</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">LOC_HEAD_MAP</span><span class="p">,</span> <span class="n">DEVS</span>
+<span class="kn">from</span> <span class="nn">..core.hpc_defs</span> <span class="kn">import</span> <span class="n">JobState</span>
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">SchedulerBase</span><span class="p">,</span> <span class="n">to_string</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="RestScheduler"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler">[docs]</a><span class="k">class</span> <span class="nc">RestScheduler</span><span class="p">(</span><span class="n">SchedulerBase</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    communicate with HPC cluster through rest API</span>
+<span class="sd">    that class is intended to replace the .NET based implementation being able to submit something from Linux as well</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="RestScheduler.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headnode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init me&quot;&quot;&quot;</span>
+        <span class="n">SchedulerBase</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headnode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_location</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">LOC_HEAD_MAP</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span> <span class="ow">in</span> <span class="n">v</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span> <span class="o">=</span> <span class="n">server_path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">)</span>
+
+        <span class="c1"># some exceptions: Sven, Cedrik, Mohan, Joachim and our HPC user</span>
+        <span class="k">if</span> <span class="n">LOGINNAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DEVS</span><span class="p">:</span>
+            <span class="n">loc</span> <span class="o">=</span> <span class="n">location</span><span class="p">(</span><span class="s2">&quot;(unknown)&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">:</span>  <span class="c1"># or self._location not in [loc, X_SUBMIT_EXC.get(loc)]:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;it&#39;s not allowed to submit a job from </span><span class="si">{}</span><span class="s2"> to </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_df</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_headers</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;Content-Type&#39;</span><span class="p">:</span> <span class="s2">&quot;application/xml; charset=utf-8&quot;</span><span class="p">,</span> <span class="s1">&#39;api-version&#39;</span><span class="p">:</span> <span class="s1">&#39;2012-11-01.4.0&#39;</span><span class="p">}</span>
+
+        <span class="k">with</span> <span class="n">HpcPassword</span><span class="p">()</span> <span class="k">as</span> <span class="n">hset</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="n">HTTPBasicAuth</span><span class="p">(</span><span class="n">UID_NAME</span><span class="p">,</span> <span class="n">hset</span><span class="p">[</span><span class="n">UID_NAME</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="o">!=</span> <span class="s1">&#39;Default&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">check_template</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">version</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">root</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">&#39;ArrayOfProperty&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;xmlns&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;</span><span class="p">})</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_add_prop</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">to_string</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_prop</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;Name&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">fromstring</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Jobs&quot;</span><span class="p">,</span> <span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>  <span class="c1"># return job ID as integer</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Configuring</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_cp</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">All</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: nice representation</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;rest scheduler: head=</span><span class="si">{}</span><span class="s2">, id=</span><span class="si">{}</span><span class="s2">, name=</span><span class="si">{}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_add_prop</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;add name value pair as xml property&quot;&quot;&quot;</span>
+        <span class="n">prop</span> <span class="o">=</span> <span class="n">SubElement</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="s2">&quot;Property&quot;</span><span class="p">)</span>
+        <span class="n">pname</span> <span class="o">=</span> <span class="n">SubElement</span><span class="p">(</span><span class="n">prop</span><span class="p">,</span> <span class="s2">&quot;Name&quot;</span><span class="p">)</span>
+        <span class="n">pname</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="n">pval</span> <span class="o">=</span> <span class="n">SubElement</span><span class="p">(</span><span class="n">prop</span><span class="p">,</span> <span class="s2">&quot;Value&quot;</span><span class="p">)</span>
+        <span class="n">pval</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="nd">@suppress_warnings</span>
+    <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        do a request</span>
+
+<span class="sd">        :param str url: sub-url to the head node</span>
+<span class="sd">        :param object data: xml element tree to be send as data</span>
+<span class="sd">        :param str method: method to be used</span>
+<span class="sd">        :param list params: list of extra url parameters</span>
+<span class="sd">        :raises hpc.HpcError: once response it not 200, though failed</span>
+<span class="sd">        :return: :class:`Response &lt;Response&gt;` object</span>
+<span class="sd">        :rtype: requests.Response</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">tostring</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+        <span class="n">uri_parm</span> <span class="o">=</span> <span class="s2">&quot;api-version=2012-11-01.4.0&quot;</span>
+        <span class="k">if</span> <span class="n">params</span><span class="p">:</span>
+            <span class="n">uri_parm</span> <span class="o">=</span> <span class="s2">&quot;&amp;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">uri_parm</span><span class="p">,</span> <span class="n">params</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;&amp;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">params</span><span class="p">)])</span>
+
+        <span class="n">res</span> <span class="o">=</span> <span class="n">request</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="s2">&quot;https://</span><span class="si">{}</span><span class="s2">.CW01.CONTIWAN.COM/WindowsHPC/</span><span class="si">{}</span><span class="s2">?</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="n">uri_parm</span><span class="p">),</span>
+                      <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_headers</span><span class="p">,</span> <span class="n">auth</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="p">,</span> <span class="n">proxies</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;no_proxy&quot;</span><span class="p">:</span> <span class="s2">&quot;.contiwan.com&quot;</span><span class="p">},</span>
+                      <span class="n">allow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">!=</span> <span class="mi">200</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;ERROR during head comm: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">res</span>
+
+<div class="viewcode-block" id="RestScheduler.submit"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler.submit">[docs]</a>    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_args</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260,W0221</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        configure the job and finalize (submit) it</span>
+
+<span class="sd">        :param _args: unused</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># create xml file to be used to reconfigure HPC job</span>
+        <span class="n">raw_xml</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_xml</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">),</span> <span class="s2">&quot;HPC_submit&quot;</span><span class="p">,</span> <span class="s2">&quot;job&quot;</span><span class="p">,</span>
+                       <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">_</span><span class="si">{}</span><span class="s2">.xml&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">)),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">raw_xml</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+
+        <span class="k">for</span> <span class="n">elm</span> <span class="ow">in</span> <span class="n">fromstring</span><span class="p">(</span><span class="n">raw_xml</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">elm</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;EnvironmentVariables&quot;</span><span class="p">:</span>
+                <span class="n">root</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">&#39;ArrayOfProperty&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;xmlns&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;</span><span class="p">})</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">elm</span><span class="p">:</span>
+                    <span class="n">v</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="s2">&quot;Property&quot;</span>
+                    <span class="n">root</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">/EnvVariables&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">),</span> <span class="n">root</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">elm</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;Tasks&quot;</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">elm</span><span class="p">:</span>
+                    <span class="n">root</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">&#39;ArrayOfProperty&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;xmlns&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;</span><span class="p">})</span>
+                    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">i</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_add_prop</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+                    <span class="n">tid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">fromstring</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">/Tasks&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">),</span> <span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">)</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+
+                    <span class="n">root</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">&#39;ArrayOfProperty&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;xmlns&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;</span><span class="p">})</span>
+                    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">i</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;EnvironmentVariables&quot;</span><span class="p">):</span>
+                        <span class="n">v</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="s2">&quot;Property&quot;</span>
+                        <span class="n">root</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">/Task/</span><span class="si">{}</span><span class="s2">/EnvVariables&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">,</span> <span class="n">tid</span><span class="p">),</span> <span class="n">root</span><span class="p">)</span>
+
+        <span class="c1"># do the final commit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">/Submit&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Queued</span></div>
+
+<div class="viewcode-block" id="RestScheduler.check_template"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler.check_template">[docs]</a>    <span class="k">def</span> <span class="nf">check_template</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check if template is available</span>
+
+<span class="sd">        :raises hpc.HpcError: if Default or non-existing template is being used</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;JobTemplates&quot;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GET&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">i</span><span class="o">.</span><span class="n">text</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">fromstring</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">text</span><span class="p">)}</span> <span class="o">-</span> <span class="p">{</span><span class="s2">&quot;Default&quot;</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;error: template &#39;</span><span class="si">{}</span><span class="s2">&#39; does not exist!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">template</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="RestScheduler.cancel_job"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler.cancel_job">[docs]</a>    <span class="k">def</span> <span class="nf">cancel_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        cancel specified job. here, we remove the job from the queue,</span>
+<span class="sd">        but the job remains in the scheduler.</span>
+
+<span class="sd">        :param str message: message to display at HPC Job Manager</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">&#39;string&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;xmlns&quot;</span><span class="p">:</span> <span class="s2">&quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;</span><span class="p">})</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">message</span><span class="p">[:</span><span class="mi">127</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">/Cancel&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">),</span> <span class="n">root</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="s2">&quot;Forced=True&quot;</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">jobstate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: state of job</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_request</span><span class="p">(</span><span class="s2">&quot;Job/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">),</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GET&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">fromstring</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">text</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">text</span> <span class="o">==</span> <span class="s2">&quot;State&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+                <span class="k">break</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span>
+
+<div class="viewcode-block" id="RestScheduler.wait_until_finished"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_rest.RestScheduler.wait_until_finished">[docs]</a>    <span class="k">def</span> <span class="nf">wait_until_finished</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        wait until job finishes</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *timeout* (``int``): wait timeout [s]</span>
+<span class="sd">            * *interval* (``int``): interval time [s]</span>
+<span class="sd">        :return `JobState`: final state of job</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span><span class="p">:</span>
+            <span class="n">ostate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span>
+            <span class="n">timeout</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">,</span> <span class="mi">12</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;waiting until max (</span><span class="si">%s</span><span class="s2"> | finished | failed | canceled)....&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">s&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">timeout</span><span class="p">))</span>
+
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstate</span> <span class="o">!=</span> <span class="n">ostate</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job state changed from </span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                                      <span class="nb">str</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="n">ostate</span><span class="p">)),</span> <span class="nb">str</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span><span class="p">)))</span>
+                    <span class="n">ostate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span>
+
+                <span class="k">if</span> <span class="n">time</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">timeout</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstate</span> <span class="ow">in</span> <span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">Finished</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Failed</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Canceled</span><span class="p">,):</span>
+                    <span class="k">break</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interval&quot;</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="mi">12</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span></div></div>
+
+    <span class="c1"># def _set_jattr(self, name, value):</span>
+    <span class="c1">#     &quot;&quot;&quot;set a job attribute&quot;&quot;&quot;</span>
+    <span class="c1">#     root = Element(&#39;ArrayOfProperty&#39;, {&quot;xmlns&quot;: &quot;http://schemas.microsoft.com/HPCS2008R2/common&quot;})</span>
+    <span class="c1">#     self._add_prop(root, name, to_string(value))</span>
+    <span class="c1">#     res = self._request(&quot;Job/{}&quot;.format(self._jobid), root)</span>
+    <span class="c1">#     # tid = int(fromstring(self._request(&quot;Job/{}&quot;.format(self._jobid), root).text).text)</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,385 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.logger</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.logger</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">logger.py</span>
+<span class="sd">---------</span>
+
+<span class="sd">DummyLogger: uses just print / stderr</span>
+<span class="sd">get_logger: wrapper for Python&#39;s logger for HPC stuff</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">environ</span>
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span><span class="p">,</span> <span class="n">StreamHandler</span><span class="p">,</span> <span class="n">Formatter</span><span class="p">,</span> <span class="n">DEBUG</span><span class="p">,</span> <span class="n">WARN</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="kn">import</span> <span class="n">warn</span><span class="p">,</span> <span class="n">filterwarnings</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">time</span><span class="p">,</span> <span class="n">gmtime</span><span class="p">,</span> <span class="n">ctime</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">recmp</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">from</span> <span class="nn">keyring</span> <span class="kn">import</span> <span class="n">get_password</span><span class="p">,</span> <span class="n">set_password</span><span class="p">,</span> <span class="n">delete_password</span><span class="p">,</span> <span class="n">errors</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">StringTypes</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,)</span>
+
+<span class="c1"># - HPC imports --------------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">DATEFORMAT</span> <span class="o">=</span> <span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span>
+<span class="n">Formatter</span><span class="o">.</span><span class="n">converter</span> <span class="o">=</span> <span class="n">gmtime</span>
+
+
+<span class="c1"># - classes and functions ----------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="DummyLogger"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.DummyLogger">[docs]</a><span class="k">class</span> <span class="nc">DummyLogger</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0903</span>
+    <span class="sd">&quot;&quot;&quot;dummy logger&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DummyLogger.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.DummyLogger.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_print</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;use real print or not&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_use_print</span> <span class="o">=</span> <span class="kc">False</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">use_print</span><span class="p">,</span> <span class="s2">&quot;__call__&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">use_print</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span> <span class="o">=</span> <span class="n">use_print</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">use_print</span><span class="p">,</span> <span class="s2">&quot;__call__&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="nf">_dummy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="o">*</span><span class="n">xtra</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;if store, store!&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">xtra</span><span class="p">:</span>  <span class="c1"># sometimes the ducks are stupid and we need to ignore E1102</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">%</span> <span class="n">xtra</span><span class="p">)</span>  <span class="c1"># pylint: disable=E1102</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>  <span class="c1"># pylint: disable=E1102</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_print</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;print text&quot;&quot;&quot;</span>
+        <span class="nb">print</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">%</span> <span class="n">args</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_perr</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;print to stderr&quot;&quot;&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">%</span> <span class="n">args</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DummyLogger.flush"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.DummyLogger.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;flush me dummily&quot;&quot;&quot;</span></div>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">which</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;for each missing, return dummy&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_print</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_perr</span> <span class="k">if</span> <span class="n">which</span> <span class="o">==</span> <span class="s2">&quot;error&quot;</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_print</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dummy</span></div>
+
+
+<div class="viewcode-block" id="ListStream"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream">[docs]</a><span class="k">class</span> <span class="nc">ListStream</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;grab stdout from a call&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ListStream.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;additional dict to take over&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span></div>
+
+<div class="viewcode-block" id="ListStream.write"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream.write">[docs]</a>    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">txt</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;grab text into internal data&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">txt</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ListStream.read"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return read in data&quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+<div class="viewcode-block" id="ListStream.seek"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream.seek">[docs]</a>    <span class="k">def</span> <span class="nf">seek</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;rewind&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+<div class="viewcode-block" id="ListStream.flush"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ListStream.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;flush me&quot;&quot;&quot;</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;go&quot;&quot;&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;stop and reset&quot;&quot;&quot;</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">__stdout__</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">__stderr__</span>
+
+    <span class="n">close</span> <span class="o">=</span> <span class="fm">__exit__</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;whatever we gave&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">[</span><span class="n">item</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="StdFormatter"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.StdFormatter">[docs]</a><span class="k">class</span> <span class="nc">StdFormatter</span><span class="p">(</span><span class="n">Formatter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;colorize the format for HTML output&quot;&quot;&quot;</span>
+
+    <span class="n">LEVEL_FRMT</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{:^8}</span><span class="s1">&#39;</span>
+    <span class="n">COLORS</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>
+                     <span class="p">{</span><span class="mi">40</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;ERROR&quot;</span><span class="p">),</span>
+                      <span class="mi">30</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;WARNING&quot;</span><span class="p">),</span>
+                      <span class="mi">20</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;INFO&quot;</span><span class="p">)})</span>
+
+<div class="viewcode-block" id="StdFormatter.format"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.StdFormatter.format">[docs]</a>    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;overwrite default&quot;&quot;&quot;</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">levelname</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">COLORS</span><span class="p">[</span><span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">Formatter</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="ColoredFormatter"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ColoredFormatter">[docs]</a><span class="k">class</span> <span class="nc">ColoredFormatter</span><span class="p">(</span><span class="n">StdFormatter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;colorize the format for HTML output&quot;&quot;&quot;</span>
+
+    <span class="n">LEVEL_FRMT</span> <span class="o">=</span> <span class="s1">&#39;&lt;span style=&quot;background-color: </span><span class="si">{}</span><span class="s1">&quot;&gt;</span><span class="si">{:^8}</span><span class="s1">&lt;/span&gt;&#39;</span>
+    <span class="n">LOG_COLOR</span> <span class="o">=</span> <span class="s1">&#39;&lt;span style=&quot;color: </span><span class="si">{}</span><span class="s1">&quot;&gt;</span><span class="si">{}</span><span class="s1">&lt;/span&gt;&#39;</span>
+    <span class="n">COLORS</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="s2">&quot;DEBUG&quot;</span><span class="p">),</span>
+                     <span class="p">{</span><span class="mi">40</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">),</span>
+                      <span class="mi">30</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;orange&quot;</span><span class="p">,</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">),</span>
+                      <span class="mi">20</span><span class="p">:</span> <span class="n">LEVEL_FRMT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;yellow&quot;</span><span class="p">,</span> <span class="s2">&quot;INFO&quot;</span><span class="p">)})</span>
+
+<div class="viewcode-block" id="ColoredFormatter.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ColoredFormatter.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init the Formatter&quot;&quot;&quot;</span>
+        <span class="n">StdFormatter</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cmpl</span> <span class="o">=</span> <span class="n">recmp</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;starting\ssubtask\s(\d+)\s\(id \d+\)&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_http</span> <span class="o">=</span> <span class="n">recmp</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(.*)(https?:\/\/[-a-zA-Z0-9:%._\+~#?&amp;\//=()]{1,256})(\b.*)&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ColoredFormatter.format"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.ColoredFormatter.format">[docs]</a>    <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;overwrite default&quot;&quot;&quot;</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">StdFormatter</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="s2">&quot;color&quot;</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOG_COLOR</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">color</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mtc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cmpl</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">mtc</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&lt;span style=&quot;background-color: LINEN&quot; id=&quot;stid</span><span class="si">{}</span><span class="s1">&quot;&gt;</span><span class="si">{}</span><span class="s1">&lt;/span&gt;</span><span class="si">{}</span><span class="s1">&#39;</span>\
+                    <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">msg</span><span class="p">[:</span><span class="n">mtc</span><span class="o">.</span><span class="n">start</span><span class="p">()],</span> <span class="nb">int</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="n">mtc</span><span class="o">.</span><span class="n">start</span><span class="p">():</span><span class="n">mtc</span><span class="o">.</span><span class="n">end</span><span class="p">()],</span>
+                            <span class="n">msg</span><span class="p">[</span><span class="n">mtc</span><span class="o">.</span><span class="n">end</span><span class="p">():])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">mtc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_http</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">mtc</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{0}</span><span class="s1">&lt;a href=&quot;</span><span class="si">{1}</span><span class="s1">&quot;&gt;</span><span class="si">{1}</span><span class="s1">&lt;/a&gt;</span><span class="si">{2}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="n">msg</span></div></div>
+
+
+<div class="viewcode-block" id="get_logger"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.get_logger">[docs]</a><span class="k">def</span> <span class="nf">get_logger</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">strms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    provide a logger with a specific name</span>
+
+<span class="sd">    :param str name:   name, which should appear in the log</span>
+<span class="sd">    :param list strms: streams to log to</span>
+<span class="sd">    :param str prefix: prefix each message</span>
+<span class="sd">    :param int level: log level</span>
+<span class="sd">    :return:  object of type `logger`</span>
+<span class="sd">    :rtype: `logger`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Create a Logger with the specified name</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">DEBUG</span> <span class="k">if</span> <span class="n">level</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">WARN</span><span class="p">)</span>
+
+    <span class="c1"># this is for module tests, log handlers are not cleaned up, but left behind,</span>
+    <span class="c1"># so we initialize every time anew, but doesn&#39;t matter, as for each logger needed,</span>
+    <span class="c1"># we&#39;re not calling get_logger frequently</span>
+    <span class="k">while</span> <span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="n">fmt</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">%%</span><span class="s1">(asctime)s.</span><span class="si">%%</span><span class="s1">(msecs)03d </span><span class="si">%%</span><span class="s1">(name)-15s </span><span class="si">%%</span><span class="s1">(levelname)-8s </span><span class="si">%s%%</span><span class="s1">(message)s&#39;</span> <span class="o">%</span> <span class="n">prefix</span>
+
+    <span class="n">frmter</span> <span class="o">=</span> <span class="p">[</span><span class="n">StdFormatter</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">fmt</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="n">DATEFORMAT</span><span class="p">),</span> <span class="n">ColoredFormatter</span><span class="p">(</span><span class="n">fmt</span><span class="o">=</span><span class="n">fmt</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="n">DATEFORMAT</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">strms</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">strms</span> <span class="o">=</span> <span class="p">[[</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="kc">False</span><span class="p">]]</span>
+
+    <span class="k">for</span> <span class="n">strm</span><span class="p">,</span> <span class="n">frmt</span> <span class="ow">in</span> <span class="n">strms</span><span class="p">:</span>
+        <span class="n">hdl</span> <span class="o">=</span> <span class="n">StreamHandler</span><span class="p">(</span><span class="n">strm</span><span class="p">)</span>
+        <span class="n">hdl</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">frmter</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">frmt</span><span class="p">)])</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">hdl</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">logger</span></div>
+
+
+<div class="viewcode-block" id="timeit"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.timeit">[docs]</a><span class="k">def</span> <span class="nf">timeit</span><span class="p">(</span><span class="n">method</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    decorate a method / function to measure execution time</span>
+<span class="sd">    idea from https://medium.com/pythonhive/python-decorator-to-measure-the-execution-time-of-methods-fa04cb6bb36d</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">timed</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">ts</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">method</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">te</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{!s}</span><span class="s2">: </span><span class="si">{:.3f}</span><span class="s2"> ms&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">method</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">(</span><span class="n">te</span> <span class="o">-</span> <span class="n">ts</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;logger&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;logger&#39;</span><span class="p">](</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">return</span> <span class="n">timed</span></div>
+
+
+<div class="viewcode-block" id="deprecated"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.deprecated">[docs]</a><span class="k">def</span> <span class="nf">deprecated</span><span class="p">(</span><span class="n">replacement</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    decorate functions being deprecated soon.</span>
+<span class="sd">    It will result in a warning being emitted when function is used.</span>
+
+<span class="sd">    python ::</span>
+
+<span class="sd">        @deprecated  # if you just want to state that it&#39;s deprecated</span>
+<span class="sd">        def foo():</span>
+<span class="sd">            pass</span>
+
+<span class="sd">        # or</span>
+
+<span class="sd">        @deprecated(&#39;bar&#39;)  # if you want to tell a replacement (bar)</span>
+<span class="sd">        def foo():</span>
+<span class="sd">            pass</span>
+
+<span class="sd">    :param str|property replacement: name of function / method / property to replace decorated one</span>
+<span class="sd">    :return: inner function</span>
+<span class="sd">    :rtype: property</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">outer</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+        <span class="sd">&quot;&quot;&quot;outer call wraps message output&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">{}</span><span class="s2">&#39; is deprecated&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">fget</span><span class="o">.</span><span class="n">func_name</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">property</span><span class="p">)</span> <span class="k">else</span> <span class="n">func</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">{}</span><span class="s2">&#39; is deprecated&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">fget</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">property</span><span class="p">)</span> <span class="k">else</span> <span class="n">func</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">replacement</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">+=</span> <span class="s2">&quot;, </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">replacement</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">replacement</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">)</span> <span class="k">else</span> <span class="n">replacement</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">func</span><span class="o">.</span><span class="vm">__doc__</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">func</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">msg</span>
+
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;inner call outputs message&quot;&quot;&quot;</span>
+            <span class="n">warn</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">inner</span>
+
+    <span class="k">return</span> <span class="n">outer</span></div>
+
+
+<div class="viewcode-block" id="suppress_warnings"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.suppress_warnings">[docs]</a><span class="k">def</span> <span class="nf">suppress_warnings</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    suppress python warnings</span>
+<span class="sd">    https://stackoverflow.com/questions/14463277/how-to-disable-python-warnings</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">call_fnc</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check and return the instance of class (already being instantiated) to suppress warnings</span>
+
+<span class="sd">        :param args: std arguments to pass</span>
+<span class="sd">        :param kwargs: xtra args to pass</span>
+<span class="sd">        :return: function</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;default&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">call_fnc</span></div>
+
+
+<div class="viewcode-block" id="HpcPassword"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.HpcPassword">[docs]</a><span class="k">class</span> <span class="nc">HpcPassword</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;wrapper to get all users stored password&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HpcPassword.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.HpcPassword.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">service</span><span class="o">=</span><span class="s2">&quot;HPC&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init me&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sid</span> <span class="o">=</span> <span class="n">service</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;provide with statement support&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;exit&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;get the secret for given key&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">get_password</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sid</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">sec</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set a certain secret&quot;&quot;&quot;</span>
+        <span class="n">set_password</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sid</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">sec</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__delitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;delete a certain secret&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">delete_password</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sid</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">errors</span><span class="o">.</span><span class="n">PasswordDeleteError</span><span class="p">:</span>
+            <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="dlog"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.logger.dlog">[docs]</a><span class="k">def</span> <span class="nf">dlog</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;log some debug info&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lufs009x.li.de.conti.de\hpc\HPC_submit\sven\dlog.txt&quot;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;[</span><span class="si">{}</span><span class="s2"> @ </span><span class="si">{}</span><span class="s2">] </span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ctime</span><span class="p">(),</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;COMPUTERNAME&quot;</span><span class="p">],</span> <span class="n">text</span><span class="p">))</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

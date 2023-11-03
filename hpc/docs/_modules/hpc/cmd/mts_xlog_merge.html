@@ -1,0 +1,134 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.cmd.mts_xlog_merge</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.cmd.mts_xlog_merge</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">mts_xlog_merge.py</span>
+<span class="sd">-----------------</span>
+
+<span class="sd">This script merge mts xlog file for error and exception data collected from HPC clusters</span>
+
+<span class="sd">Example:</span>
+
+<span class="sd">    &gt; mts_xlog_merge -ler LU00156VMA_Error_28_05_2020_16_39_30.csv -ber OZAS012A_Error_22_05_2020_09_32_52.csv</span>
+<span class="sd">        -aer QHS6U5CA_Error_28_05_2020_05_20_36.csv -lex LU00156VMA_Exception_28_05_2020_16_39_30.csv</span>
+<span class="sd">        -bex OZAS012A_Exception_22_05_2020_09_32_52.csv -aex QHS6U5CA_Exception_28_05_2020_05_20_36.csv</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+
+<span class="n">DATETIME</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;_</span><span class="si">%d</span><span class="s1">_%m_%Y_%H_%M_%S&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="mts_xlog_merge_error"><a class="viewcode-back" href="../../../hpc.cmd.html#hpc.cmd.mts_xlog_merge.mts_xlog_merge_error">[docs]</a><span class="k">def</span> <span class="nf">mts_xlog_merge_error</span><span class="p">(</span><span class="n">lnd</span><span class="p">,</span> <span class="n">bng</span><span class="p">,</span> <span class="n">abh</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    merge xlog data for error</span>
+
+<span class="sd">    :param str lnd: csv file</span>
+<span class="sd">    :param str bng: csv file</span>
+<span class="sd">    :param str abh: csv file</span>
+<span class="sd">    :return: 0</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ldf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">lnd</span><span class="p">)</span>
+    <span class="n">bdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">bng</span><span class="p">)</span>
+    <span class="n">adf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">abh</span><span class="p">)</span>
+    <span class="n">edf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">ldf</span><span class="p">,</span> <span class="n">bdf</span><span class="p">,</span> <span class="n">adf</span><span class="p">])</span>
+    <span class="n">edf</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="n">edf</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;mts_xlog_error_data&#39;</span> <span class="o">+</span> <span class="n">DATETIME</span> <span class="o">+</span> <span class="s1">&#39;.csv&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="mts_xlog_merge_exception"><a class="viewcode-back" href="../../../hpc.cmd.html#hpc.cmd.mts_xlog_merge.mts_xlog_merge_exception">[docs]</a><span class="k">def</span> <span class="nf">mts_xlog_merge_exception</span><span class="p">(</span><span class="n">lndx</span><span class="p">,</span> <span class="n">bngx</span><span class="p">,</span> <span class="n">abhx</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    merge xlog data for exception</span>
+
+<span class="sd">    :param str lndx: csv file</span>
+<span class="sd">    :param str bngx: csv file</span>
+<span class="sd">    :param str abhx: csv file</span>
+<span class="sd">    :return: 0</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">lxdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">lndx</span><span class="p">)</span>
+    <span class="n">bxdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">bngx</span><span class="p">)</span>
+    <span class="n">axdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">abhx</span><span class="p">)</span>
+    <span class="n">xdf</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">lxdf</span><span class="p">,</span> <span class="n">bxdf</span><span class="p">,</span> <span class="n">axdf</span><span class="p">])</span>
+    <span class="n">xdf</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="n">xdf</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;mts_xlog_exception_data&#39;</span> <span class="o">+</span> <span class="n">DATETIME</span> <span class="o">+</span> <span class="s1">&#39;.csv&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+
+    <span class="n">opts</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">prog</span><span class="o">=</span><span class="s1">&#39;mtx_xlog_merge&#39;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-ler&quot;</span><span class="p">,</span> <span class="s2">&quot;--lnd_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog error csv file for LND cluster, &lt;headnode&gt;_Error_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-ber&quot;</span><span class="p">,</span> <span class="s2">&quot;--bng_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog error csv file for BNG Cluster, &lt;headnode&gt;_Error_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-aer&quot;</span><span class="p">,</span> <span class="s2">&quot;--abh_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog error csv file for ABH cluster, &lt;headnode&gt;_Error_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-lex&quot;</span><span class="p">,</span> <span class="s2">&quot;--lndx_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog exception csv file LND cluster, &lt;headnode&gt;_Exception_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-bex&quot;</span><span class="p">,</span> <span class="s2">&quot;--bngx_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog exception csv file BNG cluster, &lt;headnode&gt;_Exception_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-aex&quot;</span><span class="p">,</span> <span class="s2">&quot;--abhx_data&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;xlog exception csv file ABH cluster, &lt;headnode&gt;_Exception_&lt;dt&gt;.csv&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+        <span class="n">mts_xlog_merge_error</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">lnd_data</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">bng_data</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">abh_data</span><span class="p">)</span>
+        <span class="n">mts_xlog_merge_exception</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">lndx_data</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">bngxdata</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">abhxdata</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">opts</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

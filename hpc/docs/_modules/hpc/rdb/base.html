@@ -1,0 +1,642 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb.base</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.rdb.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">base_db.py</span>
+<span class="sd">----------</span>
+
+<span class="sd">base database interface</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=E1103</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">stat</span><span class="p">,</span> <span class="n">chmod</span><span class="p">,</span> <span class="n">sep</span><span class="p">,</span> <span class="n">altsep</span><span class="p">,</span> <span class="n">makedirs</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">basename</span><span class="p">,</span> <span class="n">dirname</span>
+<span class="kn">from</span> <span class="nn">stat</span> <span class="kn">import</span> <span class="n">ST_MODE</span><span class="p">,</span> <span class="n">S_IWRITE</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">search</span><span class="p">,</span> <span class="n">sub</span><span class="p">,</span> <span class="n">split</span> <span class="k">as</span> <span class="n">resplit</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">seed</span><span class="p">,</span> <span class="n">random</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">from</span> <span class="nn">zlib</span> <span class="kn">import</span> <span class="n">decompress</span><span class="p">,</span> <span class="n">compress</span> <span class="k">as</span> <span class="n">zcomp</span><span class="p">,</span> <span class="n">error</span> <span class="k">as</span> <span class="n">zliberr</span><span class="p">,</span> <span class="n">crc32</span>
+<span class="kn">from</span> <span class="nn">sqlite3</span> <span class="kn">import</span> <span class="n">connect</span> <span class="k">as</span> <span class="n">sqconnect</span><span class="p">,</span> <span class="n">register_adapter</span><span class="p">,</span> <span class="n">register_converter</span><span class="p">,</span> <span class="n">Binary</span><span class="p">,</span> <span class="n">PARSE_DECLTYPES</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+<span class="kn">from</span> <span class="nn">cx_Oracle</span> <span class="kn">import</span> <span class="n">connect</span> <span class="k">as</span> <span class="n">cxconnect</span><span class="p">,</span> <span class="n">NUMBER</span><span class="p">,</span> <span class="n">BLOB</span><span class="p">,</span> <span class="n">DatabaseError</span>  <span class="c1"># pylint:disable=E0611</span>
+
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>  <span class="c1"># pylint: disable=E0401</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span><span class="p">,</span> <span class="n">LongType</span>
+<span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">long</span> <span class="o">=</span> <span class="nb">int</span>  <span class="c1"># pylint: disable=C0103</span>
+    <span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">StringIO</span><span class="p">,</span> <span class="n">BytesIO</span>
+    <span class="n">StringTypes</span><span class="p">,</span> <span class="n">LongType</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,),</span> <span class="nb">int</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span><span class="p">,</span> <span class="n">ERR_HPC_DATABASE</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">VGA_DB_CONN</span>
+<span class="kn">from</span> <span class="nn">..core.path</span> <span class="kn">import</span> <span class="n">splitdrive</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="c1"># db_type --&gt; 0: sqlite, 1: oracle</span>
+<span class="n">DBTYPE</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;sqlite3&quot;</span><span class="p">,</span> <span class="s2">&quot;cx_Oracle&quot;</span><span class="p">,</span> <span class="s2">&quot;postgresql&quot;</span><span class="p">,</span> <span class="s2">&quot;appsrv&quot;</span><span class="p">]</span>
+<span class="n">SQL_TABLENAMES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SELECT name FROM sqlite_master WHERE type in (&#39;table&#39;, &#39;view&#39;)&quot;</span><span class="p">,</span>
+                  <span class="s2">&quot;SELECT DISTINCT OBJECT_NAME FROM ALL_OBJECTS WHERE OBJECT_TYPE IN (&#39;TABLE&#39;, &#39;VIEW&#39;) &quot;</span>
+                  <span class="s2">&quot;AND OWNER = $TS&quot;</span><span class="p">]</span>
+<span class="n">SQL_DT_EXPR</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;CURRENT_TIMESTAMP&quot;</span><span class="p">,</span> <span class="s2">&quot;CURRENT_DATE&quot;</span><span class="p">]</span>
+<span class="n">SQL_DATETIME</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SELECT strftime(&#39;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&#39;,&#39;now&#39;)&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;SELECT TO_CHAR(systimestamp at time zone &#39;utc&#39;, &#39;YYYY-MM-DD HH24:MI:SS&#39;) FROM SYS.dual&quot;</span><span class="p">]</span>
+<span class="n">SQL_COLUMNS</span> <span class="o">=</span> <span class="p">[([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;PRAGMA table_info($TBL)&quot;</span><span class="p">),</span>
+               <span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;SELECT column_name, data_type FROM all_tab_cols WHERE table_name = &#39;$TBL&#39; AND owner = &#39;$TP&#39;&quot;</span><span class="p">)]</span>
+
+<span class="n">VARS</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;blob&#39;</span><span class="p">:</span> <span class="n">Binary</span><span class="p">},</span> <span class="p">{</span><span class="s1">&#39;number&#39;</span><span class="p">:</span> <span class="n">NUMBER</span><span class="p">,</span> <span class="s1">&#39;blob&#39;</span><span class="p">:</span> <span class="n">BLOB</span><span class="p">}]</span>
+
+<span class="n">SQLITE_FILE_EXT</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;.db&quot;</span><span class="p">,</span> <span class="s2">&quot;.sqlite&quot;</span><span class="p">,)</span>
+<span class="n">DEFAULT_DATETIME_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span>
+
+
+<span class="c1"># - functions and classes ----------------------------------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">_reconnect</span><span class="p">(</span><span class="n">fnc</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;reconnect to DB, just in case&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_decorate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;inner decoration (providing self)&quot;&quot;&quot;</span>
+        <span class="n">kws</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">print_err</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;print_err&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_print_err</span><span class="p">)</span>  <span class="c1"># pylint: disable=W0212</span>
+        <span class="n">exc_retry</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;exc_retry&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_maxretry</span><span class="p">)</span>  <span class="c1"># pylint: disable=W0212</span>
+        <span class="n">raise_err</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;raise_err&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">exc_retry</span><span class="p">,</span> <span class="mi">1</span><span class="p">)):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">fnc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kws</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">print_err</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DB error: </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="p">))</span>
+                <span class="n">mtc</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;.+ORA-([0-9]</span><span class="si">{5}</span><span class="s2">):.+&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">mtc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="mi">24280</span> <span class="o">&gt;=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">29250</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">reconnect</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="n">raise_err</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;unable to execute SQL (ORA-</span><span class="si">%s</span><span class="s2">)!&quot;</span> <span class="o">%</span> <span class="n">mtc</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">mtc</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">ERR_HPC_DATABASE</span><span class="p">)</span>
+        <span class="c1"># else:  # pragma: no cover</span>
+        <span class="c1">#     raise HpcError(&quot;unable to connect to DB!&quot;, ERR_HPC_DATABASE)</span>
+    <span class="k">return</span> <span class="n">_decorate</span>
+
+
+<div class="viewcode-block" id="BaseDbException"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDbException">[docs]</a><span class="k">class</span> <span class="nc">BaseDbException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base database exception&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="BaseDB"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB">[docs]</a><span class="k">class</span> <span class="nc">BaseDB</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;Base implementation of the Database Interface&quot;&quot;&quot;</span>
+
+    <span class="n">SQLITE</span><span class="p">,</span> <span class="n">ORACLE</span><span class="p">,</span> <span class="n">APPSRV</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+
+<div class="viewcode-block" id="BaseDB.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db_connection</span><span class="o">=</span><span class="s2">&quot;HPC&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0915,R1260</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize database</span>
+
+<span class="sd">        :param str db_connection: The database connection to be used</span>
+
+<span class="sd">        :param dict kwargs: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *aggregates* (``list``): list of additional aggregates</span>
+<span class="sd">            * *maxtry* (``int``): try maximum times to get connection to Oracle DB, default: 60</span>
+<span class="sd">            * *create* (``bool``): flag to create a non-existing sqlite DB, default: False (do not create)</span>
+<span class="sd">            * *journal* (``bool``): turn off journal mode with sqlite DB, default: True</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;maxtry&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="nb">int</span><span class="p">),</span> <span class="s2">&quot;maxtry argument should be int!&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="nb">bool</span><span class="p">),</span> <span class="s2">&quot;create flag should be boolean!&quot;</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;journal&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="nb">bool</span><span class="p">),</span> <span class="s2">&quot;journal mode should be boolean!&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;autocommit&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_own_conn</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conn_dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_maxretry</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;maxtry&#39;</span><span class="p">,</span> <span class="mi">23</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_print_err</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;print_err&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_agregates</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;aggregates&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_functions</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;functions&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_call_tout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;call_timeout&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># self._functions.extend([(self._path.subpath, 1,), basename])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">db_connection</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>  <span class="c1"># if we have a connection string, do connect here</span>
+            <span class="k">if</span> <span class="n">db_connection</span> <span class="o">==</span> <span class="s1">&#39;HPC&#39;</span><span class="p">:</span>  <span class="c1"># do we have a string from predefined?</span>
+                <span class="n">db_connection</span> <span class="o">=</span> <span class="n">DEFAULT_DB_CONN</span>
+            <span class="k">elif</span> <span class="n">db_connection</span> <span class="o">==</span> <span class="s1">&#39;VGA&#39;</span><span class="p">:</span>
+                <span class="n">db_connection</span> <span class="o">=</span> <span class="n">VGA_DB_CONN</span>
+            <span class="k">elif</span> <span class="n">db_connection</span> <span class="o">==</span> <span class="s1">&#39;VGA_PWR&#39;</span><span class="p">:</span>
+                <span class="n">db_connection</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;VAL_GLOBAL_PWUSER_RES&quot;</span><span class="p">,</span> <span class="s2">&quot;VAL_GLBL_PWUSER_RES1&quot;</span><span class="p">,</span> <span class="s2">&quot;racadmpe&quot;</span><span class="p">,),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span>
+                                 <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">cxconnect</span><span class="p">,</span> <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">,</span> <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;VGA_PWR@oracle&quot;</span><span class="p">,</span>
+                                 <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ALTER SESSION SET current_schema = VAL_GLOBAL_ADMIN&quot;</span><span class="p">],</span>
+                                 <span class="s2">&quot;set&quot;</span><span class="p">:</span> <span class="p">[(</span><span class="s2">&quot;autocommit&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">,)]}</span>
+            <span class="k">elif</span> <span class="s2">&quot;uid=&quot;</span> <span class="ow">in</span> <span class="n">db_connection</span> <span class="ow">and</span> <span class="s2">&quot;pwd=&quot;</span> <span class="ow">in</span> <span class="n">db_connection</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">conn</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;;&#39;</span><span class="p">))</span>
+                <span class="n">db_connection</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">conn</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">],</span> <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;pwd&quot;</span><span class="p">],</span> <span class="n">conn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dbq&quot;</span><span class="p">,</span> <span class="s2">&quot;racadmpe&quot;</span><span class="p">),),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span>
+                                 <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">cxconnect</span><span class="p">,</span> <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">,</span>
+                                 <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">@oracle&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">conn</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]),</span>
+                                 <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ALTER SESSION SET current_schema = </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sch&quot;</span><span class="p">,</span> <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]))],</span>
+                                 <span class="s2">&quot;set&quot;</span><span class="p">:</span> <span class="p">[(</span><span class="s2">&quot;autocommit&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">,)]}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">db_connection</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+            <span class="c1"># seems like an sqlite3 ...</span>
+            <span class="c1"># if splitext(db_connection)[-1].lower() in SQLITE_FILE_EXT and \</span>
+            <span class="c1">#         (isfile(str(db_connection)) or kwargs.get(&quot;create&quot;, False)) or db_connection == &quot;:memory:&quot;:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">stat</span><span class="p">(</span><span class="n">db_connection</span><span class="p">)[</span><span class="n">ST_MODE</span><span class="p">]</span> <span class="o">&amp;</span> <span class="n">S_IWRITE</span><span class="p">:</span>
+                    <span class="n">chmod</span><span class="p">(</span><span class="n">db_connection</span><span class="p">,</span> <span class="n">S_IWRITE</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pylint: disable=W0702</span>
+                <span class="k">pass</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">db_connection</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="c1"># self.str_connection = db_connection</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">=</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span>
+            <span class="n">exe</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PRAGMA foreign_keys = ON&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;journal&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                <span class="n">exe</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;PRAGMA JOURNAL_MODE = OFF&quot;</span><span class="p">,</span> <span class="s2">&quot;PRAGMA synchronous = OFF&quot;</span><span class="p">])</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connect</span><span class="p">({</span><span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">sqconnect</span><span class="p">,</span> <span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">db_connection</span><span class="p">,),</span>
+                           <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;detect_types&quot;</span><span class="p">:</span> <span class="n">PARSE_DECLTYPES</span><span class="p">},</span> <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="n">exe</span><span class="p">,</span>
+                           <span class="s2">&quot;set&quot;</span><span class="p">:</span> <span class="p">[(</span><span class="s2">&quot;text_factory&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">,)],</span> <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="n">db_connection</span><span class="p">})</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">db_connection</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="c1"># arg = {}</span>
+            <span class="c1"># for i, v in [a.split(&#39;=&#39;, 2) for a in db_connection.split(&#39;;&#39;)]:</span>
+            <span class="c1">#     arg[i.strip().lower()] = v.strip()</span>
+            <span class="c1"># self.str_connection = (arg[&#39;uid&#39;], arg[&#39;pwd&#39;], arg.pop(&#39;dbname&#39;, kwargs.get(&#39;dbname&#39;, &#39;racadmpe&#39;)))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">=</span> <span class="n">db_connection</span><span class="p">[</span><span class="s2">&quot;db_type&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connect</span><span class="p">(</span><span class="n">db_connection</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">,</span> <span class="n">l</span><span class="p">:</span> <span class="p">[((</span><span class="n">r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">l</span> <span class="k">else</span> <span class="n">r</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                                          <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="p">))]</span>
+        <span class="c1"># otherwise we have an already existing connection</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="o">=</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">db_connection</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_own_conn</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span> <span class="o">=</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">autocommit</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">=</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">str_connection</span> <span class="o">=</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">str_connection</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span> <span class="o">=</span> <span class="n">db_connection</span><span class="o">.</span><span class="n">lob_conv</span>
+
+        <span class="c1"># as large objects need to be retrieved at once, speed it up here for each item of a record line</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">def</span> <span class="nf">_conv</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
+                <span class="sd">&quot;&quot;&quot;convert lobs&quot;&quot;&quot;</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">res</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">ret</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">decompress</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
+                        <span class="k">except</span> <span class="n">zliberr</span><span class="p">:</span>
+                            <span class="n">ret</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ret</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">ret</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span> <span class="o">=</span> <span class="n">_conv</span>
+            <span class="c1"># self.lob_conv = lambda r, l: [((str(r[i]) if r[i] is not None else None) if i in l else r[i])</span>
+            <span class="c1">#                               for i in range(len(r))]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">date_time_format</span> <span class="o">=</span> <span class="n">DEFAULT_DATETIME_FORMAT</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cur</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return some self descriptive information&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;connection: </span><span class="si">{}</span><span class="s2">, type: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">str_connection</span><span class="p">,</span> <span class="n">DBTYPE</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;being able to use with statement&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">_connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;connect to DB&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">conn</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_conn_dict</span> <span class="o">=</span> <span class="n">conn</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conn_dict</span>
+
+        <span class="n">seed</span><span class="p">()</span>  <span class="c1"># init rng</span>
+        <span class="n">exc</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">str_connection</span> <span class="o">=</span> <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;repr&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_maxretry</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>  <span class="c1"># min 3 minutes along...</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="o">=</span> <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;conn_func&quot;</span><span class="p">](</span><span class="o">*</span><span class="n">conn</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">],</span> <span class="o">**</span><span class="n">conn</span><span class="p">[</span><span class="s2">&quot;kwargs&quot;</span><span class="p">])</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mf">0.2</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">exc</span> <span class="o">=</span> <span class="n">ex</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">random</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;cannot connect to DB (</span><span class="si">{!s}</span><span class="s2">)!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span> <span class="n">ERR_HPC_DATABASE</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="n">register_adapter</span><span class="p">(</span><span class="n">LongType</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="s1">&#39;#</span><span class="si">{:d}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">2147483647</span> <span class="k">else</span> <span class="n">n</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+                <span class="n">register_converter</span><span class="p">(</span><span class="s2">&quot;integer&quot;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;#&#39;</span> <span class="k">else</span> <span class="n">n</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">register_converter</span><span class="p">(</span><span class="s2">&quot;integer&quot;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="nb">chr</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="s1">&#39;#&#39;</span> <span class="k">else</span> <span class="n">n</span><span class="p">))</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_agregates</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">create_aggregate</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">step</span><span class="o">.</span><span class="n">im_func</span><span class="o">.</span><span class="n">func_code</span><span class="o">.</span><span class="n">co_argcount</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">create_aggregate</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">step</span><span class="o">.</span><span class="vm">__func__</span><span class="o">.</span><span class="vm">__code__</span><span class="o">.</span><span class="n">co_argcount</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_functions</span><span class="p">:</span>
+                <span class="n">name</span><span class="p">,</span> <span class="n">argcnt</span><span class="p">,</span> <span class="n">func</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> \
+                    <span class="k">else</span> <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">func_code</span><span class="o">.</span><span class="n">co_argcount</span> <span class="k">if</span> <span class="n">PY2</span> <span class="k">else</span> <span class="n">i</span><span class="o">.</span><span class="vm">__code__</span><span class="o">.</span><span class="n">co_argcount</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">create_function</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">argcnt</span><span class="p">,</span> <span class="n">func</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">:</span>
+                <span class="n">toset</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;set&quot;</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="n">toset</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;isolation_level&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,))</span>
+                <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;set&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">toset</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_call_tout</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">,</span> <span class="s2">&quot;callTimeout&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_call_tout</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">DatabaseError</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_call_tout</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">conn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exec&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="bp">self</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">conn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;copy&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,)):</span>
+                <span class="n">k</span><span class="p">,</span> <span class="n">l</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">k</span> <span class="o">=</span> <span class="n">l</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">l</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">conn</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;set&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span>
+        <span class="n">sleep</span><span class="p">(</span><span class="mf">0.2</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BaseDB.reconnect"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.reconnect">[docs]</a>    <span class="k">def</span> <span class="nf">reconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+        <span class="sd">&quot;&quot;&quot;close and re-open connection&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_own_conn</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">sleep</span><span class="p">(</span><span class="mf">0.7</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connect</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="BaseDB.close"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close connection&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_own_conn</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">pass</span>  <span class="c1"># we&#39;ll get the exception when connection is lost</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="fm">__del__</span> <span class="o">=</span> <span class="n">close</span>
+    <span class="fm">__exit__</span> <span class="o">=</span> <span class="n">close</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">db_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return a string about what type of DB we have here.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">,</span> <span class="n">DBTYPE</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">]</span>
+
+<div class="viewcode-block" id="BaseDB.commit"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.commit">[docs]</a>    <span class="k">def</span> <span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Commit the pending transactions&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="BaseDB.rollback"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.rollback">[docs]</a>    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Rollback the pending transactions&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="BaseDB.mkvar"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.mkvar">[docs]</a>    <span class="k">def</span> <span class="nf">mkvar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vartype</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create a cx_Oracle / sqlite variable</span>
+
+<span class="sd">        :param str vartype: current supported ones are blob and number</span>
+<span class="sd">        :return: oracle variable</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        :raises Exception: when connection is unknown</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">VARS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">][</span><span class="n">vartype</span><span class="o">.</span><span class="n">lower</span><span class="p">()])</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">VARS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">][</span><span class="n">vartype</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span>
+
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;connection doesn&#39;t support var creation!&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="BaseDB.stream2blob"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.stream2blob">[docs]</a>    <span class="k">def</span> <span class="nf">stream2blob</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">compress</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        convert a stream object to oracle blob</span>
+
+<span class="sd">        :param stream stream: some stream from which data can be read</span>
+<span class="sd">        :param bool compress: do a zlib compress before converting</span>
+<span class="sd">        :return: cx_Oracle BLOB</span>
+<span class="sd">        :rtype: buffer</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">stream</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="s1">&#39;seek&#39;</span><span class="p">):</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">strm</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+                <span class="n">strm</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">strm</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+                <span class="n">strm</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+            <span class="n">stream</span> <span class="o">=</span> <span class="n">strm</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">compress</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">strm</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>
+                <span class="n">strm</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">zcomp</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="mi">9</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">strm</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">()</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="n">strm</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">zcomp</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">9</span><span class="p">))</span>
+            <span class="n">stream</span> <span class="o">=</span> <span class="n">strm</span>
+            <span class="n">stream</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Binary</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+        <span class="n">blob</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">BLOB</span><span class="p">)</span>
+        <span class="n">blob</span><span class="o">.</span><span class="n">setvalue</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">stream</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">blob</span></div>
+
+<div class="viewcode-block" id="BaseDB.execute"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.execute">[docs]</a>    <span class="nd">@_reconnect</span>
+    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912</span>
+        <span class="sd">&quot;&quot;&quot;see __call__(...)&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="nd">@_reconnect</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0915,R1260</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute SQL statement(s). Multiple statements can be semicolon (;) separated</span>
+
+<span class="sd">        :param str statement: SQL query, supported statements: select, insert, update, delete, execute</span>
+<span class="sd">        :param dict kwargs: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *insertmany* (``list[tuple]``): used to insert more then one item into DB</span>
+<span class="sd">            * *lob* (``int``): index / indices which column have LOB&#39;s to be read out</span>
+<span class="sd">            * *commit* (``bool``): overwrites autocommit</span>
+<span class="sd">            * *iter* (``bool``): return an iterator instead of a list</span>
+
+<span class="sd">        :return: returns all rows</span>
+<span class="sd">        :rtype: int|list|iterator</span>
+<span class="sd">        :raises Exception: once statement caused trouble</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">APPSRV</span><span class="p">:</span>  <span class="c1"># we handle it special here...</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">data</span>
+
+        <span class="n">iterate</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;iter&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">commit</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;commit&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">)</span>
+        <span class="n">insertmany</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;insertmany&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">lobo</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s2">&quot;lob&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">lobo</span> <span class="o">=</span> <span class="p">[</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;lob&#39;</span><span class="p">)]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;lob&#39;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span> <span class="k">else</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;lob&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lobo</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">lobo</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># helper to return proper insertion ID</span>
+        <span class="n">pat</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)returning\s(\w*);?$&quot;</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+        <span class="n">retlastid</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">pat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>
+                <span class="n">statement</span> <span class="o">=</span> <span class="n">statement</span><span class="p">[:</span><span class="n">pat</span><span class="o">.</span><span class="n">regs</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]]</span> <span class="o">+</span> <span class="n">pat</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot; INTO :id&quot;</span>
+                <span class="n">rid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mkvar</span><span class="p">(</span><span class="s1">&#39;number&#39;</span><span class="p">)</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rid</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+                <span class="n">statement</span> <span class="o">=</span> <span class="n">statement</span><span class="p">[:</span><span class="n">pat</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">retlastid</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="c1"># we can also replace $DT as current date time, $CD as current date and $CT as current time</span>
+        <span class="c1"># .replace(&quot;$DT&quot;, &quot;SYSDATE&quot; if self._db_type == -1 else &quot;CURRENT_TIMESTAMP&quot;)</span>
+        <span class="c1"># .replace(&quot;$CD&quot;, &quot;CURRENT_DATE&quot;)</span>
+        <span class="c1"># .replace(&quot;$CT&quot;, &quot;CURRENT_TIMESTAMP&quot; if self._db_type == -1 else &quot;CURRENT_TIME&quot;)</span>
+        <span class="n">statement</span> <span class="o">=</span> <span class="n">statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; None&quot;</span><span class="p">,</span> <span class="s2">&quot; null&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="n">statement</span> <span class="o">=</span> <span class="n">statement</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;NVL&#39;</span><span class="p">,</span> <span class="s1">&#39;IFNULL&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; FROM DUAL&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>\
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; NULLS LAST&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; NULLS FIRST&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">statement</span> <span class="o">=</span> <span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;WHERE ROWNUM (\&lt;=?|=)&quot;</span><span class="p">,</span> <span class="s2">&quot;LIMIT&quot;</span><span class="p">,</span> <span class="n">statement</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+            <span class="c1"># remove keyword to get more ease in checking later on</span>
+            <span class="n">kwd</span> <span class="o">=</span> <span class="n">statement</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+            <span class="c1"># execute</span>
+            <span class="k">if</span> <span class="n">insertmany</span><span class="p">:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">insertmany</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">lobo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+                    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">kwd</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;select&quot;</span><span class="p">,</span> <span class="s2">&quot;pragma&quot;</span><span class="p">,</span> <span class="s2">&quot;with&quot;</span><span class="p">,</span> <span class="s2">&quot;declare&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                    <span class="n">records</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">elif</span> <span class="n">lobo</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># let&#39;s do weird stuff here:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+                        <span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">lobo</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lob_conv</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">lobo</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)]</span>
+                    <span class="c1"># for rec in records:</span>
+                    <span class="c1">#     for i in lobo:</span>
+                    <span class="c1">#         if rec[i] is not None:</span>
+                    <span class="c1">#             try:</span>
+                    <span class="c1">#                 rec[i] = decompress(rec[i])</span>
+                    <span class="c1">#             except zliberr:  # pragma: no cover</span>
+                    <span class="c1">#                 pass</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">iterate</span><span class="p">:</span>
+                        <span class="n">records</span> <span class="o">=</span> <span class="n">cursor</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">records</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">cursor</span><span class="o">.</span><span class="n">fetchall</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">records</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">rowcount</span>
+                <span class="c1"># commit if not switched off</span>
+                <span class="k">if</span> <span class="n">commit</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocommit</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_trans_acted</span> <span class="o">=</span> <span class="kc">False</span>
+
+                <span class="k">if</span> <span class="n">pat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>  <span class="c1"># grab the returning ID if oracle</span>
+                    <span class="n">records</span> <span class="o">=</span> <span class="n">rid</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                        <span class="n">records</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">records</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">records</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">records</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">retlastid</span><span class="p">:</span>
+                    <span class="n">records</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">lastrowid</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;error: </span><span class="si">{!s}</span><span class="s2">, statement: </span><span class="si">{}</span><span class="s2"> data: </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">iterate</span><span class="p">:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cur</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cur</span> <span class="o">=</span> <span class="n">cursor</span>
+
+        <span class="c1"># done</span>
+        <span class="k">return</span> <span class="n">records</span>
+
+<div class="viewcode-block" id="BaseDB.executex"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.executex">[docs]</a>    <span class="k">def</span> <span class="nf">executex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statement</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute SQL statement(s).</span>
+
+<span class="sd">        :param str statement: SQL query, supported statements: select, insert, update, delete, execute</span>
+<span class="sd">        :param list args: additional arguments</span>
+<span class="sd">        :param dict kwargs: additional arguments</span>
+<span class="sd">        :return: returns all rows</span>
+<span class="sd">        :rtype: tuple</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;iter&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="k">yield</span> <span class="n">i</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cur</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cur</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="BaseDB.columns"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.columns">[docs]</a>    <span class="k">def</span> <span class="nf">columns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get a list of column names for a given table.</span>
+
+<span class="sd">        :param str table: name of table</span>
+<span class="sd">        :return: list of columns</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="n">SQL_COLUMNS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]]),</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="n">SQL_COLUMNS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]]))</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">(</span><span class="n">SQL_COLUMNS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                              <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;$TBL&#39;</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;$TP&#39;</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">,</span>
+                                                                             <span class="s2">&quot;current_schema&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)))]</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">tables</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: tables of DB</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">(</span><span class="n">SQL_TABLENAMES</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span><span class="p">]</span>
+                                   <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;$TS&#39;</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db_connection</span><span class="p">,</span> <span class="s2">&quot;current_schema&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)))]</span>
+
+<div class="viewcode-block" id="BaseDB.primary_key"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.BaseDB.primary_key">[docs]</a>    <span class="k">def</span> <span class="nf">primary_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the primary key column(s).</span>
+
+<span class="sd">        :param str table: name of table</span>
+<span class="sd">        :return: list of columns</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">(</span><span class="s2">&quot;SELECT COLUMN_NAME FROM ALL_CONSTRAINTS c &quot;</span>
+                                       <span class="s2">&quot;INNER JOIN ALL_CONS_COLUMNS USING(OWNER, CONSTRAINT_NAME) &quot;</span>
+                                       <span class="s2">&quot;WHERE c.CONSTRAINT_TYPE = &#39;P&#39; AND c.TABLE_NAME = :tbl&quot;</span><span class="p">,</span> <span class="n">tbl</span><span class="o">=</span><span class="n">table</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_type</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">(</span><span class="s2">&quot;PRAGMA table_info(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">table</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="p">[]</span></div></div>
+
+
+<div class="viewcode-block" id="tohex"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.tohex">[docs]</a><span class="k">def</span> <span class="nf">tohex</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;sqlite function to support hex output&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%X</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">val</span></div>
+
+
+<div class="viewcode-block" id="bitand"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.bitand">[docs]</a><span class="k">def</span> <span class="nf">bitand</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;sqlite function to support for oracle&#39;s bitand&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">col</span> <span class="o">&amp;</span> <span class="n">val</span></div>
+
+
+<div class="viewcode-block" id="serverpath"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.serverpath">[docs]</a><span class="k">def</span> <span class="nf">serverpath</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;only return server share part&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">filepath</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="n">sep</span><span class="p">,</span> <span class="n">altsep</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">splitdrive</span><span class="p">(</span><span class="n">filepath</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">jnr</span><span class="p">,</span> <span class="n">jps</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">,)</span> <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">jnr</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resplit</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">|/&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)[</span><span class="mi">0</span><span class="p">:</span><span class="n">jps</span><span class="p">])</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="basepath"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.basepath">[docs]</a><span class="k">def</span> <span class="nf">basepath</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;strip server share apart&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">filepath</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="n">sep</span><span class="p">,</span> <span class="n">altsep</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">splitdrive</span><span class="p">(</span><span class="n">filepath</span><span class="p">)[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">jnr</span><span class="p">,</span> <span class="n">jps</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">,)</span> <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">jnr</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">resplit</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">|/&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)[</span><span class="n">jps</span><span class="p">:])</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="crc"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.base.crc">[docs]</a><span class="k">def</span> <span class="nf">crc</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;calc crc32 out of filepath&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">crc32</span><span class="p">(</span><span class="n">filepath</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span> <span class="o">&amp;</span> <span class="n">long</span><span class="p">(</span><span class="mh">0xFFFFFFFF</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">crc32</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">filepath</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">))</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

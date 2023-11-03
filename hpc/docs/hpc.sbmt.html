@@ -1,0 +1,1960 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sbmt package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="next" title="hpc.sched package" href="hpc.sched.html" />
+    <link rel="prev" title="hpc.rdb package" href="hpc.rdb.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sched.html" title="hpc.sched package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="hpc.rdb.html" title="hpc.rdb package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" accesskey="U">hpc package</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-sbmt-package">
+<h1>hpc.sbmt package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.sbmt.apps">
+<span id="hpc-sbmt-apps-module"></span><h2>hpc.sbmt.apps module</h2>
+<div class="section" id="app-helper-py">
+<h3>app_helper.py</h3>
+<p>helper for <a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.Job</span></code></a> to encapsulate e.g. MTS or any other application</p>
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.job">
+<span id="hpc-sbmt-job-module"></span><h2>hpc.sbmt.job module</h2>
+<div class="section" id="job-py">
+<h3>job.py</h3>
+<p>job module for HPC.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="#hpc.sbmt.job.Job" title="hpc.sbmt.job.Job"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Job</span></code></a> (complete package)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.job.Job">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.job.</code><code class="descname">Job</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p><strong>main Interface of HPC.</strong></p>
+<ul class="simple">
+<li>You can use this class to submit jobs onto the ADAS HPC Cluster.</li>
+<li>For minimum functionality you need at least the <a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> and <a class="reference internal" href="hpc.html#hpc.TaskFactory" title="hpc.TaskFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.TaskFactory</span></code></a>.</li>
+<li>To simulate a whole submit and execute a testrun, you can use instead of
+the Hpc the <code class="xref py py-obj docutils literal notranslate"><span class="pre">HpcSim</span></code> class.</li>
+</ul>
+<p><strong>1. Example:</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import hpc</span>
+<span class="kn">import</span> <span class="nn">hpc</span>
+
+<span class="c1">#Connect to the HPC Server</span>
+<span class="k">with</span> <span class="n">hpc</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Trainging_Ping&#39;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s1">&#39;MFC310&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">job</span><span class="p">:</span>
+    <span class="n">factory</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+    <span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="s1">&#39;ping 127.0.0.1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>2. Example</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import hpc</span>
+<span class="kn">import</span> <span class="nn">hpc</span>
+
+<span class="c1"># calls the init and start job creation</span>
+<span class="k">with</span> <span class="n">hpc</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;my first job&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">&quot;Short_Test&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">job</span><span class="p">:</span>
+    <span class="c1"># create a factory from myJob to be able to create your tasks</span>
+    <span class="n">fact</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+    <span class="c1"># now create the task(s) finally</span>
+    <span class="n">fact</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="s1">&#39;ping 127.0.0.1&#39;</span><span class="p">)</span>
+<span class="c1"># when *with* exits, job is going to get submitted automagically.</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>initialize HPC job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – <em>head_node</em>, <em>name</em> and <em>project</em> must be given, others are optional (kwargs)</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>head_node</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): head node to use, default: site local simulation cluster</li>
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): <a class="reference internal" href="hpc.core.html#hpc.core.tds.validate_name" title="hpc.core.tds.validate_name"><code class="xref py py-meth docutils literal notranslate"><span class="pre">name</span> <span class="pre">of</span> <span class="pre">job</span></code></a></li>
+<li><em>project</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of project to use</li>
+<li><em>template</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of template</li>
+<li><em>priority</em> (<code class="docutils literal notranslate"><span class="pre">JobPriority</span></code>): initial priority, int and string values are allowed, e.g. ‘Normal+100’</li>
+<li><em>unit</em> (<code class="docutils literal notranslate"><span class="pre">JobUnit</span></code>): job unit (JobUnit), can be either Node, Core or Socket</li>
+<li><em>pyexe</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): python.exe including path pointing to another interpreter job should execute on</li>
+<li><em>notify_on_start</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job starts</li>
+<li><em>notify_on_completion</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job completes</li>
+<li><em>hold_time</em> (<code class="docutils literal notranslate"><span class="pre">datetime</span></code>): local date/time for first try to start job.</li>
+<li><em>depends</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): job ID(‘s) this job should depend upon</li>
+<li><em>requested_nodes</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of nodes this job should run</li>
+<li><em>excluded_nodes</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of nodes to be excluded</li>
+<li><em>min_hd_space</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): minimum HD space requirement for a node</li>
+<li><em>env</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): dictionary containing additional environment variables</li>
+<li><em>venv</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code> | <code class="docutils literal notranslate"><span class="pre">str</span></code>): list of requirements.txt entries or requirements file name</li>
+<li><em>venv_sys</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): use system-site-packages on venv, default: True</li>
+<li><dl class="first docutils">
+<dt><em>popts</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): extra options to pip when using venv next to -r</dt><dd>(=&gt; <a class="reference external" href="https://pip.pypa.io/en/stable/cli/pip_install/#options" target="_blank">https://pip.pypa.io/en/stable/cli/pip_install/#options</a>)</dd>
+</dl>
+</li>
+<li><em>xlog</em> (<code class="docutils literal notranslate"><span class="pre">Logger</span></code>): extra logger to use and to log to</li>
+<li><em>mtscheck</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check MTS errmon / crashrep log files, default: True</li>
+<li><em>procdump</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): do a procdump on “frozen” MTS, default: False</li>
+<li><em>bsig_check</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check bsig outputs from MTS, default: True</li>
+<li><em>bsig_ext</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): bsig extensions to be used, default: [“.bsig”]</li>
+<li><em>precmd</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): prepare command to be executed after preparation is done</li>
+<li><em>relcmd</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): release command to be executed before release is done</li>
+<li><em>exit_codes</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of codes to Finish each task</li>
+<li><em>add_exit_codes</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of codes to append to exit_codes</li>
+<li><em>ignore_codes</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of codes to completely ignore</li>
+<li><em>robo_retry</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): retry count for result copy back (starter)</li>
+<li><em>robo_wait</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): wait time between those retries (starter)</li>
+<li><em>task_out</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): copy back task’s output data to task folder instead of _data folder</li>
+<li><em>runas</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): &lt;username&gt;[:&lt;password&gt;] to run the job as (password is only needed for first time)</li>
+<li><em>eoe</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): on first failure subtask execution stops, no further processing done if set</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – on any</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.add_task">
+<code class="descname">add_task</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.add_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a task to job</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.base_db">
+<em class="property">property </em><code class="descname">base_db</code></dt>
+<dd><p>HPC DB connection</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return <code class="xref py py-obj docutils literal notranslate"><span class="pre">BaseDb</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.cancel">
+<code class="descname">cancel</code><span class="sig-paren">(</span><em>msg='canceled on purpose'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.cancel"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>cancel the already submitted job</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.client_folder">
+<em class="property">property </em><code class="descname">client_folder</code></dt>
+<dd><p>folder of job on client</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.create">
+<code class="descname">create</code><span class="sig-paren">(</span><em>job_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.create"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>remove me 2011: compat: create</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.create_mts_task">
+<code class="descname">create_mts_task</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.create_mts_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.create_task">
+<code class="descname">create_task</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.create_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.head_node">
+<em class="property">property </em><code class="descname">head_node</code></dt>
+<dd><p>head node name</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.job_folder">
+<em class="property">property </em><code class="descname">job_folder</code></dt>
+<dd><p>folder of job on hpc share</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.job_name">
+<em class="property">property </em><code class="descname">job_name</code></dt>
+<dd><p>name of job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.job_sim">
+<em class="property">property </em><code class="descname">job_sim</code></dt>
+<dd><p>wether it’s sim or real</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return bool</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.jobid">
+<em class="property">property </em><code class="descname">jobid</code></dt>
+<dd><p>the id of job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.jobprecmd">
+<code class="descname">jobprecmd</code><span class="sig-paren">(</span><em>cmds</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.jobprecmd"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a job prepare command to be done on the very first prepare</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cmds</strong> (<em>str</em>) – command (plus arguments) to be executed</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – arguments for cmds to used, e.g. cwd, …</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.jobrelcmd">
+<code class="descname">jobrelcmd</code><span class="sig-paren">(</span><em>cmds</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.jobrelcmd"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a job release command to be done on the very last node release</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cmds</strong> (<em>str</em>) – command (plus arguments) to be executed</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – arguments for cmds to used, e.g. cwd, …</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.join">
+<code class="descname">join</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.join"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>join arguments</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – join those with destination separator</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">path join</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.logger">
+<em class="property">property </em><code class="descname">logger</code></dt>
+<dd><p>return submit logger</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.nodeprecmd">
+<code class="descname">nodeprecmd</code><span class="sig-paren">(</span><em>cmds</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.nodeprecmd"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a node prepare command to be done on first node prepare</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cmds</strong> (<em>str</em>) – command (plus arguments) to be executed</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – arguments for cmds to used, e.g. cwd, …</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.noderelcmd">
+<code class="descname">noderelcmd</code><span class="sig-paren">(</span><em>cmds</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.noderelcmd"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a node release command to be done on last node release</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cmds</strong> (<em>str</em>) – command (plus arguments) to be executed</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – arguments for cmds to used, e.g. cwd, …</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.portal_link">
+<em class="property">property </em><code class="descname">portal_link</code></dt>
+<dd><p>portal link</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.precmd">
+<em class="property">property </em><code class="descname">precmd</code></dt>
+<dd><p>return preparation command</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.relcmd">
+<em class="property">property </em><code class="descname">relcmd</code></dt>
+<dd><p>return release command</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.sched">
+<em class="property">property </em><code class="descname">sched</code></dt>
+<dd><p>scheduler instance</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return <code class="xref py py-obj docutils literal notranslate"><span class="pre">Scheduler</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.submit">
+<code class="descname">submit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.submit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>be compatible to hpc_one</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.subtask_factory">
+<code class="descname">subtask_factory</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.subtask_factory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a taskfactory and return it, see <code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.SubTaskFactoy</span></code> for more information</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.task_factory">
+<code class="descname">task_factory</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.task_factory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a taskfactory and return it, see <code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.TaskFactoy</span></code> for more information</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.task_factory_mts">
+<code class="descname">task_factory_mts</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.task_factory_mts"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a taskfactory and return it, see <code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.TaskFactoyMTS</span></code> for more information</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job.Job.wait_until_finished">
+<code class="descname">wait_until_finished</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job.html#Job.wait_until_finished"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>wait until job finishes</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>timeout</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): wait timeout [s]</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Return JobState<code class="xref py py-obj docutils literal notranslate"><span class="pre">JobState</span></code>:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">final state of job</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.job_sim">
+<span id="hpc-sbmt-job-sim-module"></span><h2>hpc.sbmt.job_sim module</h2>
+<div class="section" id="job-sim-py">
+<h3>job_sim.py</h3>
+<p>job_sim module for hpc.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">job_sim</span></code> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.job_sim.JobSim">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.job_sim.</code><code class="descname">JobSim</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job_sim.html#JobSim"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sbmt.job.Job" title="hpc.sbmt.job.Job"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sbmt.job.Job</span></code></a></p>
+<div class="graphviz"><img src="_images/inheritance-e0fa79640995f2a34bf1843cc5792112a25ce55c.png" alt="Inheritance diagram of hpc.JobSim" usemap="#inheritance3658d7b393" class="inheritance graphviz" /></div>
+<map id="inheritance3658d7b393" name="inheritance3658d7b393">
+<area shape="rect" id="node1" href="#hpc.sbmt.job.Job" target="_top" title="**main Interface of HPC.**" alt="" coords="5,5,173,36"/>
+<area shape="rect" id="node2" href="#hpc.sbmt.job_sim.JobSim" target="_top" title=".. inheritance&#45;diagram:: hpc.JobSim" alt="" coords="221,5,464,36"/>
+</map><p>The JobSim class can be used instead of the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Job</span></code> class to simulate
+a job submit on the HPC-Cluster on the local pc and test the first Task
+of the job in a simple way.</p>
+<p><strong>Following steps explain the workflow:</strong></p>
+<ol class="arabic simple">
+<li>Replace in the submit script the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Job</span></code> class with <a class="reference internal" href="#hpc.sbmt.job_sim.JobSim" title="hpc.sbmt.job_sim.JobSim"><code class="xref py py-obj docutils literal notranslate"><span class="pre">JobSim</span></code></a></li>
+<li>Be sure you have a local folder called d:/data.</li>
+<li>JobSim will copy all needed test files to d:/data with the given jobname.</li>
+<li>Execute you submit script.</li>
+<li>Go to d:/data/1_JobName/1_Input and execute the test.bat file.</li>
+<li>The Job will executed exactly in the same way like on the HPC-Cluster
+The results will be copied to
+D:/data/_hpc_base/1_JobName/2_Output/_data</li>
+<li>Go to D:/data/_hpc_base/1_JobName/2_Output/T00001
+and check if the results are ok.</li>
+<li>If the results as expected, do a real submit on the HPC-Cluster
+in the Test-Queue.</li>
+</ol>
+<p><strong>1. Example</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import hpc</span>
+<span class="kn">import</span> <span class="nn">hpc</span>
+
+<span class="c1">#Connect to the HPC Server</span>
+<span class="k">with</span> <span class="n">hpc</span><span class="o">.</span><span class="n">JobSim</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;Training_Ping&#39;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s1">&#39;Short_Test&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">job</span><span class="p">:</span>
+    <span class="n">factory</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+    <span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="s1">&#39;ping 127.0.0.1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="hpc.sbmt.job_sim.JobSim.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job_sim.html#JobSim.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>initialize HPC job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – <em>head_node</em>, <em>name</em> and <em>project</em> must be given, others are optional (kwargs)</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>head_node</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): head node to use, default: Lindau production cluster</li>
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of job</li>
+<li><em>project</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of project to use</li>
+<li><em>template</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of template</li>
+<li><em>priority</em> (<code class="docutils literal notranslate"><span class="pre">JobPriority</span></code>): initial priority, use int or JobPriority class</li>
+<li><em>unit</em> (<code class="docutils literal notranslate"><span class="pre">JobUnit</span></code>): job unit (JobUnit), can be either Node, Core or Socket</li>
+<li><em>notify_on_start</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job starts</li>
+<li><em>notify_on_completion</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job completes</li>
+<li><em>hold_time</em> (<code class="docutils literal notranslate"><span class="pre">datetime</span></code>): local date/time for first try to start job.</li>
+<li><em>depends</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): job ID(‘s) this job should depend uppon</li>
+<li><em>bsig_check</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check bsig outputs from MTS, default: True</li>
+<li><em>precmd</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): prepare command to be executed after preparation is done</li>
+<li><em>relcmd</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): release command to be executed before release is done</li>
+<li><em>robo_retry</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): retry count for result copy back (starter)</li>
+<li><em>robo_wait</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): wait time between those retries (starter)</li>
+<li><em>runas</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): ‘&lt;username&gt;[:&lt;password&gt;] to run the job as (password is only needed for first time)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.job_sim.JobSim.wait_until_finished">
+<code class="descname">wait_until_finished</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job_sim.html#JobSim.wait_until_finished"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Start the local execution of test.bat and wait until it is finalized, return the final job’s state</p>
+<p>Set job type to Core to run as many tasks in parallel as your machine provides.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.sbmt.job_sim.duplicate">
+<code class="descclassname">hpc.sbmt.job_sim.</code><code class="descname">duplicate</code><span class="sig-paren">(</span><em>src</em>, <em>dst</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/job_sim.html#duplicate"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>compat to os.link for windows to create a symlink</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.subtask_factory">
+<span id="hpc-sbmt-subtask-factory-module"></span><h2>hpc.sbmt.subtask_factory module</h2>
+<div class="section" id="subtask-factory-py">
+<h3>subtask_factory.py</h3>
+<p>SubTaskFactory Module for Hpc.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><a class="reference internal" href="#hpc.sbmt.subtask_factory.SubTaskFactory" title="hpc.sbmt.subtask_factory.SubTaskFactory"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactory</span></code></a> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.subtask_factory.CmdHelper">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.subtask_factory.</code><code class="descname">CmdHelper</code><span class="sig-paren">(</span><em>cmd</em>, <em>linux</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#CmdHelper"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Helper Class to handle in a easy way the cmd-line arguments from the different applications.
+Main goal is to convert the cmd-line string into a list of items.</p>
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.CmdHelper.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>cmd</em>, <em>linux</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#CmdHelper.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init me with</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>cmd</strong> (<em>str</em>) – command line</li>
+<li><strong>linux</strong> (<em>bool</em>) – if we have a linux command</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.CmdHelper.command">
+<em class="property">property </em><code class="descname">command</code></dt>
+<dd><p>actual command
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.CmdHelper.cwd">
+<em class="property">property </em><code class="descname">cwd</code></dt>
+<dd><p>return working directory</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.CmdHelper.get_cmd_list">
+<code class="descname">get_cmd_list</code><span class="sig-paren">(</span><em>cmd_asis=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#CmdHelper.get_cmd_list"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>convert the internal set cmd-line string to to a list of arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">List of Arguments</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list[string,..]</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.subtask_factory.</code><code class="descname">SubTaskFactory</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<ul class="simple">
+<li>Specialized class for creating Hpc SubTasks which are based
+on “normal” commandline call.</li>
+<li>Typical usage is first to set all information, which is the same for
+all Tasks. (environment variables, working dir, ….)</li>
+<li>After that, multiple calls of the “create_task”
+-&gt; for the real Task creation.</li>
+</ul>
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init subtaskfactory</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>hpc</strong> (<a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><em>hpc.Job</em></a>) – link to job</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>head_node</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): head node to use, default: Lindau production cluster</li>
+<li><em>io_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch io traffic</li>
+<li><em>cpu_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall track cpu usage</li>
+<li><em>time_watch</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): whether watchdog shall monitor time [h]</li>
+<li><em>prn_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch the printout</li>
+<li><em>time_factor</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): default 16 x recording length</li>
+<li><em>skipon</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</li>
+<li><em>wrapexe</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): executable wrapped around each sub task</li>
+<li><em>exit_map</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): map real exit code to user defined</li>
+<li><em>folders</em> (<code class="docutils literal notranslate"><span class="pre">list[str]</span></code>): list of extra folder to create on WSN at start of (sub)task run</li>
+<li><em>env</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of lists containing environment variables to set when running all subtasks</li>
+<li><em>skip</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): skip this amount of subtasks when [Finished, Failed]</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory.activate_app_watcher">
+<code class="descname">activate_app_watcher</code><span class="sig-paren">(</span><em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory.activate_app_watcher"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>deprecate me on time!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory.add_environment_variable">
+<code class="descname">add_environment_variable</code><span class="sig-paren">(</span><em>key</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory.add_environment_variable"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>With this method, you are able to set multiple Environment variables
+for your Task. You can call this method several times, with different
+key/value - pairs. All of them will be set before your task
+starts with execution.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>str</em>) – name of the Environment Variable.</li>
+<li><strong>value</strong> (<em>str</em>) – value which is used to set the Environment Variable.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory.create_task">
+<code class="descname">create_task</code><span class="sig-paren">(</span><em>cmd</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory.create_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a new task</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>cmd</strong> (<em>str|list</em>) – command(line) for the executable to start.</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>time_watch</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): max runtime for subtask [h]</li>
+<li><em>io_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch io traffic</li>
+<li><em>cpu_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall track cpu usage</li>
+<li><em>time_factor</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): calculated time of recording * 16. is default</li>
+<li><em>recording</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): full path to recording to be used later on</li>
+<li><em>mtscheck</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check MTS log files for problems, default: False</li>
+<li><em>errorlevel</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): which errorlevel to use for MTS reporting, 0-6, default 1</li>
+<li><em>rec_map</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): set it to False, when recording’s usage should not be tracked</li>
+<li><em>rec_diff</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): allowed difference [%] from calculated time of recording compared to bsig output</li>
+<li><em>wrapexe</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): executable(s) which are wrapped around actual main call of e.g. MTS</li>
+<li><em>exit_map</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): map real exit code to user defined</li>
+<li><em>cmd_asis</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): set to true, if you don’t want the app call to be manipulated by Popen</li>
+<li><em>replace_path</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): if set to True, do not replace any path’s from command</li>
+<li><em>shell</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): use a shell for execution of a command</li>
+<li><em>env</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): additional environment data to be set when calling Popen for execution</li>
+<li><em>folders</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): additional folders to create when task executes</li>
+<li><em>skipon</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): skip this subtask if previous exits with one of those in list</li>
+<li><em>skip</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): skip this amount of subtasks when [Finished, Failed]</li>
+<li><em>xlog</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): extra list to log out during (sub)task execution</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">created SubTaskList</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list[int]</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory.SubTaskFactory.set_cur_work_dir">
+<code class="descname">set_cur_work_dir</code><span class="sig-paren">(</span><em>working_dir</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory.html#SubTaskFactory.set_cur_work_dir"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set the working dir for your process.
+default working directory is D:/data/%JobName%/1_Input.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Note:</th><td class="field-body"><ul class="first simple">
+<li>%JobName% will be replaced with the real JobName.</li>
+<li>%TaskName% will be replaced with the real TaskName.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first last"><strong>working_dir</strong> (<em>str</em>) – Name of the Environment Variable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.subtask_factory_mts">
+<span id="hpc-sbmt-subtask-factory-mts-module"></span><h2>hpc.sbmt.subtask_factory_mts module</h2>
+<div class="section" id="subtask-factory-mts-py">
+<h3>subtask_factory_mts.py</h3>
+<p>SubTaskFactoryMTS Module for hpc.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><a class="reference internal" href="#hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS" title="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactoryMTS</span></code></a> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.subtask_factory_mts.</code><code class="descname">MTSCmdHelper</code><span class="sig-paren">(</span><em>mode='MTS'</em>, <em>exist=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Command Helper class which handles all MTS specific
+commands for the TaskFactoryMTS.</p>
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>mode='MTS'</em>, <em>exist=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init the helper</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.cfg_file">
+<em class="property">property </em><code class="descname">cfg_file</code></dt>
+<dd><p>full path to config file
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.command">
+<em class="property">property </em><code class="descname">command</code></dt>
+<dd><p>actual command
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.cwd">
+<em class="property">property </em><code class="descname">cwd</code></dt>
+<dd><p>working directory
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.get_cmd_list">
+<code class="descname">get_cmd_list</code><span class="sig-paren">(</span><em>cmd_asis=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.get_cmd_list"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>prepare the whole cmd_list, either for *.bpl or *.rec usage.
+Replace all internal used placeholder with the data given by the user,
+and provide it to the user.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>cmd_asis</strong> (<em>bool</em>) – compatibility parameter for CmdHelper class (as of broken Popen), not used here</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">command line as list</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – once, path is not specified</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.get_cmd_var_list">
+<code class="descname">get_cmd_var_list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.get_cmd_var_list"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>return the whole cmd_var_list, which is a dictionary.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">cmd_var_list</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">dict</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.get_property">
+<code class="descname">get_property</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.get_property"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>get a property</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.set_app_path">
+<code class="descname">set_app_path</code><span class="sig-paren">(</span><em>app_path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.set_app_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set the path of the mts / sil_lite application, which is used
+by hpc to do the calling. Path of executable.</p>
+<p>Following Variables will be resolved automatically:</p>
+<blockquote>
+<div><ul class="simple">
+<li>%JobName%</li>
+<li>%TaskName%</li>
+</ul>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>app_path</strong> (<em>str</em>) – absolute path to measapp.exe</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.set_bpl_file_path">
+<code class="descname">set_bpl_file_path</code><span class="sig-paren">(</span><em>bplfile_path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.set_bpl_file_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set the bpl file path parameter for MTS / SIL.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bplfile_path</strong> (<em>str</em>) – absolute path to the recfile, typically a subfolder under %JobName%/1_Input</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.set_property">
+<code class="descname">set_property</code><span class="sig-paren">(</span><em>key</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.set_property"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set a key replacement to a certain value</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>obj</em>) – name of key</li>
+<li><strong>value</strong> (<em>obj</em>) – value</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.set_rec_file_path">
+<code class="descname">set_rec_file_path</code><span class="sig-paren">(</span><em>recfile_path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.set_rec_file_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set the rec file path parameter for mts.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>recfile_path</strong> (<em>str</em>) – absolute path to the recfile.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – recfile cannot be set when on SIM mode</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.MTSCmdHelper.set_sim_file_path">
+<code class="descname">set_sim_file_path</code><span class="sig-paren">(</span><em>simfile_path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#MTSCmdHelper.set_sim_file_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set the sim file path parameter for SIL lite.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>simfile_path</strong> (<em>str</em>) – absolute path to the recfile.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – recfile cannot be set when on SIM mode</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.subtask_factory_mts.</code><code class="descname">SubTaskFactoryMTS</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sbmt.subtask_factory.SubTaskFactory" title="hpc.sbmt.subtask_factory.SubTaskFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sbmt.subtask_factory.SubTaskFactory</span></code></a></p>
+<div class="graphviz"><img src="_images/inheritance-59fe22e5a16266b11df3dda5a2891604c64ad25f.png" alt="Inheritance diagram of hpc.SubTaskFactoryMTS" usemap="#inheritance371cab7a76" class="inheritance graphviz" /></div>
+<map id="inheritance371cab7a76" name="inheritance371cab7a76">
+<area shape="rect" id="node1" href="#hpc.sbmt.subtask_factory.SubTaskFactory" target="_top" title="&#45; Specialized class for creating Hpc SubTasks which are based" alt="" coords="5,5,329,31"/>
+<area shape="rect" id="node2" href="#hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS" target="_top" title=".. inheritance&#45;diagram:: hpc.SubTaskFactoryMTS" alt="" coords="370,5,763,31"/>
+</map><p>Specialized class for creating Hpc SubTasks which run out MTS.</p>
+<ul class="simple">
+<li>Typical usage is first to set all information,
+which is the same for all Tasks. (SetConfigFolder,SetConfigFile,…)</li>
+<li>After that, multiple calls of the “create_task”
+-&gt; for the real MTS-Task creation.</li>
+<li>This class is derived from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactory</span></code>,
+this means all methods from there can also be used.</li>
+<li>a private check method is registered to be executed in Job.submit() checking
+the availability of the MTS config file.</li>
+</ul>
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>hpc</strong> (<a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><em>hpc.Job</em></a>) – hpc job class</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>io_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch io traffic</li>
+<li><em>cpu_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall track cpu usage</li>
+<li><em>time_watch</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): whether watchdog shall monitor time [h]</li>
+<li><em>prn_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch the printout</li>
+<li><em>time_factor</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): default 16 x recording length</li>
+<li><em>loglevel</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): use a certain logging level (mts_check)</li>
+<li><em>exist</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check existence of recording, default: False</li>
+<li><em>mtscheck</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check MTS log files for problems, default: False</li>
+<li><em>skipon</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</li>
+<li><em>cfg_blacklist</em> (<code class="docutils literal notranslate"><span class="pre">list[str]</span></code>): blacklisted MTS / SilLite config sections</li>
+<li><em>wrapexe</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): executable wrapped around each sub task</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.copy_mts_folders">
+<code class="descname">copy_mts_folders</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.copy_mts_folders"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>copy MTS folders from default (or given) directories and
+omit unneeded mts files and folders that are not needed in offline simulation</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>*args</strong> – <em>mts_sys_folder_name</em>, <em>mts_measure_folder_name</em>, <em>use_filter</em>, <em>mts_sys_dest</em>
+and <em>mts_measure_dest</em> can be given, others are optional (kwargs)</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>mts_sys_folder_name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): MTS system folder path</li>
+<li><em>mts_measure_folder_name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): MTS measurement folder path</li>
+<li><em>use_filter</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): deactivate ignore filter, default: True</li>
+<li><em>mts_sys_dest</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): destination path for mts_system</li>
+<li><em>mts_measure_dest</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): destination path for mts_measurement</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
+<li><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – on copy error</li>
+<li><strong>ValueError</strong> – in case path cannot be found</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.create_task">
+<code class="descname">create_task</code><span class="sig-paren">(</span><em>bpl_rec_file_path</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.create_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Create a single SubTask based on a given *.bpl file or a given
+*.rec file for MTS or a *.sim file for sil_lite.
+If checker is enabled, it will automatically create also a checker task.</p>
+<p>note: for additional parameters, please review <code class="xref py py-obj docutils literal notranslate"><span class="pre">subtask_factory.create_task</span></code> as well</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bpl_rec_file_path</strong> (<em>str</em>) – Bpl / Rec / Sim file URL which must be used for MTS / sil_lite.
+Type depends on initializer mod (‘rec’, ‘bpl’)</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>checker</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): Enables a second SubTask which checks the MTS / sil_lite Output (xlog, crash)</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">created SubTaskList</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">list[int]</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – in case of a unicode encode problem, reading config</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.create_tasks">
+<code class="descname">create_tasks</code><span class="sig-paren">(</span><em>bpl_file_path</em>, <em>checker=True</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.create_tasks"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a multiple SubTask based on a given *.bpl file
+If bpl file entry contains a section, then a bpl file based task
+will be created, and also the needed split new bpl file with this
+single entry. If bpl file entry is without sections, the task creation
+will use directly the *.rec file path as argument.
+If checker is enabled, it will automatically create also a checker task.</p>
+<p>Note: for additional parameters, please review <code class="xref py py-obj docutils literal notranslate"><span class="pre">subtask_factory.create_task</span></code> as well</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bpl_file_path</strong> (<em>str</em>) – bpl file URL which must be used for MTS / sil_lite.</li>
+<li><strong>checker</strong> (<em>bool</em>) – enables a second SubTask which checks the MTS Output (xlog, crash)</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">SubTaskList</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list[int]</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_app_path">
+<code class="descname">set_app_path</code><span class="sig-paren">(</span><em>app_path=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_app_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Provide the possibility to set the path to MTS / sil_lite
+to the correct one, if the default path can’t be used.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Note:</th><td class="field-body">%JobName% will be replaced with the real JobName.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Parameters:</th><td class="field-body"><strong>app_path</strong> (<em>str</em>) – Absolute path to the measapp.exe, which is used to start the Task.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_config">
+<code class="descname">set_config</code><span class="sig-paren">(</span><em>folder</em>, <em>file_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_config"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set the folder, where MTS / sil_lite will find the given config file.
+This folder will also be used, if you have multiple configuration,
+which depends via a relative path from each other.
+So this Folder will also be used as the base config folder to resolve
+the relative paths to other given config files.</p>
+<p>Set the config file name, which shall be used.
+This FileName can also contain a relative path to the config file,
+if the Base Config Folder feature is needed.
+Please see also <code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactoryMTS.SetConfigFolder</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>folder</strong> (<em>str</em>) – path to base config folder</li>
+<li><strong>file_name</strong> (<em>str</em>) – relative path to config file</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – raised when either folder of file is empty</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_config_file_name">
+<code class="descname">set_config_file_name</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_config_file_name"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>deprecate !!!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_config_folder">
+<code class="descname">set_config_folder</code><span class="sig-paren">(</span><em>folder</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_config_folder"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>deprecate !!!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_data_folder">
+<code class="descname">set_data_folder</code><span class="sig-paren">(</span><em>data_folder</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_data_folder"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set output data folder for MTS to a different than standard:
+“D:\data\%JobName%\2_Output\%TaskName%\data”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data_folder</strong> (<em>str</em>) – path to the output data folder on the hpc-client.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_parameter">
+<code class="descname">set_parameter</code><span class="sig-paren">(</span><em>param</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_parameter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set an extra parameter’s value</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS.set_split_section">
+<code class="descname">set_split_section</code><span class="sig-paren">(</span><em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_mts.html#SubTaskFactoryMTS.set_split_section"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set split_section for section based exports of MTS</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>value</strong> (<em>bool</em>) – True/False</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.subtask_factory_sil_lite">
+<span id="hpc-sbmt-subtask-factory-sil-lite-module"></span><h2>hpc.sbmt.subtask_factory_sil_lite module</h2>
+<div class="section" id="subtask-factory-sil-lite-py">
+<h3>subtask_factory_sil_lite.py</h3>
+<p>SubTaskFactorySILLite Module for HPC.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><a class="reference internal" href="#hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite" title="hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactorySILLite</span></code></a> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.subtask_factory_sil_lite.</code><code class="descname">SubTaskFactorySILLite</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_sil_lite.html#SubTaskFactorySILLite"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS" title="hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sbmt.subtask_factory_mts.SubTaskFactoryMTS</span></code></a></p>
+<p>Specialized class for creating Hpc SubTasks which run out SIL Lite.</p>
+<ul class="simple">
+<li>Typical usage is first to set all information,
+which is the same for all Tasks. (SetConfigFolder,SetConfigFile,…)</li>
+<li>After that, multiple calls of the “create_task”
+-&gt; for the real SIL Lite-Task creation.</li>
+<li>This class is derived from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">SubTaskFactory</span></code>,
+this means all methods from there can also be used.</li>
+<li>a private check method is registered to be executed in Job.submit() checking
+the availability of the SIL Lite config file.</li>
+</ul>
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_sil_lite.html#SubTaskFactorySILLite.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>hpc</strong> (<a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><em>hpc.Job</em></a>) – hpc job class</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>io_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch io traffic</li>
+<li><em>cpu_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall track cpu usage</li>
+<li><em>time_watch</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): whether watchdog shall monitor time [h]</li>
+<li><em>prn_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch the printout</li>
+<li><em>time_factor</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): default 16 x recording length</li>
+<li><em>loglevel</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): use a certain logging level (mts_check)</li>
+<li><em>exist</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check existence of recording, default: False</li>
+<li><em>mtscheck</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): check MTS log files for problems, default: False</li>
+<li><em>skipon</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</li>
+<li><em>cfg_blacklist</em> (<code class="docutils literal notranslate"><span class="pre">list[str]</span></code>): blacklisted MTS / SilLite config sections</li>
+<li><em>wrapexe</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): executable wrapped around each sub task</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite.copy_sil_lite_folders">
+<code class="descname">copy_sil_lite_folders</code><span class="sig-paren">(</span><em>sil_sys_folder_name='.\\sil_lite'</em>, <em>sil_measure_folder_name='.\\mts_measurement'</em>, <em>use_filter=True</em>, <em>sil_sys_dest='sil_lite'</em>, <em>sil_measure_dest='mts_measurement'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_sil_lite.html#SubTaskFactorySILLite.copy_sil_lite_folders"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Copy SIL lite folders from default (or given) directories and
+omit unneeded mts files and folders that are not needed in offline simulation</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>sil_sys_folder_name</strong> (<em>str</em>) – optional path to sil_lite folder</li>
+<li><strong>sil_measure_folder_name</strong> (<em>str</em>) – optional path to mts_measurement folder</li>
+<li><strong>use_filter</strong> (<em>bool</em>) – optional to deactivate ignore filter</li>
+<li><strong>sil_sys_dest</strong> (<em>str</em>) – destination path for sil_lite</li>
+<li><strong>sil_measure_dest</strong> (<em>str</em>) – destination path for mts_measurement</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.subtask_factory_sil_lite.SubTaskFactorySILLite.set_app_path">
+<code class="descname">set_app_path</code><span class="sig-paren">(</span><em>app_path='d:\\data\\%JobName%\\1_Input\\sil_lite\\sil_lite.exe'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/subtask_factory_sil_lite.html#SubTaskFactorySILLite.set_app_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Provide the possibility to set the path to sil_lite
+to the correct one, if the default path can’t be used.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Note:</th><td class="field-body">%JobName% will be replaced with the real JobName.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Parameters:</th><td class="field-body"><strong>app_path</strong> (<em>str</em>) – Absolute path to the sil_lite.exe,
+which is used to start the Task.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.task">
+<span id="hpc-sbmt-task-module"></span><h2>hpc.sbmt.task module</h2>
+<div class="section" id="task-py">
+<h3>task.py</h3>
+<p>TODO: documentation</p>
+<dl class="class">
+<dt id="hpc.sbmt.task.Task">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.task.</code><code class="descname">Task</code><span class="sig-paren">(</span><em>job</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task.html#Task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>task implementation</p>
+<dl class="method">
+<dt id="hpc.sbmt.task.Task.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>job</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task.html#Task.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>job</strong> – </li>
+<li><strong>kwargs</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task.Task.add_subtask">
+<code class="descname">add_subtask</code><span class="sig-paren">(</span><em>app</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task.html#Task.add_subtask"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a subtask</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>app</strong> (<em>(</em><em>hpc.task.App</em><em>)</em>) – application class</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.task_factory">
+<span id="hpc-sbmt-task-factory-module"></span><h2>hpc.sbmt.task_factory module</h2>
+<div class="section" id="hpc-task-factory">
+<h3>hpc/task_factory</h3>
+<p>TaskFactoryMTS Module for Hpc.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><a class="reference internal" href="#hpc.sbmt.task_factory.TaskFactory" title="hpc.sbmt.task_factory.TaskFactory"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskFactory</span></code></a> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.task_factory.TaskFactory">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.task_factory.</code><code class="descname">TaskFactory</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p><strong>Create Tasks based on “normal” commandline call.</strong></p>
+<ul class="simple">
+<li>Typical usage is first to set all information, which is the same for
+all Tasks. (environment-variables, working-dir, ….)</li>
+<li>After that, multiple calls of the “create_task” - for the real
+Task creation.</li>
+</ul>
+<p><em>Example:</em>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import hpc</span>
+<span class="kn">import</span> <span class="nn">hpc</span>
+
+<span class="c1">#connect to HPC cluster</span>
+<span class="n">job</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Training_Ping&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">&quot;Short_Test&quot;</span><span class="p">)</span>
+
+<span class="n">factory</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="s1">&#39;ping 127.0.0.1&#39;</span><span class="p">)</span>
+<span class="n">job</span><span class="o">.</span><span class="n">submit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Creates Tasks based on SubTasks.</strong></p>
+<ul class="simple">
+<li>Tasks can be the SubTaskIndex from a SubTaskFactory Created Task.</li>
+</ul>
+<p><em>Example:</em>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import hpc</span>
+<span class="kn">import</span> <span class="nn">hpc</span>
+
+<span class="c1"># connect to local (pseudo) &quot;HPC&quot; cluster</span>
+<span class="n">job</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">JobSim</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Training_SubTask&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">&quot;Short_Test&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create the main task factory</span>
+<span class="n">factory</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+
+<span class="c1"># Create TaskFactory</span>
+<span class="n">ping1</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">SubTaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+<span class="n">ping2</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">SubTaskFactory</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+
+<span class="n">sub1</span> <span class="o">=</span> <span class="n">ping1</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="s2">&quot;ping.exe 127.0.0.1&quot;</span><span class="p">)</span>
+
+<span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">):</span>
+    <span class="n">sub2</span> <span class="o">=</span> <span class="n">ping2</span><span class="o">.</span><span class="n">CreateTask</span><span class="p">(</span><span class="s2">&quot;ping.exe 127.0.0.1 -n</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">counter</span><span class="p">)</span>
+    <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">sub1</span> <span class="o">+</span> <span class="n">sub2</span><span class="p">)</span>
+
+<span class="n">job</span><span class="o">.</span><span class="n">submit</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init task factory</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>hpc</strong> (<a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><em>hpc.Job</em></a>) – link to job</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of task</li>
+<li><em>io_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch io traffic</li>
+<li><em>cpu_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall track cpu usage</li>
+<li><em>time_watch</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): whether watchdog shall monitor time [h]</li>
+<li><em>prn_watch</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether watchdog shall watch the printout</li>
+<li><em>time_factor</em> (<code class="docutils literal notranslate"><span class="pre">float</span></code>): default 16 x recording length</li>
+<li><em>skipon</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</li>
+<li><dl class="first docutils">
+<dt><em>wrapexe</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): executables wrapped around all sub task, e.g.</dt><dd><dl class="docutils">
+<dt>[{“cmd”: “foobar.exe -o1 -o2”, “cwd”: None, “timeout”: 0.5,</dt><dd>”waitfor”: “wait for this on stdout and continue”, “erroron”: “wait for this on stdout and fail”,}]</dd>
+</dl>
+</dd>
+</dl>
+</li>
+<li><em>cncl_cmd</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): cancel command to be executed when task is canceled, max runtime: 60s</li>
+<li><em>exit_map</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): map real exit code to user defined</li>
+<li><em>folders</em> (<code class="docutils literal notranslate"><span class="pre">list[str]</span></code>): list of extra folder to create on WSN at start of (sub)task run</li>
+<li><em>env</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): environment variables to set for the task</li>
+<li><em>notify_on_start</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job starts</li>
+<li><em>notify_on_completion</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): receive an email when job completes</li>
+<li><em>out_dir</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): output directory, if it should be different than the task folder or _data</li>
+<li><em>log_dir</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): log directory, if it should be different than the task folder \ log</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.activate_app_watcher">
+<code class="descname">activate_app_watcher</code><span class="sig-paren">(</span><em>active</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.activate_app_watcher"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>wether to (de)activate the watcher: deprecated</p>
+<p>The ApplicationWatcher normal checks the real Task, if the task is
+still running. He does this with looking on the cpu-load and the io
+of the process. Is the task under the limit of the minimum cpu-load
+and/or io, he will kill the process to free the node again.</p>
+<p>Sometime it is necessay, to deactivate this, because the
+ApplicationWatcher kills the process in a unwanted situation.
+For this you can call this Method.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>active</strong> (<em>bool</em>) – flag if Application Watcher shall be deactivated or not.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.add_environment_variable">
+<code class="descname">add_environment_variable</code><span class="sig-paren">(</span><em>key</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.add_environment_variable"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>With this method, you are able to set multiple Environment variables
+for your Task. You can call this method several times, with different
+key/value - pairs. All of them will be set before your task
+starts with execution.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> (<em>string</em>) – Name of the Environment Variable.</li>
+<li><strong>value</strong> (<em>string</em>) – Value which is used to set the Environment Variable.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.create_task">
+<code class="descname">create_task</code><span class="sig-paren">(</span><em>cmd</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.create_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Create a new task.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>cmd</strong> (<em>str</em>) – Commandline for the executable to start.</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – misc more args, see create_task method of subtask_factory for more info…</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">info about the task</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.create_tasks">
+<code class="descname">create_tasks</code><span class="sig-paren">(</span><em>bpl_file_path</em>, <em>cmd=''</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.create_tasks"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Create multiple tasks based on a given *.bpl file.
+%recfile% inside ‘cmd’ keyword will be replaced by iterated recording from bpl
+Sections will not be taken into consideration as for create_tasks of task factory mts…</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bpl_file_path</strong> (<em>str</em>) – bpl file name</li>
+<li><strong>cmd</strong> (<em>str</em>) – cmd to be used</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – misc more args</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">info of details being added</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list[dict]</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory.TaskFactory.set_cur_work_dir">
+<code class="descname">set_cur_work_dir</code><span class="sig-paren">(</span><em>working_dir</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory.html#TaskFactory.set_cur_work_dir"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>SetCurWorkingDir set the current working dir for your process.
+Per default the current working directory is set to
+D:/data/%JobName%/1_Input.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Note:</th><td class="field-body"><ul class="first simple">
+<li>%JobName% will be replaced with the real JobName.</li>
+<li>%TaskName% will be replaced with the real TaskName.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first last"><strong>working_dir</strong> (<em>string</em>) – Name of the Environment Variable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt.task_factory_mts">
+<span id="hpc-sbmt-task-factory-mts-module"></span><h2>hpc.sbmt.task_factory_mts module</h2>
+<div class="section" id="task-factory-mts-py">
+<h3>task_factory_mts.py</h3>
+<p>TaskFactoryMTS Module for Hpc.</p>
+<p><strong>User-API Interfaces</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="hpc.html#module-hpc" title="hpc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hpc</span></code></a> (complete package)</li>
+<li><a class="reference internal" href="#hpc.sbmt.task_factory_mts.TaskFactoryMTS" title="hpc.sbmt.task_factory_mts.TaskFactoryMTS"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskFactoryMTS</span></code></a> (this module)</li>
+</ul>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS">
+<em class="property">class </em><code class="descclassname">hpc.sbmt.task_factory_mts.</code><code class="descname">TaskFactoryMTS</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sbmt.task_factory.TaskFactory" title="hpc.sbmt.task_factory.TaskFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sbmt.task_factory.TaskFactory</span></code></a></p>
+<div class="graphviz"><img src="_images/inheritance-7df219b2f36da1ab596ca9c1ac0a71c1c6262de7.png" alt="Inheritance diagram of hpc.TaskFactoryMTS" usemap="#inheritance8393336e75" class="inheritance graphviz" /></div>
+<map id="inheritance8393336e75" name="inheritance8393336e75">
+<area shape="rect" id="node1" href="#hpc.sbmt.task_factory.TaskFactory" target="_top" title="**Create Tasks based on &quot;normal&quot; commandline call.**" alt="" coords="5,5,319,36"/>
+<area shape="rect" id="node2" href="#hpc.sbmt.task_factory_mts.TaskFactoryMTS" target="_top" title=".. inheritance&#45;diagram:: hpc.TaskFactoryMTS" alt="" coords="367,5,763,36"/>
+</map><ul class="simple">
+<li>Specialized class for creating Hpc Tasks which run out MTS.</li>
+<li>Typical usage is first to set all information, which is the
+same for all Tasks. (SetConfigFolder,SetConfigFile,…)</li>
+<li>After that, multiple calls of the “create_task” - for the real
+MTS-Task creation.</li>
+<li>This class is derived from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskFactory</span></code>, this means all
+methods from there can also be used.</li>
+</ul>
+<p><strong>To Create multiple Tasks from a given *.bpl do</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create multiple task, to use as much as possible hpc power</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">create_tasks</span><span class="p">(</span><span class="n">bpl_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>To Create a single Task to replay a single *.rec file do</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a single task, which replay a single *.rec</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">rec_file_url</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>To Create a single Task to replay a complete *.bpl do</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a single task, which replay the whole bpl</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">bpl_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Full Example how a MTS Job can be submitted</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">bpl_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="sa">r</span><span class="s1">&#39;07_training_mts.bpl&#39;</span><span class="p">)</span>
+
+<span class="c1"># Connect to the HPC Server</span>
+<span class="n">job</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Training_MTS_Job&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="s2">&quot;Short_Test&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="n">hpc</span><span class="o">.</span><span class="n">JobUnitType</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
+
+<span class="c1"># Create TaskFactory</span>
+<span class="n">factory</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">TaskFactoryMTS</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+
+<span class="c1"># Copy Job Input to the Job Folder</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">copy_mts_folders</span><span class="p">(</span><span class="s1">&#39;.</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">06_Test_Tools</span><span class="se">\\</span><span class="s1">mts_system&#39;</span><span class="p">,</span>
+                         <span class="s1">&#39;.</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">..</span><span class="se">\\</span><span class="s1">06_Test_Tools</span><span class="se">\\</span><span class="s1">mts_measurement&#39;</span><span class="p">)</span>
+
+<span class="c1"># Set some general Task settings</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">set_config</span><span class="p">(</span><span class="s1">&#39;mts_measurement</span><span class="se">\\</span><span class="s1">cfg</span><span class="se">\\</span><span class="s1">algo&#39;</span><span class="p">,</span> <span class="s1">&#39;hpc_mts_test.cfg&#39;</span><span class="p">)</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">set_data_folder</span><span class="p">(</span><span class="s2">&quot;d:</span><span class="se">\\</span><span class="s2">data</span><span class="se">\\</span><span class="s2">%JobName%</span><span class="se">\\</span><span class="s2">2_Output</span><span class="se">\\</span><span class="s2">%TaskName%</span><span class="se">\\</span><span class="s2">data&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create for every entry inside the bpl-file one Tasks</span>
+<span class="n">factory</span><span class="o">.</span><span class="n">create_tasks</span><span class="p">(</span><span class="n">bpl_path</span><span class="p">)</span>
+
+<span class="n">job</span><span class="o">.</span><span class="n">submit</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>hpc</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init task factory first</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.cfg_file">
+<em class="property">property </em><code class="descname">cfg_file</code></dt>
+<dd><p>return the config file name</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.cfg_folder">
+<em class="property">property </em><code class="descname">cfg_folder</code></dt>
+<dd><p>return the config folder</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.copy_mts_folders">
+<code class="descname">copy_mts_folders</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.copy_mts_folders"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>copy MTS folders from default (or given) directories and
+omit unneeded mts files and folders that are not needed in offline simulation</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>*args</strong> – <em>mts_sys_folder_name</em>, <em>mts_measure_folder_name</em>, <em>use_filter</em>, <em>mts_sys_dest</em>
+and <em>mts_measure_dest</em> can be given, others are optional (kwargs)</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>mts_sys_folder_name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): MTS system folder path, can also be an artifactory (zip file)</li>
+<li><em>mts_measure_folder_name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): MTS measurement folder path</li>
+<li><em>use_filter</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): optional to deactivate ignore filter</li>
+<li><em>mts_sys_dest</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): destination path for mts_system</li>
+<li><em>mts_measure_dest</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): destination path for mts_measurement</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
+<li><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – on copy error</li>
+<li><strong>ValueError</strong> – in case path cannot be found</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.create_task">
+<code class="descname">create_task</code><span class="sig-paren">(</span><em>bpl_rec_filepath</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.create_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Create a single task with the given input.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bpl_rec_filepath</strong> (<em>str</em>) – Bpl or Rec File URL which must be used for MTS.
+Type depends on initializer mode (‘rec’, ‘bpl’)</li>
+<li><strong>args</strong> (<em>tuple</em>) – for more args, please review subtask_factory.create_task’s doc.</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – for more kwargs, please review subtask_factory.create_task’s doc.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">task info being added herein</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">dict</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The use case will be selected automatically with the argument of
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">bpl_rec_filepath</span></code> and depends on the given File Ending.</p>
+<p><em>2 use cases are currently supported:</em></p>
+<ol class="arabic">
+<li><div class="first line-block">
+<div class="line">Create a single task with one rec file.</div>
+<div class="line">HPC will replay in this task one rec</div>
+</div>
+</li>
+<li><div class="first line-block">
+<div class="line">Create a single task with one bpl file.</div>
+<div class="line-block">
+<div class="line">HPC will replay in this task the whole *.bpl file with the given</div>
+<div class="line">settings from MTS.</div>
+<div class="line">In this mode, the MTS Batch settings must be considered:</div>
+<div class="line-block">
+<div class="line">- Player mode:           [Play sections, Ignore sections]</div>
+<div class="line">- Simulator reset mode:  [No Reset, Reset, Reset + Init]</div>
+<div class="line">- Simulator restet time: [Before whole batch, Before batch entry]</div>
+</div>
+<div class="line">Please set the mts player settings manually with the mts itself,</div>
+<div class="line">the settings are stored inside the configuration which must be used to</div>
+<div class="line">submit the job.</div>
+</div>
+</div>
+</li>
+</ol>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.create_tasks">
+<code class="descname">create_tasks</code><span class="sig-paren">(</span><em>bpl_file_path</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.create_tasks"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Create a multiple Tasks based on a given *.bpl file.</p>
+<p>If bpl file entry contains a section, then a bpl file based task
+will be created, and also the needed split new bpl file with this
+single entry. If bpl file entry is without sections, the task creation
+will use directly the *.rec file path as argument.</p>
+<p><em>checker</em> is an older argument to be able to disable mts check (bsigs),
+<em>depends</em> is used to create dependent tasks,</p>
+<p>for more kwargs, please review subtask_factory.create_task’s doc.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bpl_file_path</strong> (<em>str</em>) – Bpl File URL which must be used for MTS.</li>
+<li><strong>args</strong> (<em>tuple</em>) – <em>depends</em> and <em>checker</em> can be given, others are optional (kwargs)</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>**kwargs</strong> – <ul class="simple">
+<li><dl class="first docutils">
+<dt><em>ignore_missing</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): if using a collection and True here,</dt><dd>recs inside not on same cluster are ignored</dd>
+</dl>
+</li>
+<li><em>loc</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): location as a fallback for JobSim usage</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">task infos being added herein</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list[dict]</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_app_path">
+<code class="descname">set_app_path</code><span class="sig-paren">(</span><em>app_path='d:\\data\\%JobName%\\1_Input\\mts_system\\measapp.exe'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_app_path"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Provide the possibility to set the path to the measapp.exe
+to the correct one, if the default path can’t be used.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Note:</th><td class="field-body">%JobName% will be replaced with the real JobName.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Parameters:</th><td class="field-body"><strong>app_path</strong> (<em>string</em>) – Absolute path to the measapp.exe,
+which is used to start the Task.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_config">
+<code class="descname">set_config</code><span class="sig-paren">(</span><em>folder</em>, <em>file_name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_config"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set the folder, where MTS will find the given config file.
+This folder will also be used, if you have multiple configuration,
+which depends via a relative path from each other. So this Folder
+will also be used as the base config folder to resolve
+the relative paths to other given config files.</p>
+<p>Set the config file name, which shall be used by MTS.
+This FileName can also contain a relative path to the
+config file, if the Base Config Folder feature is needed.
+Please see also <code class="xref py py-obj docutils literal notranslate"><span class="pre">TaskFactoryMTS.SetConfigFolder</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>folder</strong> (<em>str</em>) – path to the base config folder.</li>
+<li><strong>file_name</strong> (<em>str</em>) – name of config File or relative path to config file.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – raised when either folder of file is empty</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_config_file_name">
+<code class="descname">set_config_file_name</code><span class="sig-paren">(</span><em>fname</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_config_file_name"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>deprecate it!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_config_folder">
+<code class="descname">set_config_folder</code><span class="sig-paren">(</span><em>folder</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_config_folder"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>deprecate it!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_data_folder">
+<code class="descname">set_data_folder</code><span class="sig-paren">(</span><em>data_folder</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_data_folder"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Set output data folder for MTS to a different than standard:
+“D:\data\%JobName%\2_Output\%TaskName%\data”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>data_folder</strong> (<em>str</em>) – path to the output data folder on the hpc-client.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sbmt.task_factory_mts.TaskFactoryMTS.set_parameter">
+<code class="descname">set_parameter</code><span class="sig-paren">(</span><em>param</em>, <em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sbmt/task_factory_mts.html#TaskFactoryMTS.set_parameter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set an extra parameter’s value</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sbmt">
+<span id="module-contents"></span><h2>Module contents</h2>
+<div class="section" id="hpc-sbmt">
+<h3>hpc.sbmt</h3>
+<p>Interface Module for hpc.sbmt</p>
+<p>Subpackage which contains the needed interfaces to:</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sched.html" title="hpc.sched package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="hpc.rdb.html" title="hpc.rdb package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" >hpc package</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

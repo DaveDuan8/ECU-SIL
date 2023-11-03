@@ -1,0 +1,119 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.bpl.bpl_fnc</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.bpl.bpl_fnc</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">bpl_func.py</span>
+<span class="sd">-----------</span>
+
+<span class="sd">functions, helping the user to manipulate bpl files</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=C0103</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">getcwd</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">Bpl</span>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="create"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_fnc.create">[docs]</a><span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="n">entries</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create a single bpl-file out of some given bpllistentries.</span>
+
+<span class="sd">    :param list[`BplListEntry`] entries: list of BplListEntries</span>
+<span class="sd">    :param str path:    path to the file to be created.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out_bpl</span><span class="p">:</span>  <span class="c1"># pylint: disable=E1129</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+            <span class="n">out_bpl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="split"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_fnc.split">[docs]</a><span class="k">def</span> <span class="nf">split</span><span class="p">(</span><span class="n">bplfilepath</span><span class="p">,</span> <span class="n">task_size</span><span class="p">,</span> <span class="n">outfolder</span><span class="o">=</span><span class="n">getcwd</span><span class="p">()):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Split a bpl-file into bpl&#39;s with the given task_size which</span>
+<span class="sd">    contians the original section information.</span>
+
+<span class="sd">    :param str bplfilepath: Filepath(url) to the bpl file..</span>
+<span class="sd">    :param str task_size: Number of recordings per file.</span>
+<span class="sd">    :param str outfolder: Folder to store the generated bpl files.</span>
+<span class="sd">    :return: Array of created bpl files.</span>
+<span class="sd">    :rtype: list of bpl paths.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">bpllist</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">out_bpl</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">task_cnt</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">cnt</span> <span class="o">=</span> <span class="n">task_size</span>
+
+    <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">bplfilepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">:</span>  <span class="c1"># pylint: disable=E1129</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">bpl</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cnt</span> <span class="o">==</span> <span class="n">task_size</span><span class="p">:</span>
+                <span class="n">out_bpl</span> <span class="o">=</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">outfolder</span><span class="p">,</span> <span class="s2">&quot;T</span><span class="si">%05d</span><span class="s2">.bpl&quot;</span> <span class="o">%</span> <span class="n">task_cnt</span><span class="p">))</span>
+                <span class="n">bpllist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out_bpl</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>    <span class="c1"># pylint: disable=E1101</span>
+                <span class="n">task_cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">out_bpl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="n">cnt</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">cnt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">out_bpl</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+                <span class="n">cnt</span> <span class="o">=</span> <span class="n">task_size</span>
+
+    <span class="k">if</span> <span class="n">out_bpl</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cnt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">out_bpl</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">bpllist</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,734 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.tds</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.tds</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">tds.py</span>
+<span class="sd">------</span>
+
+<span class="sd">Test Data Server(s) utilities checking and updating server and path names</span>
+<span class="sd">e.g. if running on HPC.</span>
+
+<span class="sd">Features:</span>
+<span class="sd">  - checking if running on HPC client</span>
+<span class="sd">  - checking if the server is available</span>
+<span class="sd">  - changing server name in list of strings</span>
+
+<span class="sd">On HPC there is a fast connection server in parallel to the test data server LIFS010,</span>
+<span class="sd">if the script runs on HPC the fast one should be used</span>
+<span class="sd">to prevent that HPC clients wait for file transfer.</span>
+
+<span class="sd">The provided functions can be used to update e.g. pathnames, server names etc.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=E1101,E0611</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">platform</span><span class="p">,</span> <span class="n">modules</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">sep</span><span class="p">,</span> <span class="n">altsep</span><span class="p">,</span> <span class="n">getenv</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">search</span><span class="p">,</span> <span class="n">match</span><span class="p">,</span> <span class="n">sub</span>
+<span class="kn">from</span> <span class="nn">subprocess</span> <span class="kn">import</span> <span class="n">PIPE</span><span class="p">,</span> <span class="n">STDOUT</span><span class="p">,</span> <span class="n">call</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostname</span><span class="p">,</span> <span class="n">gethostbyname_ex</span><span class="p">,</span> <span class="n">create_connection</span><span class="p">,</span> <span class="n">socket</span><span class="p">,</span> <span class="n">AF_INET</span><span class="p">,</span> <span class="n">SOCK_STREAM</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randrange</span>
+<span class="kn">from</span> <span class="nn">requests</span> <span class="kn">import</span> <span class="n">get</span> <span class="k">as</span> <span class="n">reqget</span><span class="p">,</span> <span class="n">post</span> <span class="k">as</span> <span class="n">reqpost</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+<span class="c1"># try:</span>
+<span class="kn">from</span> <span class="nn">cx_Oracle</span> <span class="kn">import</span> <span class="n">connect</span> <span class="k">as</span> <span class="n">cxconnect</span>
+<span class="c1"># ISCX = True</span>
+<span class="c1"># except ImportError:</span>
+<span class="c1">#     from oracledb import connect as cxconnect</span>
+<span class="c1">#     ISCX = False</span>
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span>
+    <span class="kn">from</span> <span class="nn">urllib</span> <span class="kn">import</span> <span class="n">quote</span>
+<span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="n">StringTypes</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,)</span>
+    <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">quote</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">numba</span> <span class="kn">import</span> <span class="n">cuda</span>
+    <span class="n">CC_CORES_PER_SM</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">32</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span> <span class="mi">48</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">192</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span> <span class="mi">192</span><span class="p">,</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">7</span><span class="p">):</span> <span class="mi">192</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span> <span class="mi">128</span><span class="p">,</span>
+                       <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span> <span class="mi">128</span><span class="p">,</span> <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span> <span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="mi">64</span><span class="p">,</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">6</span><span class="p">):</span> <span class="mi">128</span><span class="p">}</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="n">cuda</span> <span class="o">=</span> <span class="n">CC_CORES_PER_SM</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># pylint: disable=C0103</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+<span class="kn">from</span> <span class="nn">..sched.sched_defs</span> <span class="kn">import</span> <span class="n">LOCAL_NET_PATH</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">suppress_warnings</span>
+<span class="kn">from</span> <span class="nn">..rdb.app_srv</span> <span class="kn">import</span> <span class="n">connect</span> <span class="k">as</span> <span class="n">asconnect</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">MSWIN</span> <span class="o">=</span> <span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span>
+
+<span class="n">MAX_TASKS</span> <span class="o">=</span> <span class="mi">25000</span>
+<span class="c1"># Sven, Joachim, Mohan, Cedrik, HPC_Services, Jenkins_Environment</span>
+<span class="n">DEVS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;uidv7805&quot;</span><span class="p">,</span> <span class="s2">&quot;uidv8815&quot;</span><span class="p">,</span> <span class="s2">&quot;uidp2898&quot;</span><span class="p">,</span> <span class="s2">&quot;uie61052&quot;</span><span class="p">,</span> <span class="s2">&quot;uia70156&quot;</span><span class="p">,</span> <span class="s2">&quot;uie30182&quot;</span><span class="p">,</span> <span class="s2">&quot;uie30184&quot;</span><span class="p">]</span>
+
+<span class="n">EXC_PRJ_NAMES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;Admin&quot;</span><span class="p">,</span> <span class="s2">&quot;INFRGTS&quot;</span><span class="p">,)</span>
+
+<span class="c1"># https://mtsgoesblobstoragetest.blob.core.windows.net/mtsblobcontainer/2020.10.17_at_15.43.11_radar-mi_5174.rrec</span>
+<span class="n">AZR_BLOB_STX</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;(?P&lt;epp&gt;\w+)://(?P&lt;account&gt;[a-zA-Z0-9]+)\.[a-z]+\.(?P&lt;suffix&gt;[a-zA-Z0-9\.]+)/&quot;</span> \
+               <span class="sa">r</span><span class="s2">&quot;(?P&lt;container&gt;[a-zA-Z0-9]+)/(?P&lt;blob&gt;.*)&quot;</span>
+<span class="n">AZR_CONN_STR</span> <span class="o">=</span> <span class="s2">&quot;DefaultEndpointsProtocol=</span><span class="si">{}</span><span class="s2">;AccountName=</span><span class="si">{}</span><span class="s2">;AccountKey=</span><span class="si">{}</span><span class="s2">;EndpointSuffix=</span><span class="si">{}</span><span class="s2">&quot;</span>
+<span class="n">AZR_ACC_KEYS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;ewears540bw11prj1&quot;</span><span class="p">:</span> <span class="s2">&quot;IA1Jsz4YnMI+J+vyyBlbayNOVnFHKmjN2cQwGuKEIh+XV3xoyVkZRTW9BHF1oPyy7/+ZPrulyDEuk1tK5eDzgw==&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ewears540bw11prj2&quot;</span><span class="p">:</span> <span class="s2">&quot;0rM0WyXP/MPVKUpaXm7aGDv0XrBYXKXWt2oH+S7bz1An8KOIfNxTHhgWSR43dHqd/6TCpy8xOk8b8AGmyfBLhg==&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ewears540bw11prj3&quot;</span><span class="p">:</span> <span class="s2">&quot;lxjLTnu126Kq7wBIVBhS1W6/dzWfV32ZpBRMK/NV767P5fKOemgZW6M06Vv8RzaKqnrLiM7DE5CB4OrgmINiWA==&quot;</span>
+<span class="p">}</span>
+
+<span class="n">VALID_PYVER</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;2.7.12 (default, Dec  4 2017, 14:50:18) </span><span class="se">\n</span><span class="s2">[GCC 5.4.0 20160609]&quot;</span><span class="p">,</span>  <span class="c1"># e.g. on lu00126vmx (hpcportal)</span>
+               <span class="s2">&quot;2.7.17 (default, Oct 28 2019, 21:35:07) [MSC v.1500 64 bit (AMD64)]&quot;</span><span class="p">,</span>
+               <span class="s2">&quot;3.6.10 |Anaconda, Inc.| (default, Jan  7 2020, 15:18:16) [MSC v.1916 64 bit (AMD64)]&quot;</span><span class="p">,</span>
+               <span class="s2">&quot;3.6.10 (default, Mar  5 2020, 10:17:47) [MSC v.1900 64 bit (AMD64)]&quot;</span><span class="p">,</span>
+               <span class="s2">&quot;3.8.5 (default, Sep  3 2020, 21:29:08) [MSC v.1916 64 bit (AMD64)]&quot;</span><span class="p">,</span>
+               <span class="s2">&quot;3.10.10 | packaged by conda-forge | (main, Mar 24 2023, 20:00:38) [MSC v.1934 64 bit (AMD64)]&quot;</span><span class="p">]</span>
+
+<span class="n">HPC_SHARES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;win32&quot;</span><span class="p">:</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lufs009x.li.de.conti.de&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lufs003x.li.de.conti.de&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lifs010.cw01.contiwan.com&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">ozfs110.oz.in.conti.de&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">ozfs120.oz.in.conti.de&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lsfs001x.ls.de.conti.de&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lsfs002x.ls.de.conti.de&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">qhfs004x.qh.us.conti.de&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">itfs001x.it.cn.conti.de&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">itfs002x.it.cn.conti.de&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11sim3.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11sim4.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11sim5.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11prj1.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11prj2.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11prj3.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11dev1.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;https://ewears540bw11dev2.blob.core.windows.net&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lsfs050x.ls.de.conti.de&quot;</span><span class="p">,</span>
+                        <span class="p">],</span>
+              <span class="s2">&quot;linux&quot;</span><span class="p">:</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;/datac/lufs009x&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/lufs003x&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/lifs010&quot;</span><span class="p">,</span> <span class="s2">&quot;/datac/ozfs110&quot;</span><span class="p">,</span> <span class="s2">&quot;/datac/ozfs120&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;/datac/lsfs001x&quot;</span><span class="p">,</span> <span class="s2">&quot;/datac/lsfs002x&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/qhfs004x&quot;</span><span class="p">,</span> <span class="s2">&quot;/datac/itfs001x&quot;</span><span class="p">,</span> <span class="s2">&quot;/datac/itfs002x&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11sim3&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11sim4&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11sim5&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11prj1&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11prj2&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11prj3&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11dev1&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/datac/azure/ewears540bw11dev2&quot;</span><span class="p">,</span>
+                        <span class="sa">r</span><span class="s2">&quot;/datac/lsfs050x&quot;</span><span class="p">,</span>
+                        <span class="p">]}</span>
+
+<span class="k">if</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;HPC_STORE&quot;</span><span class="p">):</span>
+    <span class="n">HPC_SHARES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;win32&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;HPC_STORE&quot;</span><span class="p">)]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">HPC_SHARES</span><span class="p">[</span><span class="s2">&quot;win32&quot;</span><span class="p">]),</span>
+                  <span class="s2">&quot;linux&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;/mnt/&quot;</span> <span class="o">+</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;HPC_STORE&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">HPC_SHARES</span><span class="p">[</span><span class="s2">&quot;linux&quot;</span><span class="p">])}</span>
+
+<span class="k">if</span> <span class="n">MSWIN</span><span class="p">:</span>
+    <span class="n">REPLACEMENTS</span> <span class="o">=</span> <span class="p">((</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lifs010)(s?(\.cw01\.contiwan\.com)?)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2s.cw01.contiwan.com\5&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lifs010s.cw01.contiwan.com\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lufs00[39]x)(\.li\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.li.de.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lufs003x.li.de.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub3-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lufs009x.li.de.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(qhfs004x)(\.qh\.us\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1qhsimu.qh.us.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-qh\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1qhsimu.qh.us.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(ozfs1[12]0)h?(\.oz\.in\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2h.oz.in.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-oz\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1ozfs110h.oz.in.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-m8\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1ozfs120h.oz.in.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lsfs001)[xh](\.ls\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2h.ls.de.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-ls\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lsfs001h.ls.de.conti.de\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lsfs002x)(\.ls\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.ls.de.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)mdm-adas-hub2-ls\.conti\.de(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lsfs002x.ls.de.conti.de\2&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(itfs001)[xh](\.it\.cn\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2h.it.cn.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(itfs002x)(\.it\.cn\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.it.cn.conti.de\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)mdm-adas-hub1-it\.conti\.de(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1itfs001h.it.cn.conti.de\2&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)mdm-adas-hub2-it\.conti\.de(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1itfs002x.it.cn.conti.de\2&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)</span><span class="se">\\\\</span><span class="s2">enedatareprocessingsa000\.blob\.core\.windows\.net</span><span class="se">\\</span><span class="s2">enedatareprocessingsa000&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;S:&quot;</span><span class="p">),)</span>
+<span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: nocover</span>
+    <span class="n">REPLACEMENTS</span> <span class="o">=</span> <span class="p">((</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lifs010)(s?(\.cw01\.contiwan\.com)?)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2\5&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/lifs010\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lufs00[39]x)(\.li\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/lufs003x\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub3-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/lufs009x\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(qhfs00[48]x)(\.qh\.us\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-qh\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/qhfs004x\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(ozfs1[12]0)(h?(\.oz\.in\.conti\.de)?)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2\5&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-oz\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/ozfs110\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-m8\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/ozfs120\3&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lsfs00[12])[xh](\.ls\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2x\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub([12])-ls\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/lsfs00\3x\4&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(itfs00)([12])[xh](\.it\.cn\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/\2\3x\5&quot;</span><span class="p">),</span>
+                    <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)mdm-adas-hub([12])-it\.conti\.de(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;/mnt/itfs00\2x\3&quot;</span><span class="p">),)</span>
+
+<span class="n">REVPLACMENTS</span> <span class="o">=</span> <span class="p">((</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lifs010)s?(\.cw01\.contiwan\.com)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.cw01.contiwan.com\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lifs010.cw01.contiwan.com\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lufs00[39]x)(\.li\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.li.de.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lufs003x.li.de.conti.de\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub3-lu\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lufs009x.li.de.conti.de\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(qhsimu)(\.qh\.us\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1qhfs004x.qh.us.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-qh\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1qhfs004x.qh.us.conti.de\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(ozfs1[12]0)h?(\.oz\.in\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2.oz.in.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub1-oz\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1ozfs110.oz.in.conti.de\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub2-m8\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1ozfs120.oz.in.conti.de\3&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(lsfs00[12])[xh](\.ls\.de\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2x.ls.de.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(mdm-adas-hub([12])-ls\.conti\.de)(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1lsfs00\3x.ls.de.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)(itfs00[12])[xh](\.it.cn\.conti\.de)?(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\2x.it.cn.conti.de\4&quot;</span><span class="p">),</span>
+                <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)(</span><span class="se">\\\\</span><span class="s2">)mdm-adas-hub([12])[xh]-it\.conti\.de(</span><span class="se">\\</span><span class="s2">.*)&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1itfs00\2x.ls.de.conti.de\3&quot;</span><span class="p">),)</span>
+
+<span class="c1"># connections for Oracle, postgres, etc: [(arg0, arg1, ...), connect_func, type_of_db]</span>
+<span class="c1"># ORACONN = (&#39;(DESCRIPTION=(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST={})))&#39;</span>
+<span class="c1">#            &#39;(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME={}))&#39;</span>
+<span class="c1">#            &#39;(TRANSPORT_CONNECT_TIMEOUT=600)(CONNECT_TIMEOUT=600)(RETRY_COUNT=3))&#39;)</span>
+<span class="c1"># EVAL_HPC = ORACONN.format(&quot;ludb004s.lu.de.conti.de&quot;, &quot;sMISCLU_1_P_PDB.lu.de.conti.de&quot;)</span>
+<span class="n">HPC_USR</span><span class="p">,</span> <span class="n">DEV_USR</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;hpc_user&quot;</span><span class="p">,</span> <span class="s2">&quot;Baba1234&quot;</span><span class="p">,</span> <span class="s2">&quot;racadmpe&quot;</span><span class="p">,),</span> <span class="p">(</span><span class="s2">&quot;dev_hpc_user&quot;</span><span class="p">,</span> <span class="s2">&quot;Pikachu20&quot;</span><span class="p">,</span> <span class="s2">&quot;racadmpe&quot;</span><span class="p">,)</span>
+<span class="n">SHB_USR</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;hpc_user&quot;</span><span class="p">,</span> <span class="s2">&quot;Baba1234&quot;</span><span class="p">,</span> <span class="s2">&quot;testdm19p&quot;</span><span class="p">,)</span>  <span class="c1"># test dbq: testdm19p, normal: testdm-jd</span>
+<span class="n">STD_VGA</span><span class="p">,</span> <span class="n">SHB_VGA</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;VAL_GLOBAL_USER&quot;</span><span class="p">,</span> <span class="s2">&quot;PWD4VAL_GLBL&quot;</span><span class="p">,</span> <span class="s2">&quot;racadmpe&quot;</span><span class="p">,),</span> <span class="p">(</span><span class="s2">&quot;VAL_GLOBAL_USER&quot;</span><span class="p">,</span> <span class="s2">&quot;PWD4VAL_GLBL&quot;</span><span class="p">,</span> <span class="s2">&quot;testdm19p&quot;</span><span class="p">,)</span>
+<span class="n">DEFAULT_DB_CONN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">cxconnect</span><span class="p">,</span> <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                   <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ALTER SESSION SET current_schema = HPC_ADMIN&quot;</span><span class="p">,</span> <span class="s2">&quot;ALTER SESSION SET time_zone = &#39;UTC&#39;&quot;</span><span class="p">],</span>
+                   <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;HPC@oracle&quot;</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;autocommit&quot;</span><span class="p">]}</span>
+<span class="n">DEV_DB_CONN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">cxconnect</span><span class="p">,</span> <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+               <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ALTER SESSION SET current_schema = DEV_HPC_ADMIN&quot;</span><span class="p">,</span> <span class="s2">&quot;ALTER SESSION SET time_zone = &#39;UTC&#39;&quot;</span><span class="p">],</span>
+               <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;DEV_HPC@oracle&quot;</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;autocommit&quot;</span><span class="p">]}</span>
+<span class="n">CHINA_DB_CONN</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">DEFAULT_DB_CONN</span><span class="p">)</span>
+<span class="n">VGA_DB_CONN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">cxconnect</span><span class="p">,</span>
+               <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;VGA@oracle&quot;</span><span class="p">,</span> <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ALTER SESSION SET current_schema = VAL_GLOBAL_ADMIN&quot;</span><span class="p">],</span>
+               <span class="s2">&quot;copy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;autocommit&quot;</span><span class="p">]}</span>
+<span class="n">CHINA_VGA_CONN</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">VGA_DB_CONN</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">cusr</span> <span class="ow">in</span> <span class="p">[[</span><span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">HPC_USR</span><span class="p">],</span> <span class="p">[</span><span class="n">DEV_DB_CONN</span><span class="p">,</span> <span class="n">DEV_USR</span><span class="p">],</span> <span class="p">[</span><span class="n">CHINA_DB_CONN</span><span class="p">,</span> <span class="n">SHB_USR</span><span class="p">],</span>
+                   <span class="p">[</span><span class="n">VGA_DB_CONN</span><span class="p">,</span> <span class="n">STD_VGA</span><span class="p">],</span> <span class="p">[</span><span class="n">CHINA_VGA_CONN</span><span class="p">,</span> <span class="n">SHB_VGA</span><span class="p">]]:</span>
+    <span class="c1"># if ISCX:</span>
+    <span class="n">conn</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cusr</span>
+    <span class="c1"># else:</span>
+    <span class="c1">#     conn[&quot;kwargs&quot;] = dict(zip((&quot;user&quot;, &quot;password&quot;, &quot;service_name&quot;,), cusr))</span>
+
+
+<span class="c1"># postgres could look like this:</span>
+<span class="c1"># DEFAULT_DB_CONN = {&quot;args&quot;: (,), &quot;kwargs&quot;: {&quot;host&quot;: &#39;&lt;host&gt;.lu.de.conti.de&#39;, &quot;dbname&quot;: &#39;HPC&#39;, &quot;user&quot;: &#39;hpc_user&#39;,</span>
+<span class="c1">#                    &quot;password&quot;: &#39;hpc_user&#39;}, &quot;conn_func&quot;: pgconnect, &quot;db_type&quot;: 1,</span>
+<span class="c1">#                    &quot;exec&quot;: [&quot;ALTER SESSION SET current_schema = HPC_ADMIN&quot;, &quot;ALTER SESSION SET time_zone = &#39;UTC&#39;&quot;],</span>
+<span class="c1">#                    &quot;repr&quot;: &quot;HPC@oracle&quot;, &quot;copy&quot;: [&quot;autocommit&quot;]}</span>
+<span class="n">PORTAL_URL</span> <span class="o">=</span> <span class="s2">&quot;hpcportal.conti.de&quot;</span>
+<span class="n">APPSRV_DB_CONN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;args&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;http://&#39;</span> <span class="o">+</span> <span class="n">PORTAL_URL</span><span class="p">,</span> <span class="s1">&#39;HPC&#39;</span><span class="p">,),</span> <span class="s2">&quot;kwargs&quot;</span><span class="p">:</span> <span class="p">{},</span>
+                  <span class="s2">&quot;conn_func&quot;</span><span class="p">:</span> <span class="n">asconnect</span><span class="p">,</span> <span class="s2">&quot;db_type&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;repr&quot;</span><span class="p">:</span> <span class="s2">&quot;HPC@appserver&quot;</span><span class="p">,</span>
+                  <span class="s2">&quot;set&quot;</span><span class="p">:</span> <span class="p">[(</span><span class="s2">&quot;autocommit&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)],</span> <span class="s2">&quot;copy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;autocommit&quot;</span><span class="p">]}</span>
+<span class="n">APP_SERVER</span> <span class="o">=</span> <span class="s2">&quot;localhost&quot;</span> <span class="k">if</span> <span class="s1">&#39;nose&#39;</span> <span class="ow">in</span> <span class="n">modules</span> <span class="k">else</span> <span class="n">PORTAL_URL</span>
+
+<span class="n">LND_HEAD</span> <span class="o">=</span> <span class="s2">&quot;LU00156VMA&quot;</span>
+<span class="n">LND_LOC</span> <span class="o">=</span> <span class="s2">&quot;LND&quot;</span>
+<span class="n">POC_HEAD</span> <span class="o">=</span> <span class="s2">&quot;LUAS003A&quot;</span>
+<span class="n">POC_LOC</span> <span class="o">=</span> <span class="s2">&quot;POC&quot;</span>
+<span class="n">DEV_HEAD</span> <span class="o">=</span> <span class="s2">&quot;LUAS004A&quot;</span>
+<span class="n">DEV_LOC</span> <span class="o">=</span> <span class="s2">&quot;DEV&quot;</span>
+<span class="c1"># AZR_LOC = &quot;AZR&quot;</span>
+<span class="n">DUB_LOC</span> <span class="o">=</span> <span class="s2">&quot;DUB&quot;</span>
+<span class="n">DUB_HEAD</span> <span class="o">=</span> <span class="s2">&quot;LSAS002A&quot;</span>
+<span class="n">SHARES</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;(prj|legacy|sim|hpc)&quot;</span>
+<span class="n">LND_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;LIFS010S?(\.CW01\.CONTIWAN\.COM)?</span><span class="se">\\</span><span class="s2">(prj|sim|testdata|data)&quot;</span><span class="p">,</span>
+               <span class="sa">r</span><span class="s2">&quot;LUFS00[39]X(\.LI\.DE\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">(prj|legacy|sim|hpc|landing)&quot;</span><span class="p">,</span>
+               <span class="sa">r</span><span class="s2">&quot;mdm-adas-hub[123]-lu\.conti\.de</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span>
+               <span class="sa">r</span><span class="s2">&quot;cw01(\.contiwan\.com)?</span><span class="se">\\</span><span class="s2">Root</span><span class="se">\\</span><span class="s2">Loc</span><span class="se">\\</span><span class="s2">lndp</span><span class="se">\\</span><span class="s2">did[a-z]\d</span><span class="si">{4}</span><span class="s2">&quot;</span><span class="p">,)</span>
+<span class="n">MAZ_SERVERS</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">AZR_BLOB_STX</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;LSFS00[12][XH](\.LS\.DE\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">]</span>
+<span class="n">ABH_HEAD</span> <span class="o">=</span> <span class="s2">&quot;QHS6U5DA&quot;</span>
+<span class="n">ABH_LOC</span> <span class="o">=</span> <span class="s2">&quot;ABH&quot;</span>
+<span class="n">ABH_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;QH(FS004X|SIMU)(\.QH\.US\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;mdm-adas-hub1-qh\.conti\.de</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,)</span>
+<span class="n">BLR_HEAD</span> <span class="o">=</span> <span class="s2">&quot;OZAS012A&quot;</span>
+<span class="n">BLR_LOC</span> <span class="o">=</span> <span class="s2">&quot;BLR&quot;</span>
+<span class="n">BLR_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;OZFS1[12]0H?(\.OZ\.IN\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;mdm-adas-hub(1-oz|2-m8)\.conti\.de</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,)</span>
+<span class="n">SHB_HEAD</span> <span class="o">=</span> <span class="s2">&quot;ITAS004A&quot;</span>
+<span class="n">SHB_LOC</span> <span class="o">=</span> <span class="s2">&quot;SHB&quot;</span>
+<span class="n">SHB_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;ITFS00[12][XH](\.IT\.CN\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;mdm-adas-hub[12]-it\.conti\.de</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,)</span>
+<span class="n">FFM_HEAD</span> <span class="o">=</span> <span class="s2">&quot;LSAS095A&quot;</span>
+<span class="n">FFM_LOC</span> <span class="o">=</span> <span class="s2">&quot;FFM&quot;</span>
+<span class="n">FFM_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;LSFS00[12][HX](\.LS\.DE\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;mdm-adas-hub[12]-ls\.conti\.de</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span>
+               <span class="sa">r</span><span class="s2">&quot;auto(\.contiwan\.com)?</span><span class="se">\\</span><span class="s2">CAS</span><span class="se">\\</span><span class="s2">Loc</span><span class="se">\\</span><span class="s2">ffm2</span><span class="se">\\</span><span class="s2">did[a-z]\d</span><span class="si">{4}</span><span class="s2">&quot;</span><span class="p">,)</span>
+
+<span class="n">DUB_SERVERS</span> <span class="o">=</span> <span class="p">(</span><span class="sa">r</span><span class="s2">&quot;LSFS00[12][HX](\.LS\.DE\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">SHARES</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;.*\.blob\.core\.windows\.net&quot;</span><span class="p">,)</span>
+<span class="n">DEV_SERVERS</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">FFM_SERVERS</span><span class="p">)</span>
+<span class="n">POC_SERVERS</span> <span class="o">=</span> <span class="p">[</span><span class="sa">r</span><span class="s2">&quot;FRFS010x(\.FR\.GE\.CONTI\.DE)?</span><span class="se">\\</span><span class="s2">transfer&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">FFM_SERVERS</span><span class="p">)</span>
+
+<span class="n">PORTALS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;http://</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">PORTAL_URL</span><span class="p">),</span> <span class="s2">&quot;http://</span><span class="si">{}</span><span class="s2">:8000&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">PORTAL_URL</span><span class="p">),</span> <span class="s2">&quot;http://</span><span class="si">{}</span><span class="s2">:8100&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">PORTAL_URL</span><span class="p">)]</span>
+<span class="n">SPARCS_URL</span> <span class="o">=</span> <span class="s2">&quot;https://statusportal.adas.conti.de:8005&quot;</span>
+
+<span class="c1"># values of HPC_STORAGE_MAP explained:</span>
+<span class="c1"># [0]: server shares belonging to same head node,</span>
+<span class="c1"># [1]: hpc network share,</span>
+<span class="c1"># [2]: which version of HPC pack is being used,</span>
+<span class="c1"># [3]: related DB connection to be used,</span>
+<span class="c1"># [4]: location</span>
+<span class="n">HPC_STORAGE_MAP</span> <span class="o">=</span> \
+    <span class="n">DefDict</span><span class="p">(([</span><span class="s2">&quot;OTHER&quot;</span><span class="p">],</span> <span class="n">LOCAL_NET_PATH</span><span class="p">,</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;localhost&quot;</span><span class="p">),</span>
+            <span class="o">**</span><span class="p">{</span>
+                <span class="n">DEV_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">DEV_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEV_DB_CONN</span><span class="p">,</span> <span class="n">DEV_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">2</span><span class="p">],),</span>
+                <span class="c1"># &quot;LU00190VMA&quot;: (LND_SERVERS, HPC_SHARES[platform][0], None, DEV_DB_CONN, DEV_LOC, PORTALS[2],),</span>
+                <span class="c1"># LND =&gt; 156VMA: SIL, 003A: CC</span>
+                <span class="n">LND_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="n">POC_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">POC_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">6</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;LU00160VMA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;LU00199VMA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;LU00200VMA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">LND_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="c1"># ABH =&gt; 5CA: SIL, 5BA: CC</span>
+                <span class="s2">&quot;QHS6U5CA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">ABH_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">7</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;QHS6U5BA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">ABH_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">7</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="c1"># new ABH head nodes:</span>
+                <span class="n">ABH_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">ABH_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">7</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;QHS6U5FA&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">ABH_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">7</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="c1"># BLR =&gt; 012A: SIL, 013A: CC</span>
+                <span class="n">BLR_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">BLR_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">BLR_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;OZAS013A&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">BLR_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">BLR_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="c1"># FFM =&gt; 003A: SIL, 002A: CC</span>
+                <span class="n">FFM_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">FFM_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">6</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="n">DUB_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">DUB_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">6</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="s2">&quot;LSAS003A&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">FFM_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">6</span><span class="p">],</span> <span class="s2">&quot;2019&quot;</span><span class="p">,</span> <span class="n">DEFAULT_DB_CONN</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">0</span><span class="p">],),</span>
+                <span class="c1"># JIT =&gt; 06: SIL, 07: CC</span>
+                <span class="n">SHB_HEAD</span><span class="p">:</span> <span class="p">(</span><span class="n">SHB_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">9</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">CHINA_DB_CONN</span><span class="p">,</span> <span class="n">SHB_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">1</span><span class="p">],),</span>
+                <span class="s2">&quot;ITAS004A_CSCT&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">SHB_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">9</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">CHINA_DB_CONN</span><span class="p">,</span> <span class="n">SHB_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">1</span><span class="p">],),</span>
+                <span class="s2">&quot;ITAS005A&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">SHB_SERVERS</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">[</span><span class="n">platform</span><span class="p">][</span><span class="mi">9</span><span class="p">],</span> <span class="s2">&quot;2016&quot;</span><span class="p">,</span> <span class="n">CHINA_DB_CONN</span><span class="p">,</span> <span class="n">SHB_LOC</span><span class="p">,</span> <span class="n">PORTALS</span><span class="p">[</span><span class="mi">1</span><span class="p">],),</span>
+            <span class="p">})</span>
+
+<span class="n">LOC_HEAD_MAP</span> <span class="o">=</span> <span class="p">{</span><span class="n">LND_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">LND_HEAD</span><span class="p">,</span> <span class="s2">&quot;LU00160VMA&quot;</span><span class="p">,</span> <span class="s2">&quot;LU00199VMA&quot;</span><span class="p">,</span> <span class="s2">&quot;LU00200VMA&quot;</span><span class="p">],</span>
+                <span class="n">BLR_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">BLR_HEAD</span><span class="p">,</span> <span class="s2">&quot;OZAS013A&quot;</span><span class="p">],</span>
+                <span class="n">ABH_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">ABH_HEAD</span><span class="p">,</span> <span class="s2">&quot;QHS6U5FA&quot;</span><span class="p">,</span> <span class="s2">&quot;QHS6U5DA&quot;</span><span class="p">,</span> <span class="s2">&quot;QHS6U5BA&quot;</span><span class="p">],</span>
+                <span class="n">FFM_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">FFM_HEAD</span><span class="p">],</span>
+                <span class="n">POC_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">POC_HEAD</span><span class="p">],</span>
+                <span class="n">SHB_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">SHB_HEAD</span><span class="p">,</span> <span class="s2">&quot;ITAS004A_CSCT&quot;</span><span class="p">,</span> <span class="s2">&quot;ITAS005A&quot;</span><span class="p">],</span>
+                <span class="c1"># AZR_LOC: [AZR_HEAD, AZR_HEAD],</span>
+                <span class="n">DEV_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">DEV_HEAD</span><span class="p">],</span>
+                <span class="n">DUB_LOC</span><span class="p">:</span> <span class="p">[</span><span class="n">DUB_HEAD</span><span class="p">],</span>
+                <span class="p">}</span>
+<span class="n">X_SUBMIT_EXC</span> <span class="o">=</span> <span class="p">{</span><span class="n">FFM_LOC</span><span class="p">:</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="n">LND_LOC</span><span class="p">:</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">:</span> <span class="n">DUB_LOC</span><span class="p">,</span> <span class="n">DUB_LOC</span><span class="p">:</span> <span class="n">FFM_LOC</span><span class="p">}</span>
+
+<span class="n">PRODUCTION_HEADS</span> <span class="o">=</span> <span class="p">[</span><span class="n">LND_HEAD</span><span class="p">,</span> <span class="n">ABH_HEAD</span><span class="p">,</span> <span class="n">BLR_HEAD</span><span class="p">,</span> <span class="n">FFM_HEAD</span><span class="p">]</span>
+
+<span class="n">PRJ_EXC</span> <span class="o">=</span> <span class="s2">&quot;Admin|Short_Test|CI|INFRGTS&quot;</span>
+
+
+<span class="c1"># - function -</span>
+<div class="viewcode-block" id="location"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.location">[docs]</a><span class="k">def</span> <span class="nf">location</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    find out location of you, if not found, falls back to def_head</span>
+
+<span class="sd">    :param str default: default thing to return if AD cannot resolve properly</span>
+<span class="sd">    :return: hpc headnode</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">gethostname</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="c1"># # the LDAP values are not always set correctly,</span>
+    <span class="c1"># # e.g. for FFM there is some faster conn. to LND, so they use &#39;delnd11&#39;</span>
+    <span class="c1"># if platform == &quot;win32&quot;:</span>
+    <span class="c1">#     loc_lookup = {&quot;delnd&quot;: LND_LOC, &quot;deuu&quot;: LND_LOC, &quot;inblr&quot;: BLR_LOC, &quot;usabh&quot;: ABH_LOC,</span>
+    <span class="c1">#                   &quot;defrhub&quot;: FFM_LOC, &quot;defr&quot;: FFM_LOC, &quot;cnj&quot;: SHB_LOC, &quot;sgsgpl&quot;: SHB_LOC}</span>
+    <span class="c1">#     if host in [&#39;UUL5S7DW&#39;]:</span>
+    <span class="c1">#         loc_lookup[&quot;deuu&quot;] = LND_LOC</span>
+    <span class="c1">#     elif host in [&quot;LU00209VMA&quot;]:</span>
+    <span class="c1">#         loc_lookup[&quot;deuu&quot;] = DEV_LOC</span>
+    <span class="c1">#</span>
+    <span class="c1">#     srvn = None</span>
+    <span class="c1">#     try:</span>
+    <span class="c1">#         root = GetObject(&#39;LDAP://rootDSE&#39;)</span>
+    <span class="c1">#         srvn = &#39;LDAP://&#39; + root.Get(&#39;dsServiceName&#39;)</span>
+    <span class="c1">#         ntds = GetObject(srvn)</span>
+    <span class="c1">#         site = GetObject(GetObject(GetObject(ntds.Parent).Parent).Parent)</span>
+    <span class="c1">#         loc = match(r&quot;(cnj|[a-z]*)\d*&quot;, site.Get(&#39;cn&#39;).lower()).group(1)</span>
+    <span class="c1">#         if default is not None:</span>
+    <span class="c1">#             return loc_lookup.get(loc, default)</span>
+    <span class="c1">#         return loc</span>
+    <span class="c1">#     except Exception as ex:  # lookup error as user is locked out???</span>
+    <span class="c1">#         print(&quot;unable to lookup LDAP: %s&quot; % (str(ex) if srvn is None else srvn))</span>
+    <span class="c1">#         return default</span>
+    <span class="c1"># else:</span>
+    <span class="n">loc_lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;LU&quot;</span><span class="p">:</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="s2">&quot;OZ&quot;</span><span class="p">:</span> <span class="n">BLR_LOC</span><span class="p">,</span> <span class="s2">&quot;AN&quot;</span><span class="p">:</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="s2">&quot;FR&quot;</span><span class="p">:</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="s2">&quot;UU&quot;</span><span class="p">:</span> <span class="n">LND_LOC</span><span class="p">,</span> <span class="s2">&quot;IT&quot;</span><span class="p">:</span> <span class="n">SHB_LOC</span><span class="p">,</span>
+                  <span class="c1"># additional Windows names at the sites:</span>
+                  <span class="s2">&quot;QH&quot;</span><span class="p">:</span> <span class="n">ABH_LOC</span><span class="p">,</span> <span class="s2">&quot;LS&quot;</span><span class="p">:</span> <span class="n">FFM_LOC</span><span class="p">,</span> <span class="s2">&quot;JD&quot;</span><span class="p">:</span> <span class="n">SHB_LOC</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">host</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;UULBM6GW&#39;</span><span class="p">]:</span>
+        <span class="n">loc_lookup</span><span class="p">[</span><span class="s2">&quot;UU&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">LND_LOC</span>
+    <span class="k">elif</span> <span class="n">host</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LU00209VMA&quot;</span><span class="p">]:</span>
+        <span class="n">loc_lookup</span><span class="p">[</span><span class="s2">&quot;deuu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">DEV_LOC</span>
+
+    <span class="k">return</span> <span class="n">loc_lookup</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">host</span><span class="p">[:</span><span class="mi">2</span><span class="p">],</span> <span class="n">default</span><span class="p">)</span></div>
+
+
+<span class="c1"># - continue defines -</span>
+<span class="c1"># find out our actual location of current computer</span>
+<span class="n">LOCATION</span> <span class="o">=</span> <span class="n">location</span><span class="p">(</span><span class="n">LND_LOC</span><span class="p">)</span>
+<span class="n">DEFAULT_HEAD_NODE</span> <span class="o">=</span> <span class="p">{</span><span class="n">ABH_LOC</span><span class="p">:</span> <span class="n">ABH_HEAD</span><span class="p">,</span> <span class="n">BLR_LOC</span><span class="p">:</span> <span class="n">BLR_HEAD</span><span class="p">,</span> <span class="n">SHB_LOC</span><span class="p">:</span> <span class="n">SHB_HEAD</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">:</span> <span class="n">FFM_HEAD</span><span class="p">,</span>
+                     <span class="n">LND_LOC</span><span class="p">:</span> <span class="n">LND_HEAD</span><span class="p">,</span> <span class="n">DEV_LOC</span><span class="p">:</span> <span class="n">DEV_HEAD</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">LOCATION</span><span class="p">,</span> <span class="n">LND_HEAD</span><span class="p">)</span>
+<span class="n">JENKINS_NODES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LU00142VMA&quot;</span><span class="p">,</span> <span class="s2">&quot;QHS6U6BA&quot;</span><span class="p">,</span> <span class="s2">&quot;OZAS016A&quot;</span><span class="p">]</span>
+
+<span class="c1"># ww submit service provided for now by Jenkins monitoring servers</span>
+<span class="c1"># listing all possible locations so rec files at locations not supported won&#39;t break the submit</span>
+<span class="c1"># but only cause a deployment error for that files</span>
+<span class="c1"># this table needs to be synchronised with server list in has.views.WW_LOC !!!</span>
+<span class="n">WW_SUBMIT_SRV_MAP</span> <span class="o">=</span> <span class="p">{</span><span class="n">LND_LOC</span><span class="p">:</span> <span class="s2">&quot;LU00179VMA&quot;</span><span class="p">,</span> <span class="n">ABH_LOC</span><span class="p">:</span> <span class="s2">&quot;QHS6U5AA&quot;</span><span class="p">,</span> <span class="n">BLR_LOC</span><span class="p">:</span> <span class="s2">&quot;OZAS021A&quot;</span><span class="p">,</span> <span class="n">FFM_LOC</span><span class="p">:</span> <span class="s2">&quot;LSAS092A&quot;</span><span class="p">,</span>
+                     <span class="n">DEV_LOC</span><span class="p">:</span> <span class="s2">&quot;LU00209VMA&quot;</span><span class="p">}</span>
+
+<span class="n">PY_2_EXE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python27_64\python.exe&quot;</span>
+<span class="n">PY_36_EXE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python36\python.exe&quot;</span>
+<span class="n">PY_38_EXE</span> <span class="o">=</span> <span class="n">PY_3_EXE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python38\python.exe&quot;</span>
+<span class="n">PY_310_EXE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python310\python.exe&quot;</span>
+<span class="n">LIN_EXE</span> <span class="o">=</span> <span class="s2">&quot;/usr/bin/python&quot;</span>
+<span class="n">LIN_3_EXE</span> <span class="o">=</span> <span class="s2">&quot;/usr/bin/python3&quot;</span>
+<span class="c1"># take care to check the hpcreq_....txt files for each supported version</span>
+<span class="n">SHORT_VER</span> <span class="o">=</span> <span class="p">{</span><span class="n">PY_2_EXE</span><span class="p">:</span> <span class="s2">&quot;2.7&quot;</span><span class="p">,</span> <span class="n">PY_36_EXE</span><span class="p">:</span> <span class="s2">&quot;3.6&quot;</span><span class="p">,</span> <span class="n">PY_38_EXE</span><span class="p">:</span> <span class="s2">&quot;3.8&quot;</span><span class="p">,</span> <span class="n">PY_310_EXE</span><span class="p">:</span> <span class="s2">&quot;3.10&quot;</span><span class="p">}</span>
+
+<span class="n">HPC_SUPPORTED_CLASSES</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;DEV&quot;</span><span class="p">,</span> <span class="s2">&quot;EVA&quot;</span><span class="p">,</span> <span class="s2">&quot;ADM&quot;</span><span class="p">,</span> <span class="s2">&quot;CIT&quot;</span><span class="p">,</span> <span class="s2">&quot;SHT&quot;</span><span class="p">,</span> <span class="s2">&quot;AZR&quot;</span><span class="p">]</span>
+<span class="n">HPC_SUPPORTED_TYPES</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;AJS&#39;</span><span class="p">,</span> <span class="s1">&#39;AL2&#39;</span><span class="p">,</span> <span class="s1">&#39;ALL&#39;</span><span class="p">,</span> <span class="s1">&#39;AS2&#39;</span><span class="p">,</span> <span class="s1">&#39;ASL&#39;</span><span class="p">,</span> <span class="s1">&#39;CVT&#39;</span><span class="p">,</span> <span class="s1">&#39;EFS&#39;</span><span class="p">,</span> <span class="s1">&#39;FSI&#39;</span><span class="p">,</span> <span class="s1">&#39;FUS&#39;</span><span class="p">,</span> <span class="s1">&#39;IEX&#39;</span><span class="p">,</span> <span class="s1">&#39;OTH&#39;</span><span class="p">,</span> <span class="s1">&#39;SIM&#39;</span><span class="p">,</span> <span class="s1">&#39;TSF&#39;</span><span class="p">,</span> <span class="s1">&#39;VFR&#39;</span><span class="p">]</span>
+<span class="n">HPC_SUPPORTED_FUNCTIONS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;ACC&quot;</span><span class="p">,</span> <span class="s2">&quot;ALN&quot;</span><span class="p">,</span> <span class="s2">&quot;ARS&quot;</span><span class="p">,</span> <span class="s2">&quot;AWV&quot;</span><span class="p">,</span> <span class="s2">&quot;BLD&quot;</span><span class="p">,</span> <span class="s2">&quot;CB&quot;</span><span class="p">,</span> <span class="s2">&quot;CC&quot;</span><span class="p">,</span> <span class="s2">&quot;CCAL&quot;</span><span class="p">,</span> <span class="s2">&quot;CD&quot;</span><span class="p">,</span> <span class="s2">&quot;CEM&quot;</span><span class="p">,</span> <span class="s2">&quot;CIPP&quot;</span><span class="p">,</span> <span class="s2">&quot;COD&quot;</span><span class="p">,</span> <span class="s2">&quot;CRLS&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;DAP&quot;</span><span class="p">,</span> <span class="s2">&quot;EBA&quot;</span><span class="p">,</span> <span class="s2">&quot;EC&quot;</span><span class="p">,</span> <span class="s2">&quot;ECM&quot;</span><span class="p">,</span> <span class="s2">&quot;EM&quot;</span><span class="p">,</span> <span class="s2">&quot;EMO&quot;</span><span class="p">,</span> <span class="s2">&quot;EO&quot;</span><span class="p">,</span> <span class="s2">&quot;FB&quot;</span><span class="p">,</span> <span class="s2">&quot;FCA&quot;</span><span class="p">,</span> <span class="s2">&quot;FPS&quot;</span><span class="p">,</span> <span class="s2">&quot;FSD&quot;</span><span class="p">,</span> <span class="s2">&quot;GA&quot;</span><span class="p">,</span> <span class="s2">&quot;GDR&quot;</span><span class="p">,</span> <span class="s2">&quot;GEN&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;GFRS&quot;</span><span class="p">,</span> <span class="s2">&quot;GP&quot;</span><span class="p">,</span> <span class="s2">&quot;GS&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">,</span> <span class="s2">&quot;HLA&quot;</span><span class="p">,</span> <span class="s2">&quot;HRE&quot;</span><span class="p">,</span> <span class="s2">&quot;HVF&quot;</span><span class="p">,</span> <span class="s2">&quot;KCM&quot;</span><span class="p">,</span> <span class="s2">&quot;LCA&quot;</span><span class="p">,</span> <span class="s2">&quot;LD&quot;</span><span class="p">,</span> <span class="s2">&quot;LDW&quot;</span><span class="p">,</span> <span class="s2">&quot;LKA&quot;</span><span class="p">,</span> <span class="s2">&quot;LMK&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;LR&quot;</span><span class="p">,</span> <span class="s2">&quot;MAC&quot;</span><span class="p">,</span> <span class="s2">&quot;MAP&quot;</span><span class="p">,</span> <span class="s2">&quot;MCAL&quot;</span><span class="p">,</span> <span class="s2">&quot;MFC&quot;</span><span class="p">,</span> <span class="s2">&quot;MFL&quot;</span><span class="p">,</span> <span class="s2">&quot;MFS&quot;</span><span class="p">,</span> <span class="s2">&quot;MLL&quot;</span><span class="p">,</span> <span class="s2">&quot;MOS&quot;</span><span class="p">,</span> <span class="s2">&quot;OD&quot;</span><span class="p">,</span> <span class="s2">&quot;OFC&quot;</span><span class="p">,</span> <span class="s2">&quot;OFCF&quot;</span><span class="p">,</span> <span class="s2">&quot;OOC&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;OT&quot;</span><span class="p">,</span> <span class="s2">&quot;PCC&quot;</span><span class="p">,</span> <span class="s2">&quot;PD&quot;</span><span class="p">,</span> <span class="s2">&quot;PED&quot;</span><span class="p">,</span> <span class="s2">&quot;PMD&quot;</span><span class="p">,</span> <span class="s2">&quot;PV&quot;</span><span class="p">,</span> <span class="s2">&quot;RC&quot;</span><span class="p">,</span> <span class="s2">&quot;RCTA&quot;</span><span class="p">,</span> <span class="s2">&quot;RDI&quot;</span><span class="p">,</span> <span class="s2">&quot;RDT&quot;</span><span class="p">,</span> <span class="s2">&quot;RHC&quot;</span><span class="p">,</span> <span class="s2">&quot;RIC&quot;</span><span class="p">,</span> <span class="s2">&quot;RMHT&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;RMP&quot;</span><span class="p">,</span> <span class="s2">&quot;RPM&quot;</span><span class="p">,</span> <span class="s2">&quot;RSP&quot;</span><span class="p">,</span> <span class="s2">&quot;SAC&quot;</span><span class="p">,</span> <span class="s2">&quot;SCAL&quot;</span><span class="p">,</span> <span class="s2">&quot;SCT&quot;</span><span class="p">,</span> <span class="s2">&quot;SDC&quot;</span><span class="p">,</span> <span class="s2">&quot;SEP&quot;</span><span class="p">,</span> <span class="s2">&quot;SFOD&quot;</span><span class="p">,</span> <span class="s2">&quot;SI&quot;</span><span class="p">,</span> <span class="s2">&quot;SIB&quot;</span><span class="p">,</span> <span class="s2">&quot;SIR&quot;</span><span class="p">,</span> <span class="s2">&quot;SLE&quot;</span><span class="p">,</span>
+                           <span class="s2">&quot;SOD&quot;</span><span class="p">,</span> <span class="s2">&quot;SPOD&quot;</span><span class="p">,</span> <span class="s2">&quot;SR&quot;</span><span class="p">,</span> <span class="s2">&quot;SRL&quot;</span><span class="p">,</span> <span class="s2">&quot;SRP&quot;</span><span class="p">,</span> <span class="s2">&quot;TLR&quot;</span><span class="p">,</span> <span class="s2">&quot;TSA&quot;</span><span class="p">,</span> <span class="s2">&quot;UDW&quot;</span><span class="p">,</span> <span class="s2">&quot;VC&quot;</span><span class="p">,</span> <span class="s2">&quot;VCL&quot;</span><span class="p">,</span> <span class="s2">&quot;VDY&quot;</span><span class="p">,</span> <span class="s2">&quot;VL&quot;</span><span class="p">,</span> <span class="s2">&quot;VOD&quot;</span><span class="p">]</span>
+
+<span class="n">VALID_NAME</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;(ADM|DMI?)_.+|((</span><span class="si">%s</span><span class="s2">)_(</span><span class="si">%s</span><span class="s2">)|0\d</span><span class="si">{6}</span><span class="s2">)_(</span><span class="si">%s</span><span class="s2">)(_.+)&quot;</span> \
+             <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;|&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HPC_SUPPORTED_CLASSES</span><span class="p">),</span> <span class="s2">&quot;|&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HPC_SUPPORTED_TYPES</span><span class="p">),</span> <span class="s2">&quot;|&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HPC_SUPPORTED_FUNCTIONS</span><span class="p">))</span>
+
+<span class="n">DATA_PATH</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;D:\data&quot;</span> <span class="k">if</span> <span class="n">MSWIN</span> <span class="k">else</span> <span class="s2">&quot;/var/hpc&quot;</span>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="validate_name"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.validate_name">[docs]</a><span class="k">def</span> <span class="nf">validate_name</span><span class="p">(</span><span class="n">head</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0916</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    validate name of job (internal)</span>
+
+<span class="sd">    **The job name must follow these rules:**</span>
+
+<span class="sd">        CCC_TTT_FFF_xxxxxxIxx_shrt_dscr</span>
+
+<span class="sd">    .. productionlist::</span>
+<span class="sd">       job_name: (job_class &#39;_&#39; job_type | ims_issue) &#39;_&#39; job_func &#39;_&#39; sw_version &#39;_&#39; shrt_dscr</span>
+<span class="sd">       job_class: [&#39;DEV&#39;|&#39;EVA&#39;|&#39;CIT&#39;|&#39;SHT&#39;|&#39;ADM&#39;]</span>
+<span class="sd">       job_type: [&quot;AJS&quot;|&quot;AL2&quot;|&quot;ALL&quot;|&quot;AS2&quot;|&quot;ASL&quot;|&quot;CVT&quot;|&quot;EFS&quot;|&quot;FSI&quot;|&quot;FUS&quot;|&quot;IEX&quot;|&quot;OTH&quot;|&quot;SIM&quot;|&quot;TSF&quot;|&quot;VFR&quot;]</span>
+<span class="sd">       job_func: [&quot;ARS&quot;|&quot;MFS&quot;|&quot;SRL&quot;|&quot;MFC&quot;|&quot;MFL&quot;|&quot;ACC&quot;|&quot;ALN&quot;|&quot;AWV&quot;|&quot;CB&quot;|&quot;CD&quot;|&quot;CEM&quot;|&quot;CCAL&quot;|&quot;CIPP&quot;|</span>
+<span class="sd">               :  &quot;COD&quot;|&quot;CRLS&quot;|&quot;EM&quot;|&quot;EBA&quot;|&quot;ECM&quot;|&quot;EMO&quot;|&quot;EO&quot;|&quot;FB&quot;|&quot;FCA&quot;|&quot;FSD&quot;|&quot;GEN&quot;|&quot;HEAD&quot;|&quot;HLA&quot;|</span>
+<span class="sd">               :  &quot;HRE&quot;|&quot;HVF&quot;|&quot;KCM&quot;|&quot;LCA&quot;|&quot;LD&quot;|&quot;LKA&quot;|&quot;LMK&quot;|&quot;LR&quot;|&quot;MAP&quot;|&quot;MCAL&quot;|&quot;OFC&quot;|&quot;OFCF&quot;|&quot;OT&quot;|&quot;PED&quot;|</span>
+<span class="sd">               :  &quot;PV&quot;|&quot;RCTA&quot;|&quot;RHC&quot;|&quot;RSP&quot;|&quot;SAC&quot;|&quot;SCT&quot;|&quot;SDC&quot;|&quot;SFOD&quot;|&quot;SI&quot;|&quot;SIB&quot;|&quot;SIR&quot;|&quot;SLE&quot;|&quot;SPOD&quot;|</span>
+<span class="sd">               :  &quot;SR&quot;|&quot;TLR&quot;|&quot;TSA&quot;|&quot;UDW&quot;|&quot;VCL&quot;|&quot;VDY&quot;|&quot;VL&quot;|&quot;VOD&quot;|&quot;LDW&quot;|&quot;MAC&quot;|&quot;OD&quot;|&quot;SOD&quot;|&quot;GDR&quot;|</span>
+<span class="sd">               :  &quot;SCAL&quot;|&quot;BLD&quot;|&quot;PMD&quot;]</span>
+<span class="sd">       sw_version: [&#39;xxxxxxIxx&#39;|&#39;######I##&#39;]</span>
+<span class="sd">       #: [0..9]</span>
+<span class="sd">       shtr_dscr: [a..z|A..Z|0..9|_]</span>
+<span class="sd">       ims_issue: [0..9]{6}</span>
+
+<span class="sd">    max len: 128 char, no spaces and only ascii char, using following definitions:</span>
+
+<span class="sd">    supported classes CCC:</span>
+
+<span class="sd">    ===  ===========</span>
+<span class="sd">    DEV  development, job to develop a function or test</span>
+<span class="sd">    EVA  evaluation, job for final test reports</span>
+<span class="sd">    CIT  continuous integration test, automatic submit from Jenkins et.al.</span>
+<span class="sd">    SHT  short test, job with short run time, result can be deleted early in case of memory problems</span>
+<span class="sd">    ADM  administration job</span>
+<span class="sd">    ===  ===========</span>
+
+<span class="sd">    supported type names TTT:</span>
+
+<span class="sd">    ALL, AL2, SIM, EFS, AJS, FUS, FSI, VFR, IEX, CVT, OTH, ASL, AS2</span>
+
+<span class="sd">    supported functions FFF:</span>
+
+<span class="sd">    ARS, MFS, SRL, MFC, MFL, ACC, ALN, AWV, CB, CD, CEM, CCAL, CIPP,</span>
+<span class="sd">    COD, CRLS, EM, EBA, ECM, EMO, EO, FB, FCA, FSD, GEN, HEAD, HLA,</span>
+<span class="sd">    HRE, HVF, KCM, LCA, LD, LKA, LR, MAP, MCAL, OFC, OFCF, OT, PED,</span>
+<span class="sd">    PV, RCTA, RHC, RSP, SAC, SCT, SDC, SFOD, SI, SIB, SIR, SLE, SPOD,</span>
+<span class="sd">    SR, TLR, TSA, UDW, VCL, VDY, VL, VOD, LDW, MAC, OD, SOD, GDR,</span>
+<span class="sd">    SCAL, BLD, PMD</span>
+
+<span class="sd">    version number of SW under test:</span>
+
+<span class="sd">    xxxxxxIxx for release and Integration build number, or just that string for testing</span>
+
+<span class="sd">    **valid names**::</span>
+
+<span class="sd">        EVA_FUS_EBA_123456I02_all_recs</span>
+<span class="sd">        SHT_SIM_SRL_xxxxxxIxx_test_ped</span>
+
+<span class="sd">    this method &#39;validate_name&#39; is used internally to check the job name:</span>
+
+<span class="sd">    :param str head: head node name</span>
+<span class="sd">    :param str name: name of job to validate</span>
+<span class="sd">    :return: boolean whether the name follows rules</span>
+<span class="sd">    :rtype: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># care about file/folder names: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file</span>
+        <span class="c1"># pylint: disable=R0916</span>
+        <span class="k">if</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">x&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">128</span> \
+                <span class="ow">or</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">|/|:|\*|\?|</span><span class="se">\&quot;</span><span class="s2">|&lt;|&gt;|\||\.\.|\s&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="mi">20</span> <span class="o">&lt;</span> <span class="nb">ord</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">128</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">name</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">if</span> <span class="n">head</span> <span class="ow">and</span> <span class="n">head</span> <span class="ow">in</span> <span class="n">PRODUCTION_HEADS</span> <span class="ow">and</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^</span><span class="si">{}</span><span class="s2">$&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">VALID_NAME</span><span class="p">),</span> <span class="n">name</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<span class="nd">@suppress_warnings</span>
+<span class="k">def</span> <span class="nf">validate_project</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    validate the project name</span>
+<span class="sd">    docu: https://confluence.auto.continental.cloud/pages/viewpage.action?spaceKey=ASP&amp;title=HPC+CLUSTER+Team</span>
+
+<span class="sd">    :param str name: name of project</span>
+<span class="sd">    :return: message from SPARCS of what&#39;s wrong (in case)</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">search</span><span class="p">(</span><span class="n">PRJ_EXC</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">reqget</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">/project/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">SPARCS_URL</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">name</span><span class="p">)),</span>
+                     <span class="n">proxies</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;no_proxy&quot;</span><span class="p">:</span> <span class="s2">&quot;.conti.de&quot;</span><span class="p">},</span> <span class="n">allow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span> <span class="k">else</span> <span class="n">res</span><span class="o">.</span><span class="n">text</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+
+<span class="nd">@suppress_warnings</span>
+<span class="k">def</span> <span class="nf">project_usage</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">resource</span><span class="p">,</span> <span class="n">duration</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    send resource usage to statusportal</span>
+
+<span class="sd">    :param str name: name of project</span>
+<span class="sd">    :param str resource: resource being used</span>
+<span class="sd">    :param int duration: duration in [s} being used</span>
+<span class="sd">    :return: usage info could be posted successfully</span>
+<span class="sd">    :rtype: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">json</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;project_name&quot;</span><span class="p">:</span> <span class="n">quote</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">resource</span><span class="p">,</span>
+                <span class="s2">&quot;end_data&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">T%H:%M:%SZ&#39;</span><span class="p">),</span> <span class="s2">&quot;hours_used&quot;</span><span class="p">:</span> <span class="n">duration</span> <span class="o">/</span> <span class="mi">3600</span><span class="p">}</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">reqpost</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">/projects&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">SPARCS_URL</span><span class="p">),</span> <span class="n">json</span><span class="o">=</span><span class="n">json</span><span class="p">,</span>
+                      <span class="n">proxies</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;no_proxy&quot;</span><span class="p">:</span> <span class="s2">&quot;.conti.de&quot;</span><span class="p">},</span> <span class="n">allow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;project usage post error!&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">False</span>
+
+
+<div class="viewcode-block" id="head_name"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.head_name">[docs]</a><span class="k">def</span> <span class="nf">head_name</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :return: head node name</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;CCP_CLUSTER_NAME&quot;</span><span class="p">,</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;CCP_SCHEDULER&quot;</span><span class="p">,</span> <span class="n">default</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="resolve_alias"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.resolve_alias">[docs]</a><span class="k">def</span> <span class="nf">resolve_alias</span><span class="p">(</span><span class="n">alias</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Resolve a given Network Alias of a machine to a real existing</span>
+<span class="sd">    pc name inside the network.</span>
+
+<span class="sd">    :param alias: Alias of the PC.</span>
+<span class="sd">    :type alias:  sting</span>
+<span class="sd">    :return:      real pc-name</span>
+<span class="sd">    :rtype:       string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">gethostbyname_ex</span><span class="p">(</span><span class="n">alias</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">alias</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="resolve_ip"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.resolve_ip">[docs]</a><span class="k">def</span> <span class="nf">resolve_ip</span><span class="p">(</span><span class="n">server</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;resolve IP address from server name&quot;&quot;&quot;</span>
+    <span class="n">cip</span> <span class="o">=</span> <span class="n">gethostbyname_ex</span><span class="p">(</span><span class="n">server</span><span class="p">)[</span><span class="mi">2</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">cip</span><span class="p">[</span><span class="n">randrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cip</span><span class="p">))]</span></div>
+
+
+<div class="viewcode-block" id="server_path"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.server_path">[docs]</a><span class="k">def</span> <span class="nf">server_path</span><span class="p">(</span><span class="n">head_node</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    **Check if a fast path to server is available**</span>
+
+<span class="sd">    Usage mainly to check if we are on a Fast Network (e.g. on HPC),</span>
+<span class="sd">    then we should be able to access server LIFS010S for fast file transfer.</span>
+
+<span class="sd">    **Caution:** this function gets really slow (~4 sec) if the server is not available,</span>
+<span class="sd">    so use it only where it is really needed!</span>
+
+<span class="sd">    :return: path to related head node share folder</span>
+<span class="sd">    :rtype:  str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># change with extreme caution!!</span>
+    <span class="c1"># this function is used by HPC nearly everywhere and therefore an error will stop the complete cloud!</span>
+    <span class="k">if</span> <span class="n">head_node</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">LOCAL_NET_PATH</span>
+
+    <span class="c1"># check for S connection (faster)</span>
+    <span class="n">server</span> <span class="o">=</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head_node</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">MSWIN</span><span class="p">:</span>
+        <span class="n">fastsrv</span> <span class="o">=</span> <span class="n">replace_server_path</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+        <span class="n">fastparts</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">fastsrv</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sep</span> <span class="o">+</span> <span class="n">altsep</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">call</span><span class="p">([</span><span class="sa">r</span><span class="s2">&quot;ping&quot;</span><span class="p">,</span> <span class="s2">&quot;-n&quot;</span> <span class="k">if</span> <span class="n">MSWIN</span> <span class="k">else</span> <span class="s2">&quot;-c&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">fastparts</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">stdout</span><span class="o">=</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">STDOUT</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">server</span> <span class="o">=</span> <span class="n">fastsrv</span>
+
+    <span class="k">return</span> <span class="n">join</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="n">head_node</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="replace_server_path"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.replace_server_path">[docs]</a><span class="k">def</span> <span class="nf">replace_server_path</span><span class="p">(</span><span class="n">arg_list</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    replace all server name entries like \\LIFS010 entries</span>
+<span class="sd">    with the fast connection server name like \\LIFS010s when running on HPC.</span>
+
+<span class="sd">    update server names as defined in `REPLACEMENTS` if on_hpc is True</span>
+
+<span class="sd">    :param arg_list: input argument list for HPC.</span>
+<span class="sd">    :type arg_list:  list[string] | str</span>
+<span class="sd">    :param reverse: do a reverse replace</span>
+<span class="sd">    :type reverse: bool</span>
+
+<span class="sd">    :return: modified argument list.</span>
+<span class="sd">    :rtype:  list[string]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">arg_list</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_list</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+        <span class="n">arg_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_list</span><span class="p">]</span>
+
+        <span class="k">def</span> <span class="nf">conv</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;conversation&quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">def</span> <span class="nf">conv</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;conversation&quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">x</span>
+
+    <span class="n">clst</span> <span class="o">=</span> <span class="n">arg_list</span><span class="p">[:]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">clst</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">REVPLACMENTS</span> <span class="k">if</span> <span class="n">reverse</span> <span class="k">else</span> <span class="n">REPLACEMENTS</span><span class="p">:</span>
+            <span class="n">clst</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">sub</span><span class="p">(</span><span class="n">k</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">k</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">clst</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">v</span><span class="p">:</span>
+                <span class="k">break</span>
+
+    <span class="k">return</span> <span class="n">conv</span><span class="p">(</span><span class="n">clst</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="resolve_mail"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.resolve_mail">[docs]</a><span class="k">def</span> <span class="nf">resolve_mail</span><span class="p">(</span><span class="n">usr</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    resolve email address of user</span>
+
+<span class="sd">    :param str usr: user name</span>
+<span class="sd">    :return: email address</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">usr</span><span class="p">:</span>
+        <span class="n">usr</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="se">\\</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USERDOMAIN&quot;</span><span class="p">),</span> <span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;USERNAME&quot;</span><span class="p">))</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">win32com.client</span> <span class="kn">import</span> <span class="n">GetObject</span><span class="p">,</span> <span class="n">Dispatch</span>  <span class="c1"># pylint: disable=C0415</span>
+        <span class="n">nres</span> <span class="o">=</span> <span class="n">Dispatch</span><span class="p">(</span><span class="n">dispatch</span><span class="o">=</span><span class="s2">&quot;NameTranslate&quot;</span><span class="p">)</span>
+        <span class="n">nres</span><span class="o">.</span><span class="n">Set</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">usr</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">GetObject</span><span class="p">(</span><span class="s2">&quot;LDAP://&quot;</span> <span class="o">+</span> <span class="n">nres</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s2">&quot;mail&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="cuda_cores"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.cuda_cores">[docs]</a><span class="k">def</span> <span class="nf">cuda_cores</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    https://stackoverflow.com/questions/63823395/how-can-i-get-the-number-of-cuda-cores-in-my-gpu-using-python-and-numba</span>
+
+<span class="sd">    :return: number of total cores available (cuda must be installed)</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">dev</span> <span class="o">=</span> <span class="n">cuda</span><span class="o">.</span><span class="n">get_current_device</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">CC_CORES_PER_SM</span><span class="p">[</span><span class="n">dev</span><span class="o">.</span><span class="n">compute_capability</span><span class="p">]</span> <span class="o">*</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">dev</span><span class="p">,</span> <span class="s1">&#39;MULTIPROCESSOR_COUNT&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="daemon_cmd"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.daemon_cmd">[docs]</a><span class="k">def</span> <span class="nf">daemon_cmd</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">60.</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ask HPC daemon to do something</span>
+
+<span class="sd">    :param str cmd: command to send to localhost&#39;s HPC daemon</span>
+<span class="sd">    :param str host: hostname to use</span>
+<span class="sd">    :param float timeout: timeout of connection</span>
+<span class="sd">    :return: response from localhost&#39;s daemon</span>
+<span class="sd">    :rtype: `data`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="s2">&quot;ERR&quot;</span>
+    <span class="n">sock</span> <span class="o">=</span> <span class="n">socket</span><span class="p">(</span><span class="n">AF_INET</span><span class="p">,</span> <span class="n">SOCK_STREAM</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">connect</span><span class="p">((</span><span class="n">host</span><span class="p">,</span> <span class="mi">8092</span><span class="p">))</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">settimeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+            <span class="n">sock</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">cmd</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sock</span><span class="o">.</span><span class="n">send</span><span class="p">((</span><span class="n">cmd</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">sock</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">4096</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="take_offline"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.tds.take_offline">[docs]</a><span class="k">def</span> <span class="nf">take_offline</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    take me offline by asking headnode to do so</span>
+
+<span class="sd">    :param str host: take host offline</span>
+<span class="sd">    :return: success status: true/false</span>
+<span class="sd">    :rtype: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="s2">&quot;ERR&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">sock</span> <span class="o">=</span> <span class="n">create_connection</span><span class="p">((</span><span class="n">DEFAULT_HEAD_NODE</span><span class="p">,</span> <span class="mi">8088</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">sendall</span><span class="p">(</span><span class="s2">&quot;cluster=offline(</span><span class="si">%s</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">host</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">sock</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="n">sock</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">data</span> <span class="o">==</span> <span class="s2">&quot;OK&quot;</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,719 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts.mts_check</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.mts.mts_check</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">mts_check.py</span>
+<span class="sd">------------</span>
+
+<span class="sd">**Checks after MTS Crashdumps, Errors and Exception in \*.xlog files.**</span>
+
+<span class="sd">**Features:**</span>
+<span class="sd">    - Printing of Error Statistic Output from HPCErrorDB (Oracle)</span>
+<span class="sd">    - Scanning of a given Folder for Chrashdumps and xlog-Error File Entries.</span>
+<span class="sd">    - Scanning xlog-Error files for MTS Errors, Exceptions and ...</span>
+<span class="sd">    - Writing all found errors into the Oracle Error DB.</span>
+
+<span class="sd">**UseCase:**</span>
+<span class="sd">    Typically used as SubTask in the MTSTaskFactory for error checking.</span>
+
+<span class="sd">**Usage:**</span>
+
+<span class="sd">    - `C:\\&gt;python mts_check.py check \\\\LIFS010\\hpc\\liss006\\3511_MFC3B0_JointSim\\2_Output\\T00008`</span>
+<span class="sd">    - `C:\\&gt;python mts_check.py stat 3511`</span>
+<span class="sd">    - |  scan for db file and add rec file mapping entries:</span>
+<span class="sd">      | `C:\\&gt;python mts_check.py check \\\\LIFS010\\hpc\\liss006\\3511_MFC3B0_JointSim -d`</span>
+
+<span class="sd">Parameters</span>
+<span class="sd">----------</span>
+<span class="sd">    check \&lt;folder\&gt;</span>
+<span class="sd">        The given Input Folder URL which is used to scan after some errornous stuff.</span>
+<span class="sd">    stat \&lt;jobid\&gt;</span>
+<span class="sd">        JobId which must be used for getting the Error info out from the Oracle DB.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=C0413</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">walk</span><span class="p">,</span> <span class="n">listdir</span><span class="p">,</span> <span class="n">chmod</span><span class="p">,</span> <span class="n">unlink</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">isdir</span><span class="p">,</span> <span class="n">expandvars</span><span class="p">,</span> <span class="n">basename</span>
+<span class="kn">from</span> <span class="nn">fnmatch</span> <span class="kn">import</span> <span class="n">fnmatch</span>
+<span class="kn">from</span> <span class="nn">stat</span> <span class="kn">import</span> <span class="n">S_IWRITE</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">search</span> <span class="k">as</span> <span class="n">research</span><span class="p">,</span> <span class="n">match</span>
+<span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">mktemp</span>
+<span class="kn">from</span> <span class="nn">xml.sax</span> <span class="kn">import</span> <span class="n">make_parser</span><span class="p">,</span> <span class="n">SAXParseException</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">hashlib</span> <span class="kn">import</span> <span class="n">sha256</span>
+<span class="kn">from</span> <span class="nn">configparser</span> <span class="kn">import</span> <span class="n">ConfigParser</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span><span class="p">,</span> <span class="n">PY2</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">pefile</span> <span class="kn">import</span> <span class="n">PE</span><span class="p">,</span> <span class="n">DIRECTORY_ENTRY</span>
+<span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+    <span class="n">PE</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="c1"># - import HPC modules ------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..rdb.error_db</span> <span class="kn">import</span> <span class="n">ErrorDB</span>
+<span class="kn">from</span> <span class="nn">..rdb.sqlite_defs</span> <span class="kn">import</span> <span class="n">create_sqlite</span>
+<span class="kn">from</span> <span class="nn">..core.exitcodes</span> <span class="kn">import</span> <span class="n">ExitCodes</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">DummyLogger</span><span class="p">,</span> <span class="n">get_logger</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">error</span>
+<span class="kn">from</span> <span class="nn">.parser</span> <span class="kn">import</span> <span class="n">XlogHandler</span>
+
+<span class="c1"># - defines -----------------------------------------------------------------------------------------------------------</span>
+<span class="n">LOGGER_NAME</span> <span class="o">=</span> <span class="s1">&#39;MTSCheck:&#39;</span>
+<span class="n">CORRUPT_FIX</span> <span class="o">=</span> <span class="s2">&quot;&lt;!--appended by HPC --&gt;</span><span class="se">\n</span><span class="s2">&lt;/LogEntryList&gt;</span><span class="se">\n</span><span class="s2">&lt;/ErrorLog&gt;</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+<span class="c1"># treat following (regex) log entries with a specific exit code and map to an error level (-&gt; XlogHandler.levels)</span>
+<span class="c1"># fallback for other levels</span>
+<span class="n">ERR_MAPPING</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">({})</span>
+<span class="c1"># crash mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>  <span class="c1"># Exceptions are misspelled same way, with a singleton S !!!</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^ACCESS_VIOLATION$&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_ACCESS_VIOLATION</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^ARRAY_BOUNDS_EXCEEDED&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_ARRAY_BOUNDS_EXCEEDED</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^BREAKPOINT&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_BREAKPOINT</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^FLT_DIVIDE_BY_ZERO&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_FLT_DIVIDE_BY_ZERO</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^FLT_INVALID_OPERATION&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_FLT_INVALID_OPERATION</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^GUARD_PAGE&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_GUARD_PAGE</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^ILLEGAL_INSTRUCTION&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_ILLEGAL_INSTRUCTION</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^INT_DIVIDE_BY_ZERO&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INT_DIVIDE_BY_ZERO</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^INT_OVERFLOW&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INT_OVERFLOW</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^INVALID_HANDLE&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INVALID_HANDLE</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^PRIV_INSTRUCTION&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_PRIV_INSTRUCTION</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^SINGLE_STEP&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_SINGLE_STEP</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+
+    <span class="c1"># basst: using multiple lines for the same error in different languages is done by intend</span>
+    <span class="c1">#        as lines get too long using a single statement</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^An invalid parameter was passed to a C runtime function.&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INVALID_PARAMETER</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^An invalid parameter was passed to a service or function.&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INVALID_PARAMETER</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^An eine C-Laufzeitfunktion wurde ein ung&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INVALID_PARAMETER</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^Un param.*tre non valide&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_INVALID_PARAMETER</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;^The system detected an overrun of a stack-based buffer&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_STACK_BUFFER_OVERRUN</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Fatal Application Exit&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_FATAL_APP_EXIT</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Sortie d_application irr&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_FATAL_APP_EXIT</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Anwendungsbeendung&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_FATAL_APP_EXIT</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;The activation context being deactivated&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_CRASH_THREAD_ACTIVATION_CONTEXT</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="c1"># can also be used for empty error messages</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;.*&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_CRASH_DUMP_FOUND</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+<span class="p">))</span>
+
+<span class="c1"># exception mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;InvalidOperation&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_INVALID_OP</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;DivisionByZero|Zero Divide&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_DIVISION_BY_ZERO</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Overflow&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_OVERFLOW</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+
+    <span class="c1"># following definitions have not yet been seen by the time now</span>
+    <span class="c1"># basst: no unit test cases available as real examples not found</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Underflow&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_UNDERFLOW</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Inexact&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_INEXACT</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;DenormalOperation&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_DENORMAL_OP</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;StackCheck&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_FP_EXCEPTION_STACK_CHECK</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+
+    <span class="c1"># basst: following found in different error logs during a search on results</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Far scan peak lists are different&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_FAR_SCAN_PEAK_ERROR</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Near scan peak lists are different&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_NEAR_SCAN_PEAK_ERROR</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Peak error block=.*index=.*&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_PEAK_ERROR_AT_POSITION</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;0xC0000005|Acces.*Violation&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_ACCESS_VIOLATION</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Inconsistent data structure. The following performance counters will be skipped.&#39;</span><span class="p">,</span>
+     <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_INCONSISTENT_DATA_STRUCTURE</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Configuration file:.*does not exist&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_CONFIG_OF_MO_MISSING</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;error.*assert&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_MO_CODE_ERROR</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;A BMW Radome correction is done in this Simulation&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_BMW_RADOME_CORRECTION</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="c1"># (&#39;An exception occured and a crash report&#39;, (error.ERR_APP_EXC_UNKNOWN, 1)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;An unhandled exception occured&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_UNHANDLED_EXCEPTION</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;No GPU success msg after &#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_GPU_EXEC</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+
+    <span class="c1"># basst modified this to a known state</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;0x80000003|Unknown&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_UNKNOWN_EXCEPTION</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;.*&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_EXC_UNKNOWN</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="p">))</span>
+
+<span class="c1"># error mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;0x00000040 The specified network name is no longer available\.&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_ERR_NETWORK_UNAVAILABLE</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(Recording is corrupted, offset = \d+)|(Read request beyond the end of the file)|&#39;</span>
+     <span class="sa">r</span><span class="s1">&#39;(Found \d+ corrupted record-package\(s\) starting at)|&#39;</span>
+     <span class="sa">r</span><span class="s1">&#39;(The recording contains a corrupted control section at offset: )&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APP_ERR_RECORDING_CORRUPT</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(Recording reader plugin failed to open file)|(No matching reader plugin found for file: )|&#39;</span>
+     <span class="sa">r</span><span class="s1">&#39;(Failed to open [A-Za-z0-9]+ file )&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_READ_REC_FAILED</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(Connection to GPU server could not be established)|(Error in GPU model execution)&#39;</span><span class="p">,</span>
+     <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_INFRASTRUCTURE_GPU_EXEC</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;format error: not a valid MDF block&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_INVALID_BLOCK</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;MTS will exit due to lack of memory&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_LOW_VIRT_MEM</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Failed to add merge candidate recording&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_MERGE_REC</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+<span class="p">))</span>
+
+<span class="c1"># warning mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Cannot open or read configuration from file .*&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_READ_CONFIG</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+<span class="p">))</span>
+
+<span class="c1"># information mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Recovering navigation data and data source information from recording file\.&#39;</span><span class="p">,</span>
+     <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_RECOVERING_DATA</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Output file was created successfully.&#39;</span><span class="p">,</span> <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_OUTPUT_CREATED</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+<span class="p">))</span>
+
+<span class="c1"># debug mappings</span>
+<span class="n">ERR_MAPPING</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;The application has failed to start because its side-by-side configuration is incorrect&#39;</span><span class="p">,</span>
+     <span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_ERR_SIDE_BY_SIDE</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>  <span class="c1"># Please see the application event log for more detail</span>
+<span class="p">))</span>
+
+<span class="n">IGNORE_MAPPING</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">({})</span>
+<span class="c1"># ignore certain errors in case other things happen</span>
+<span class="n">IGNORE_MAPPING</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span>
+    <span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Output file was created successfully&#39;</span><span class="p">,</span> <span class="p">[</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_APPLICATION_IO_IDLE</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_UNSPECIFIED_ERROR_FOUND</span><span class="p">],),</span>
+<span class="p">))</span>
+
+
+<span class="c1"># - functions ---------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="mts_log_check"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.mts_log_check">[docs]</a><span class="k">def</span> <span class="nf">mts_log_check</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0914,R0915,R1260</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    scan given Input Folder for MTS Chrashdumps and xlog-Files.</span>
+<span class="sd">    Analyse the Files, and return dedicated infos.</span>
+<span class="sd">    =&gt; used by the starter</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *folder* (``str``): input folder to check crash xml or xlog files</span>
+<span class="sd">        * *exitcodes* (``ExitCodes``): exit code object</span>
+<span class="sd">        * *level* (``int``): limit reporting to certain level</span>
+<span class="sd">        * *log_corrupts* (``bool``): log corrupt log files, default: True</span>
+
+<span class="sd">    :return: error code</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cmdcall</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cmdline&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;logger&quot;</span><span class="p">,</span> <span class="n">DummyLogger</span><span class="p">(</span><span class="n">cmdcall</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="s2">&quot;exitcodes&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">dbase</span><span class="p">,</span> <span class="n">created</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">dbase</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dbase</span> <span class="o">=</span> <span class="n">create_sqlite</span><span class="p">(</span><span class="n">mktemp</span><span class="p">(</span><span class="s2">&quot;.sqlite&quot;</span><span class="p">,</span> <span class="s2">&quot;hpc_&quot;</span><span class="p">))</span>
+            <span class="n">created</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">xcodes</span> <span class="o">=</span> <span class="n">ExitCodes</span><span class="p">(</span><span class="n">db</span><span class="o">=</span><span class="n">dbase</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">created</span><span class="p">:</span>
+            <span class="n">unlink</span><span class="p">(</span><span class="n">dbase</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">xcodes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;exitcodes&quot;</span><span class="p">]</span>
+
+    <span class="n">err_items</span><span class="p">,</span> <span class="n">err_cnt</span> <span class="o">=</span> <span class="p">{},</span> <span class="p">{}</span>
+    <span class="n">founds</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">xfiles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">fldr</span> <span class="o">=</span> <span class="n">expandvars</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;folder&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">isdir</span><span class="p">(</span><span class="n">fldr</span><span class="p">):</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span><span class="p">)</span> <span class="ow">in</span> <span class="n">walk</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;folder&quot;</span><span class="p">]):</span>
+                <span class="n">xfiles</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">join</span><span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span>
+                               <span class="k">if</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)((.*crash.*|\d</span><span class="si">{2}</span><span class="s2">(\d</span><span class="si">{2}</span><span class="s2">_)</span><span class="si">{3}</span><span class="s2">(_\d</span><span class="si">{2}</span><span class="s2">)</span><span class="si">{3}</span><span class="s2">&#39;\d</span><span class="si">{3}</span><span class="s2">\-\d</span><span class="si">{3}</span><span class="s2">)\.xml|.*\.xlog)$&quot;</span><span class="p">,</span>
+                                        <span class="n">f</span><span class="p">)])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">xfiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fldr</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">xfiles</span><span class="p">:</span>
+            <span class="n">xcodes</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_NO_XLOG_AVAILABLE</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cmdcall</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;no x-files found&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">error</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;no xlog found! -&gt; </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_NO_XLOG_AVAILABLE</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{},</span> <span class="n">DefDict</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">cmdcall</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> x-files found&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xfiles</span><span class="p">)))</span>
+
+        <span class="n">xlog</span> <span class="o">=</span> <span class="n">XlogHandler</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">parser</span> <span class="o">=</span> <span class="n">make_parser</span><span class="p">()</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">setContentHandler</span><span class="p">(</span><span class="n">xlog</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">setErrorHandler</span><span class="p">(</span><span class="n">xlog</span><span class="p">)</span>  <span class="c1"># we have all in one</span>
+        <span class="n">old_prio</span> <span class="o">=</span> <span class="mi">999</span>
+
+        <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">xfiles</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+                <span class="n">xlog</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;parsing </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xfl</span><span class="p">:</span>
+                        <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">xfl</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">SAXParseException</span> <span class="k">as</span> <span class="n">sex</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="s2">&quot;errmon_*.xlog&quot;</span><span class="p">):</span>
+                        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xfl</span><span class="p">:</span>
+                            <span class="n">xfl</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">CORRUPT_FIX</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;needed to fix xml footer.&quot;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+                    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;log_corrupts&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;corrupt XML </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2"> @ line: </span><span class="si">%d</span><span class="s2">:</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fname</span><span class="p">,</span> <span class="n">sex</span><span class="o">.</span><span class="n">getMessage</span><span class="p">(),</span>
+                                     <span class="n">sex</span><span class="o">.</span><span class="n">getLineNumber</span><span class="p">(),</span> <span class="n">sex</span><span class="o">.</span><span class="n">getColumnNumber</span><span class="p">())</span>
+                        <span class="n">xcodes</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_CORRUPT_CRASH_FOUND</span><span class="p">)</span>
+                <span class="k">break</span>
+
+        <span class="c1"># pre-add level counters (defaults to 0 at start)</span>
+        <span class="k">for</span> <span class="n">lev</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">)):</span>
+            <span class="n">err_cnt</span><span class="p">[</span><span class="n">lev</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># iterate finally</span>
+        <span class="k">for</span> <span class="n">lev</span><span class="p">,</span> <span class="n">lname</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1702</span>
+            <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">xlog</span><span class="p">,</span> <span class="n">lname</span> <span class="o">+</span> <span class="s1">&#39;s&#39;</span><span class="p">):</span>
+                <span class="c1"># we&#39;re mapping the logs here, the lower the code, the more important</span>
+                <span class="n">nerror</span><span class="p">,</span> <span class="n">nlev</span><span class="p">,</span> <span class="n">rep</span> <span class="o">=</span> <span class="n">_filter_desc</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">,</span> <span class="n">lev</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">rep</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;found </span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nerror</span><span class="p">,</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">explain</span><span class="p">(</span><span class="n">nerror</span><span class="p">))</span>
+                    <span class="n">founds</span><span class="p">[</span><span class="n">msg</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="n">founds</span><span class="p">[</span><span class="n">msg</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                        <span class="n">xcodes</span><span class="p">(</span><span class="n">nerror</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">nlev</span> <span class="o">&lt;=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;level&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">rep</span><span class="p">:</span>
+                        <span class="n">xcodes</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">codes</span><span class="p">[</span><span class="n">nlev</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">cmdcall</span><span class="p">:</span>
+                        <span class="n">chk</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">()</span>
+                        <span class="n">chk</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}{}{}{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nlev</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_code</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_src</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+                        <span class="k">if</span> <span class="n">chk</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span> <span class="ow">in</span> <span class="n">err_items</span><span class="p">:</span>
+                            <span class="n">err_items</span><span class="p">[</span><span class="n">chk</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()][</span><span class="s1">&#39;cnt&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">res</span><span class="o">.</span><span class="n">count</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">err_items</span><span class="p">[</span><span class="n">chk</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()]</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="n">nlev</span><span class="p">,</span> <span class="s1">&#39;code&#39;</span><span class="p">:</span> <span class="n">res</span><span class="o">.</span><span class="n">err_code</span><span class="p">,</span> <span class="s1">&#39;desc&#39;</span><span class="p">:</span> <span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">,</span>
+                                                          <span class="s1">&#39;src&#39;</span><span class="p">:</span> <span class="n">res</span><span class="o">.</span><span class="n">err_src</span><span class="p">,</span> <span class="s1">&#39;time&#39;</span><span class="p">:</span> <span class="n">res</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="s1">&#39;mts&#39;</span><span class="p">:</span> <span class="n">res</span><span class="o">.</span><span class="n">mts_ts</span><span class="p">,</span>
+                                                          <span class="s1">&#39;cnt&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+                    <span class="k">elif</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">prio</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">old_prio</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;found higher prio&#39;ed error: </span><span class="si">{}</span><span class="s2"> (</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xcodes</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">desc</span><span class="p">))</span>
+                        <span class="n">old_prio</span> <span class="o">=</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">prio</span><span class="p">()</span>
+                <span class="n">err_cnt</span><span class="p">[</span><span class="n">nlev</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="c1"># todo: rewind / remove it once MTS solved the exe-hang....</span>
+                <span class="k">for</span> <span class="n">pat</span><span class="p">,</span> <span class="n">ignerr</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">IGNORE_MAPPING</span><span class="p">[</span><span class="n">lev</span><span class="p">]):</span>
+                    <span class="k">if</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">error</span> <span class="ow">in</span> <span class="n">ignerr</span> <span class="ow">and</span> <span class="n">research</span><span class="p">(</span><span class="n">pat</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="n">ignerr</span><span class="p">:</span>
+                            <span class="n">xcodes</span><span class="o">.</span><span class="n">reprioritize</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;suppressing exitcode </span><span class="si">%d</span><span class="s2"> as related </span><span class="si">%s</span><span class="s2"> at TS </span><span class="si">%s</span><span class="s2"> found: </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span>
+                                        <span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">[</span><span class="n">lev</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">time</span><span class="p">),</span> <span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">for</span> <span class="n">msg</span><span class="p">,</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">founds</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">cnt</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;message &#39;</span><span class="si">%s</span><span class="s2">&#39; repeated </span><span class="si">%d</span><span class="s2"> times.&quot;</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">cnt</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">cmdcall</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;returning error </span><span class="si">{}</span><span class="s2"> (</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">xcodes</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">desc</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">error</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">err_items</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">err_cnt</span><span class="p">,</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="mts_check"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.mts_check">[docs]</a><span class="k">def</span> <span class="nf">mts_check</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0914,R0915,R1260</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scan given Input Folder for MTS Chrashdumps and xlog-Files.</span>
+<span class="sd">    Analyse the Files, and store dedicated infos inside the DB.</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *headnode* (``str``): HPC head node name, default: DEFAULT_HEAD_NODE</span>
+<span class="sd">        * *folder* (``str``): input folder to check crash xml or xlog files</span>
+<span class="sd">        * *use_print* (``bool``): checker should use print instead of logger</span>
+<span class="sd">        * *logger* (``Logger``): use logger given if given</span>
+<span class="sd">        * *level* (``int``): limit reporting to certain level</span>
+<span class="sd">        * *log_corrupts* (``bool``): log corrupt log files, default: True</span>
+<span class="sd">        * *verbose* (``bool``): print logs additionally (be a bit more verbose)</span>
+
+<span class="sd">    :return: error code</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_folder</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;folder&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">&quot;logger&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">LOGGER_NAME</span><span class="p">,</span> <span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stream</span><span class="p">,</span> <span class="kc">True</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">DummyLogger</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use_print&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>\
+            <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use_print&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">else</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">LOGGER_NAME</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">mtc</span> <span class="o">=</span> <span class="n">research</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(?i)(.*</span><span class="se">\\</span><span class="s1">(\d*)_.*</span><span class="se">\\</span><span class="s1">0?(1_Input|2_Output))</span><span class="se">\\</span><span class="s1">T(\d+)&#39;</span><span class="p">,</span> <span class="n">input_folder</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mtc</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">())</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s1">&#39;Path </span><span class="si">%s</span><span class="s1"> does not fit into path pattern!&#39;</span><span class="p">,</span> <span class="n">input_folder</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_HPC_WRONG_ARG</span>
+
+        <span class="n">jobid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+        <span class="n">taskid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+        <span class="n">head_node</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;head_node&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;headnode: </span><span class="si">%s</span><span class="s1">, jobid: </span><span class="si">%d</span><span class="s1">, taskid: </span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">head_node</span><span class="p">,</span> <span class="n">jobid</span><span class="p">,</span> <span class="n">taskid</span><span class="p">)</span>
+
+        <span class="n">db</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head_node</span><span class="p">][</span><span class="mi">3</span><span class="p">])</span>
+        <span class="n">err_db</span> <span class="o">=</span> <span class="n">ErrorDB</span><span class="p">(</span><span class="n">head_node</span><span class="p">,</span> <span class="n">jobid</span><span class="o">=</span><span class="n">jobid</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">logger</span><span class="p">,</span> <span class="n">db</span><span class="o">=</span><span class="n">db</span><span class="p">)</span>
+        <span class="n">xcodes</span> <span class="o">=</span> <span class="n">ExitCodes</span><span class="p">(</span><span class="n">db</span><span class="o">=</span><span class="n">db</span><span class="p">)</span>
+
+        <span class="n">xfiles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span><span class="p">)</span> <span class="ow">in</span> <span class="n">walk</span><span class="p">(</span><span class="n">input_folder</span><span class="p">):</span>
+            <span class="n">xfiles</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">join</span><span class="p">(</span><span class="n">path_</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span>
+                           <span class="k">if</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?i)((.*crash.*|\d</span><span class="si">{2}</span><span class="s2">(\d</span><span class="si">{2}</span><span class="s2">_)</span><span class="si">{3}</span><span class="s2">(_\d</span><span class="si">{2}</span><span class="s2">)</span><span class="si">{3}</span><span class="s2">&#39;\d</span><span class="si">{3}</span><span class="s2">\-\d</span><span class="si">{3}</span><span class="s2">)\.xml|.*\.xlog)$&quot;</span><span class="p">,</span> <span class="n">f</span><span class="p">)])</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">xfiles</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;no xlogs found!&quot;</span><span class="p">)</span>
+            <span class="n">xcodes</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_NO_XLOG_AVAILABLE</span><span class="p">)</span>
+
+        <span class="n">xlog</span> <span class="o">=</span> <span class="n">XlogHandler</span><span class="p">(</span><span class="n">logger</span><span class="p">)</span>
+        <span class="n">parser</span> <span class="o">=</span> <span class="n">make_parser</span><span class="p">()</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">setContentHandler</span><span class="p">(</span><span class="n">xlog</span><span class="p">)</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">setErrorHandler</span><span class="p">(</span><span class="n">xlog</span><span class="p">)</span>  <span class="c1"># we have all in one</span>
+
+        <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">xfiles</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+                <span class="n">xlog</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Parsing File: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">args</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;rb&quot;</span><span class="p">}</span> <span class="k">if</span> <span class="n">PY2</span> <span class="k">else</span> <span class="p">{</span><span class="s2">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;encoding&quot;</span><span class="p">:</span> <span class="s1">&#39;utf-8-sig&#39;</span><span class="p">}</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">)</span> <span class="k">as</span> <span class="n">xfl</span><span class="p">:</span>
+                        <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">xfl</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">SAXParseException</span> <span class="k">as</span> <span class="n">sex</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">basename</span><span class="p">(</span><span class="n">fname</span><span class="p">),</span> <span class="s2">&quot;errmon_*.xlog&quot;</span><span class="p">):</span>
+                        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xfl</span><span class="p">:</span>
+                            <span class="n">xfl</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">CORRUPT_FIX</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;needed to fix xml footer.&quot;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;XML File Corrupt: </span><span class="si">%s</span><span class="s2"> @ line </span><span class="si">%d</span><span class="s2">, column </span><span class="si">%d</span><span class="s2">!&quot;</span><span class="p">,</span>
+                                 <span class="n">sex</span><span class="o">.</span><span class="n">getMessage</span><span class="p">(),</span> <span class="n">sex</span><span class="o">.</span><span class="n">getLineNumber</span><span class="p">(),</span> <span class="n">sex</span><span class="o">.</span><span class="n">getColumnNumber</span><span class="p">())</span>
+                    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;log_corrupts&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
+                        <span class="n">xcodes</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">ERR_MTS_CORRUPT_CRASH_FOUND</span><span class="p">)</span>
+                <span class="k">break</span>
+
+        <span class="c1"># pre-add level counters (defaults to 0 at start)</span>
+        <span class="k">for</span> <span class="n">lev</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">)):</span>
+            <span class="n">err_db</span><span class="o">.</span><span class="n">add_count</span><span class="p">(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">lev</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># iterate finally</span>
+        <span class="k">for</span> <span class="n">lev</span><span class="p">,</span> <span class="n">lname</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">):</span>
+            <span class="n">scnt</span><span class="p">,</span> <span class="n">fcnt</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="k">for</span> <span class="n">fcnt</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">xlog</span><span class="p">,</span> <span class="n">lname</span> <span class="o">+</span> <span class="s1">&#39;s&#39;</span><span class="p">)):</span>
+                <span class="c1"># we&#39;re mapping the logs here, the lower the code, the more important</span>
+                <span class="n">nerror</span><span class="p">,</span> <span class="n">nlev</span><span class="p">,</span> <span class="n">rep</span> <span class="o">=</span> <span class="n">_filter_desc</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">,</span> <span class="n">lev</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">rep</span><span class="p">:</span>
+                    <span class="n">xcodes</span><span class="p">(</span><span class="n">nerror</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">nlev</span> <span class="o">&lt;=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;level&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">rep</span><span class="p">:</span>
+                        <span class="n">xcodes</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">codes</span><span class="p">[</span><span class="n">nlev</span><span class="p">])</span>
+                    <span class="n">err_db</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">nlev</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_code</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_desc</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">err_src</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                                    <span class="n">res</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">mts_ts</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">count</span><span class="p">)</span>
+                    <span class="n">scnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>  <span class="c1"># just add the count</span>
+                    <span class="n">err_db</span><span class="o">.</span><span class="n">add_count</span><span class="p">(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">nlev</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">fcnt</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">msg</span><span class="p">,</span> <span class="n">log</span> <span class="o">=</span> <span class="s1">&#39;found </span><span class="si">%d</span><span class="s1"> </span><span class="si">%s</span><span class="s1">(s)&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">fcnt</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">lname</span><span class="p">),</span> <span class="n">logger</span><span class="o">.</span><span class="n">debug</span>
+                <span class="k">if</span> <span class="n">scnt</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">+=</span> <span class="p">(</span><span class="s1">&#39; and saving </span><span class="si">%d</span><span class="s1"> to HPC DB&#39;</span> <span class="o">%</span> <span class="n">scnt</span><span class="p">)</span>
+                    <span class="n">log</span> <span class="o">=</span> <span class="n">logger</span><span class="o">.</span><span class="n">info</span>
+                <span class="n">log</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">xfiles</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Scully, no x-files in folder: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">input_folder</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Logs:&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;type / count / code / desc / src / mts&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="n">frmt</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> / </span><span class="si">%5d</span><span class="s2"> / </span><span class="si">%10s</span><span class="s2"> / </span><span class="si">%s</span><span class="s2"> / </span><span class="si">%s</span><span class="s2"> / </span><span class="si">%d</span><span class="s2">&quot;</span>
+            <span class="n">err_items</span> <span class="o">=</span> <span class="n">err_db</span><span class="o">.</span><span class="n">items</span><span class="p">(</span><span class="n">taskid</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">err_items</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">frmt</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">err_items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;no item details available!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dry_run&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">err_db</span><span class="o">.</span><span class="n">commit_items</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;purge&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_HPC_DATABASE</span>
+
+    <span class="k">if</span> <span class="n">err_db</span><span class="p">:</span>
+        <span class="n">err_db</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;returning </span><span class="si">%d</span><span class="s2"> to OS&quot;</span><span class="p">,</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">xcodes</span><span class="o">.</span><span class="n">error</span></div>
+
+
+<span class="k">def</span> <span class="nf">_filter_desc</span><span class="p">(</span><span class="n">desc</span><span class="p">,</span> <span class="n">lev</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    check if desc is one of those we need to care about</span>
+
+<span class="sd">    :param str desc: description</span>
+<span class="sd">    :param int lev: level of mapping</span>
+
+<span class="sd">    :return: error code, level and success state</span>
+<span class="sd">    :rtype: tuple</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">pat</span><span class="p">,</span> <span class="n">emap</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">ERR_MAPPING</span><span class="p">[</span><span class="n">lev</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">research</span><span class="p">(</span><span class="n">pat</span><span class="p">,</span> <span class="n">desc</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">emap</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">emap</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_OK</span><span class="p">,</span> <span class="n">lev</span><span class="p">,</span> <span class="kc">False</span>
+
+
+<div class="viewcode-block" id="mts_recheck"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.mts_recheck">[docs]</a><span class="k">def</span> <span class="nf">mts_recheck</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    scan given Input Folder for MTS Chrashdumps and xlog-Files.</span>
+<span class="sd">    Analyse the Files, and store dedicated infos inside the DB.</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *headnode* (``str``): HPC head node name, default: DEFAULT_HEAD_NODE</span>
+<span class="sd">        * *jobrange* (``str``): range of jobid&#39;s to take care of</span>
+
+<span class="sd">    :return: always 0</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">jobs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobrange&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s1">&#39;-&#39;</span> <span class="ow">in</span> <span class="n">i</span><span class="p">:</span>
+            <span class="n">rng</span> <span class="o">=</span> <span class="n">i</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)</span>
+            <span class="n">jobs</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="mi">1</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">rng</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">jobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+    <span class="n">head</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;head_node&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exitcode&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">win32com.client</span> <span class="kn">import</span> <span class="n">Dispatch</span>  <span class="c1"># pylint: disable=C0415</span>
+        <span class="n">sched</span> <span class="o">=</span> <span class="n">Dispatch</span><span class="p">(</span><span class="s2">&quot;Microsoft.Hpc.Scheduler.Scheduler&quot;</span><span class="p">)</span>
+        <span class="n">sched</span><span class="o">.</span><span class="n">Connect</span><span class="p">(</span><span class="n">head</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sched</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">basefldr</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="n">head</span><span class="p">)</span>
+    <span class="n">margs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;head_node&quot;</span><span class="p">:</span> <span class="n">head</span><span class="p">,</span> <span class="s2">&quot;use_print&quot;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;use_print&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="s2">&quot;purge&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+    <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">listdir</span><span class="p">(</span><span class="n">basefldr</span><span class="p">))</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">jobs</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">sched</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">job</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">OpenJob</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]))</span>
+            <span class="n">tasks</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">GetTaskList</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="n">tasks</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;T</span><span class="si">%05d</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">i</span><span class="p">:</span> <span class="n">tasks</span><span class="o">.</span><span class="n">Item</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">ExitCode</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">tasks</span><span class="o">.</span><span class="n">Count</span><span class="p">)}</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">listdir</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">basefldr</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="s1">&#39;2_Output&#39;</span><span class="p">)))</span> <span class="k">if</span> <span class="n">research</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;T\d</span><span class="si">{5}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">k</span><span class="p">)]:</span>
+            <span class="k">if</span> <span class="n">sched</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">tasks</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">!=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exitcode&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;--- starting to scan </span><span class="si">%s</span><span class="s2">...&quot;</span> <span class="o">%</span> <span class="n">join</span><span class="p">(</span><span class="n">basefldr</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="s1">&#39;2_Output&#39;</span><span class="p">,</span> <span class="n">k</span><span class="p">))</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">mts_check</span><span class="p">(</span><span class="n">folder</span><span class="o">=</span><span class="n">join</span><span class="p">(</span><span class="n">basefldr</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="s2">&quot;2_Output&quot;</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="o">**</span><span class="n">margs</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;- return code: </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">ret</span><span class="p">)</span>
+            <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">sched</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">sched</span><span class="o">.</span><span class="n">Close</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;finally, we scanned </span><span class="si">%d</span><span class="s2"> folder&quot;</span> <span class="o">%</span> <span class="n">cnt</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="print_statistic"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.print_statistic">[docs]</a><span class="k">def</span> <span class="nf">print_statistic</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    open a Connection to the Oracle DB and returns the number of issues</span>
+<span class="sd">    given by the JobId.</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *headnode* (``str``): HPC head node name, default: DEFAULT_HEAD_NODE</span>
+<span class="sd">        * *jobid* (``int``): id of HPC job</span>
+<span class="sd">        * *taskid* (``int``): id of task to query, default: None</span>
+
+<span class="sd">    :return: error code</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">head_node</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;head_node&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;logger&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">LOGGER_NAME</span><span class="p">,</span> <span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">stream</span><span class="p">,</span> <span class="kc">True</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="p">(</span><span class="n">DummyLogger</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use_print&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span> <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;use_print&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="n">get_logger</span><span class="p">(</span><span class="n">LOGGER_NAME</span><span class="p">))</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">ErrorDB</span><span class="p">(</span><span class="n">head_node</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">],</span>
+                     <span class="n">db</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head_node</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">ora_db</span><span class="p">:</span>
+            <span class="n">taskid</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;taskid&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;MTS Error Log Statistic from JobID:</span><span class="si">{0: &gt;8}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;============================================&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--------------------------------------------&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Type             All Tasks    Task:</span><span class="si">{0:&gt;8}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">taskid</span><span class="p">))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;--------------------------------------------&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Chrashdumps:  </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_crashes</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_crashes</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Exceptions:   </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_exceptions</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_exceptions</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Errors:       </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_errors</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_errors</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Alerts:       </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_alerts</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_alerts</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Infos:        </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_information</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_information</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Debug:        </span><span class="si">{0:&gt;12}</span><span class="s2">     </span><span class="si">{1:&gt;12}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_debugs</span><span class="p">(),</span>
+                                                                   <span class="n">ora_db</span><span class="o">.</span><span class="n">get_num_debugs</span><span class="p">(</span><span class="n">taskid</span><span class="p">)))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_HPC_DATABASE</span>
+
+    <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_OK</span></div>
+
+
+<div class="viewcode-block" id="print_logs"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.print_logs">[docs]</a><span class="k">def</span> <span class="nf">print_logs</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Open a connection to Oracle DB and return details of job / task.</span>
+
+<span class="sd">    :keyword \**kwargs:</span>
+<span class="sd">        * *headnode* (``str``): HPC head node name, default: DEFAULT_HEAD_NODE</span>
+<span class="sd">        * *jobid* (``int``): id of HPC job</span>
+
+<span class="sd">    :return: error code</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">head_node</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;head_node&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">DummyLogger</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use_print&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">else</span> <span class="n">get_logger</span><span class="p">(</span><span class="s1">&#39;MTSCheck:&#39;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">ErrorDB</span><span class="p">(</span><span class="n">head_node</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">],</span>
+                     <span class="n">db</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="s2">&quot;HPC&quot;</span><span class="p">),</span> <span class="n">autocommit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">ora_db</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Logs&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;type / count / code / desc / src / time&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="n">frmt</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> / </span><span class="si">%5d</span><span class="s2"> / </span><span class="si">%10s</span><span class="s2"> / </span><span class="si">%s</span><span class="s2"> / </span><span class="si">%s</span><span class="s2"> / </span><span class="si">%s</span><span class="s2">&quot;</span>
+            <span class="n">loi</span> <span class="o">=</span> <span class="n">ora_db</span><span class="o">.</span><span class="n">get_list_of_incidents</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;taskid&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">loi</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">frmt</span> <span class="o">%</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>  <span class="c1"># pylint: disable=W1201</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loi</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;no logs available!&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_HPC_DATABASE</span>
+
+    <span class="k">return</span> <span class="n">error</span><span class="o">.</span><span class="n">ERR_OK</span></div>
+
+
+<div class="viewcode-block" id="debug_lib_check"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.debug_lib_check">[docs]</a><span class="k">def</span> <span class="nf">debug_lib_check</span><span class="p">(</span><span class="n">folder</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    check a folder for towards a debug compilation</span>
+
+<span class="sd">    :param str folder: folder / file to check</span>
+<span class="sd">    :return: list of libraries being compiled in debug mode</span>
+<span class="sd">    :rtype: list</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">PE</span><span class="p">:</span>  <span class="c1"># ignore silently</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">check_dll</span><span class="p">(</span><span class="n">dll</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;check a dll&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pef</span> <span class="o">=</span> <span class="n">PE</span><span class="p">(</span><span class="n">dll</span><span class="p">,</span> <span class="n">fast_load</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">pef</span><span class="o">.</span><span class="n">parse_data_directories</span><span class="p">(</span><span class="n">directories</span><span class="o">=</span><span class="p">[</span><span class="n">DIRECTORY_ENTRY</span><span class="p">[</span><span class="s1">&#39;IMAGE_DIRECTORY_ENTRY_IMPORT&#39;</span><span class="p">],</span>
+                                                    <span class="n">DIRECTORY_ENTRY</span><span class="p">[</span><span class="s1">&#39;IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT&#39;</span><span class="p">],</span>
+                                                    <span class="n">DIRECTORY_ENTRY</span><span class="p">[</span><span class="s1">&#39;IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT&#39;</span><span class="p">]])</span>
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">pef</span><span class="p">,</span> <span class="s2">&quot;DIRECTORY_ENTRY_IMPORT&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="o">+</span> \
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">pef</span><span class="p">,</span> <span class="s2">&quot;IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="c1"># filter for all MSVC libs</span>
+                <span class="n">dependency</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">dll</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">if</span> <span class="s2">&quot;MSVC&quot;</span> <span class="ow">in</span> <span class="n">dependency</span> <span class="ow">and</span> <span class="n">dependency</span><span class="p">[</span><span class="o">-</span><span class="mi">5</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;D.DLL&quot;</span><span class="p">:</span>
+                    <span class="c1"># found a lib witch is compiled in debug mode</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># frequently there&#39;s an error that not enough storage is available...</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">dlls</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">fldr</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">walk</span><span class="p">(</span><span class="n">folder</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">fldr</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;*.dll&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">check_dll</span><span class="p">(</span><span class="n">fname</span><span class="p">):</span>
+                    <span class="n">dlls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">MemoryError</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">dlls</span></div>
+
+
+<div class="viewcode-block" id="check_mts_ini"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.cmd.mts_check.check_mts_ini">[docs]</a><span class="k">def</span> <span class="nf">check_mts_ini</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">checkonly</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>  <span class="c1"># pylint: disable=W0621</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    check if the path to the mts_measurement folder is given in the correct</span>
+<span class="sd">    way (Prepared for HPC). Otherwise, an error is thrown.</span>
+
+<span class="sd">    :param str fname: path to mts.ini file</span>
+<span class="sd">    :param str folder: path to mts.ini</span>
+<span class="sd">    :param bool checkonly: only check, do not manipulate</span>
+<span class="sd">    :raises error.HpcError: once file cannot be read</span>
+<span class="sd">    :rtype: bool</span>
+<span class="sd">    :return: success state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cfg</span> <span class="o">=</span> <span class="n">ConfigParser</span><span class="p">(</span><span class="n">allow_no_value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">delimiters</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">,))</span>
+    <span class="n">cfg</span><span class="o">.</span><span class="n">optionxform</span> <span class="o">=</span> <span class="nb">str</span>
+    <span class="n">cfg</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s1">&#39;utf_8_sig&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">folder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">measpath</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;System&quot;</span><span class="p">,</span> <span class="s2">&quot;UserPath&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">measpath</span> <span class="o">!=</span> <span class="s1">&#39;&quot;..</span><span class="se">\\\\</span><span class="si">{}</span><span class="se">\\\\</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">folder</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">error</span><span class="o">.</span><span class="n">HpcError</span><span class="p">(</span><span class="s1">&#39;error in mts.ini file.</span><span class="se">\n</span><span class="s1">&#39;</span>
+                                 <span class="s1">&#39;UserPath in section [System] must be &quot;..</span><span class="se">\\</span><span class="si">{}</span><span class="se">\\</span><span class="s1">&quot;, &#39;</span>
+                                 <span class="s1">&#39;but is &quot;..</span><span class="se">\\</span><span class="si">{}</span><span class="se">\\</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">folder</span><span class="p">,</span> <span class="n">measpath</span><span class="p">))</span>
+
+    <span class="n">checks</span> <span class="o">=</span> <span class="p">((</span><span class="s2">&quot;System&quot;</span><span class="p">,</span> <span class="s2">&quot;AllowMultipleInstances&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,),</span> <span class="p">(</span><span class="s2">&quot;System&quot;</span><span class="p">,</span> <span class="s2">&quot;DoNotAskForConfirmation&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,),)</span>
+    <span class="n">changes</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">chap</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">checks</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cfg</span><span class="o">.</span><span class="n">has_option</span><span class="p">(</span><span class="n">chap</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="ow">or</span> <span class="n">cfg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">chap</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span> <span class="o">!=</span> <span class="n">val</span><span class="p">:</span>
+            <span class="n">cfg</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">chap</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+            <span class="n">changes</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">changes</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">checkonly</span><span class="p">:</span>
+        <span class="n">chmod</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">S_IWRITE</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">cfp</span><span class="p">:</span>
+            <span class="n">cfg</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">cfp</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">changes</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

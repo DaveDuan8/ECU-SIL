@@ -1,0 +1,217 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sbmt.job_sim</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sbmt.job_sim</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">job_sim.py</span>
+<span class="sd">----------</span>
+
+<span class="sd">job_sim module for hpc.</span>
+
+<span class="sd">**User-API Interfaces**</span>
+
+<span class="sd">    - `hpc` (complete package)</span>
+<span class="sd">    - `job_sim` (this module)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=C0413,C0412,E1101</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">platform</span>
+<span class="kn">from</span> <span class="nn">shutil</span> <span class="kn">import</span> <span class="n">rmtree</span>
+<span class="k">if</span> <span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">makedirs</span>
+    <span class="kn">from</span> <span class="nn">shutil</span> <span class="kn">import</span> <span class="n">copytree</span>
+    <span class="kn">from</span> <span class="nn">win32file</span> <span class="kn">import</span> <span class="n">CreateSymbolicLink</span>
+    <span class="kn">from</span> <span class="nn">pywintypes</span> <span class="kn">import</span> <span class="n">error</span>
+
+<div class="viewcode-block" id="duplicate"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.duplicate">[docs]</a>    <span class="k">def</span> <span class="nf">duplicate</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;compat to os.link for windows to create a symlink&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">CreateSymbolicLink</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">error</span><span class="p">:</span>  <span class="c1"># user doesn&#39;t seem to have full rights, so, let&#39;s copy instead</span>
+            <span class="n">copytree</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span></div>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">makedirs</span><span class="p">,</span> <span class="n">link</span> <span class="k">as</span> <span class="n">duplicate</span>
+
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">exists</span>
+
+<span class="c1"># - import HPC modules ------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.job</span> <span class="kn">import</span> <span class="n">Job</span>
+<span class="kn">from</span> <span class="nn">..core.path</span> <span class="kn">import</span> <span class="n">on_rm_error</span>
+<span class="kn">from</span> <span class="nn">..core.hpc_defs</span> <span class="kn">import</span> <span class="n">JobState</span><span class="p">,</span> <span class="n">JobUnitType</span>
+
+
+<span class="c1"># - classes -----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="JobSim"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.JobSim">[docs]</a><span class="k">class</span> <span class="nc">JobSim</span><span class="p">(</span><span class="n">Job</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    .. inheritance-diagram:: hpc.JobSim</span>
+
+<span class="sd">    The JobSim class can be used instead of the `Job` class to simulate</span>
+<span class="sd">    a job submit on the HPC-Cluster on the local pc and test the first Task</span>
+<span class="sd">    of the job in a simple way.</span>
+
+<span class="sd">    **Following steps explain the workflow:**</span>
+
+<span class="sd">    1. Replace in the submit script the `Job` class with `JobSim`</span>
+<span class="sd">    2. Be sure you have a local folder called d:/data.</span>
+<span class="sd">    3. JobSim will copy all needed test files to d:/data with the given jobname.</span>
+<span class="sd">    4. Execute you submit script.</span>
+<span class="sd">    5. Go to d:/data/1_JobName/1_Input and execute the test.bat file.</span>
+<span class="sd">    6. The Job will executed exactly in the same way like on the HPC-Cluster</span>
+<span class="sd">       The results will be copied to</span>
+<span class="sd">       D:/data/_hpc_base/1_JobName/2_Output/_data</span>
+<span class="sd">    7. Go to D:/data/_hpc_base/1_JobName/2_Output/T00001</span>
+<span class="sd">       and check if the results are ok.</span>
+<span class="sd">    8. If the results as expected, do a real submit on the HPC-Cluster</span>
+<span class="sd">       in the Test-Queue.</span>
+
+<span class="sd">    **1. Example**::</span>
+
+<span class="sd">        # Import hpc</span>
+<span class="sd">        import hpc</span>
+
+<span class="sd">        #Connect to the HPC Server</span>
+<span class="sd">        with hpc.JobSim(name=&#39;Training_Ping&#39;, project=&#39;Short_Test&#39;) as job:</span>
+<span class="sd">            factory = hpc.TaskFactory(job)</span>
+<span class="sd">            factory.create_task(&#39;ping 127.0.0.1&#39;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="JobSim.__init__"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.JobSim.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize HPC job</span>
+
+<span class="sd">        :param \*args: *head_node*, *name* and *project* must be given, others are optional (kwargs)</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *head_node* (``str``): head node to use, default: Lindau production cluster</span>
+<span class="sd">            * *name* (``str``): name of job</span>
+<span class="sd">            * *project* (``str``): name of project to use</span>
+<span class="sd">            * *template* (``str``): name of template</span>
+<span class="sd">            * *priority* (``JobPriority``): initial priority, use int or JobPriority class</span>
+<span class="sd">            * *unit* (``JobUnit``): job unit (JobUnit), can be either Node, Core or Socket</span>
+<span class="sd">            * *notify_on_start* (``bool``): receive an email when job starts</span>
+<span class="sd">            * *notify_on_completion* (``bool``): receive an email when job completes</span>
+<span class="sd">            * *hold_time* (``datetime``): local date/time for first try to start job.</span>
+<span class="sd">            * *depends* (``list``): job ID(&#39;s) this job should depend uppon</span>
+<span class="sd">            * *bsig_check* (``bool``): check bsig outputs from MTS, default: True</span>
+<span class="sd">            * *precmd* (``str``): prepare command to be executed after preparation is done</span>
+<span class="sd">            * *relcmd* (``str``): release command to be executed before release is done</span>
+<span class="sd">            * *robo_retry* (``int``): retry count for result copy back (starter)</span>
+<span class="sd">            * *robo_wait* (``int``): wait time between those retries (starter)</span>
+<span class="sd">            * *runas* (``str``): &#39;&lt;username&gt;[:&lt;password&gt;] to run the job as (password is only needed for first time)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Job</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">sim</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_submit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;submit!&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handle_venv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_db</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_update_db</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c1"># clean up job folder and link / copy all to WS data path</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">rmtree</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">onerror</span><span class="o">=</span><span class="n">on_rm_error</span><span class="p">)</span>
+        <span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">duplicate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;commit finished, start using </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span> <span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="s2">&quot;test.bat&quot;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="JobSim.wait_until_finished"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.JobSim.wait_until_finished">[docs]</a>    <span class="k">def</span> <span class="nf">wait_until_finished</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start the local execution of test.bat and wait until it is finalized, return the final job&#39;s state</span>
+
+<span class="sd">        Set job type to Core to run as many tasks in parallel as your machine provides.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">All</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Pool</span><span class="p">,</span> <span class="n">Manager</span><span class="p">,</span> <span class="n">cpu_count</span>  <span class="c1"># pylint: disable=C0415</span>
+
+            <span class="n">cpus</span> <span class="o">=</span> <span class="n">cpu_count</span><span class="p">()</span>
+            <span class="n">mpl</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">({</span><span class="n">JobUnitType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="o">.</span><span class="n">Socket</span><span class="p">:</span> <span class="n">cpus</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span>
+                        <span class="n">JobUnitType</span><span class="o">.</span><span class="n">Core</span><span class="p">:</span> <span class="n">cpus</span><span class="p">}[</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">unit</span><span class="p">)])</span>
+            <span class="n">man</span> <span class="o">=</span> <span class="n">Manager</span><span class="p">()</span>
+            <span class="n">snake</span> <span class="o">=</span> <span class="n">man</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+            <span class="n">mpl</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_starter</span><span class="p">,</span> <span class="p">[(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fastwatch&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="n">snake</span><span class="p">,)</span>
+                               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)])</span>
+
+            <span class="n">state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Finished</span>
+            <span class="k">while</span> <span class="ow">not</span> <span class="n">snake</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">snake</span><span class="o">.</span><span class="n">get_nowait</span><span class="p">()</span> <span class="o">!=</span> <span class="n">state</span><span class="p">:</span>
+                    <span class="n">state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Failed</span>
+                    <span class="k">break</span>
+
+        <span class="k">return</span> <span class="n">state</span></div></div>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">_starter</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    start a task</span>
+
+<span class="sd">    :param list args: task id, input path and Queue</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">taskid</span><span class="p">,</span> <span class="n">in_path</span><span class="p">,</span> <span class="n">fastwatch</span><span class="p">,</span> <span class="n">snk</span> <span class="o">=</span> <span class="n">args</span>
+    <span class="kn">from</span> <span class="nn">..starter</span> <span class="kn">import</span> <span class="n">AppStarter</span>  <span class="c1"># pylint: disable=C0415,R0401</span>
+
+    <span class="k">with</span> <span class="n">AppStarter</span><span class="p">(</span><span class="n">cwd</span><span class="o">=</span><span class="n">in_path</span><span class="p">,</span> <span class="n">sched</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fastwatch</span><span class="o">=</span><span class="n">fastwatch</span><span class="p">)</span> <span class="k">as</span> <span class="n">starter</span><span class="p">:</span>
+        <span class="n">snk</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">Finished</span> <span class="k">if</span> <span class="n">starter</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">taskid</span><span class="o">=</span><span class="n">taskid</span><span class="p">,</span> <span class="n">verblevel</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Failed</span><span class="p">)</span>
+        <span class="n">starter</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,618 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sched.base</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sched.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">base.py</span>
+<span class="sd">-------</span>
+
+<span class="sd">base class for local and MS HPC scheduler</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">executable</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">makedirs</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">basename</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">normpath</span>
+<span class="kn">from</span> <span class="nn">ntpath</span> <span class="kn">import</span> <span class="n">dirname</span> <span class="k">as</span> <span class="n">ntdirname</span><span class="p">,</span> <span class="n">join</span> <span class="k">as</span> <span class="n">ntjoin</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">xml.dom.minidom</span> <span class="kn">import</span> <span class="n">Document</span>
+<span class="c1"># from inspect import stack</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">from</span> <span class="nn">psutil</span> <span class="kn">import</span> <span class="n">disk_usage</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..version</span> <span class="kn">import</span> <span class="n">VERSION</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">UID_NAME</span>
+<span class="kn">from</span> <span class="nn">..core.convert</span> <span class="kn">import</span> <span class="n">human_size</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">DummyLogger</span>
+<span class="kn">from</span> <span class="nn">..core.hpc_defs</span> <span class="kn">import</span> <span class="n">JobState</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="p">,</span> <span class="n">JobPriority</span><span class="p">,</span> <span class="n">TaskType</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">LIN_EXE</span><span class="p">,</span> <span class="n">PY_2_EXE</span><span class="p">,</span> <span class="n">PY_36_EXE</span><span class="p">,</span> <span class="n">PY_38_EXE</span><span class="p">,</span> <span class="n">PY_310_EXE</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">resolve_mail</span><span class="p">,</span> \
+    <span class="n">validate_name</span>
+<span class="kn">from</span> <span class="nn">.sched_defs</span> <span class="kn">import</span> <span class="n">INPUT_PATH</span><span class="p">,</span> <span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">OUTPUT_DATA_PATH</span><span class="p">,</span> \
+    <span class="n">SHORT_TEST_RUNTIME</span><span class="p">,</span> <span class="n">STD_TASK_RUNTIME</span><span class="p">,</span> <span class="n">MAX_TASK_RUNTIME</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">STD_PATH</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;C:\Program Files\Microsoft HPC Pack </span><span class="si">{}</span><span class="s2">\Bin\;C:\Program Files\Microsoft MPI\Bin\;C:\Windows;&quot;</span> \
+           <span class="sa">r</span><span class="s2">&quot;C:\Windows\system32;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;&quot;</span> \
+           <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Oracle\client19600_64\bin;C:\LegacyApp\Oracle\client19600_64;&quot;</span>
+
+<span class="c1"># r&quot;C:\LegacyApp\Python27_64;C:\LegacyApp\Python27_64\Scripts;C:\LegacyApp\Python27_64\Library\bin;&quot;</span>
+<span class="c1"># r&quot;C:\LegacyApp\Python27_64\Lib\site-packages\osgeo&quot;</span>
+<span class="n">GEN_PATHS</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Scripts&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;Library\mingw-w64\bin&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;Library\usr\bin&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;Library\bin&quot;</span><span class="p">,</span>
+             <span class="sa">r</span><span class="s2">&quot;Lib\site-packages\pywin32_system32&quot;</span><span class="p">]</span>
+<span class="n">PY_PATH</span> <span class="o">=</span> <span class="p">{</span><span class="n">PY_2_EXE</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Scripts&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;Library\bin&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;Lib\site-packages\osgeo&quot;</span><span class="p">],</span>
+           <span class="n">PY_36_EXE</span><span class="p">:</span> <span class="n">GEN_PATHS</span><span class="p">,</span>
+           <span class="n">PY_38_EXE</span><span class="p">:</span> <span class="n">GEN_PATHS</span><span class="p">,</span>
+           <span class="n">PY_310_EXE</span><span class="p">:</span> <span class="n">GEN_PATHS</span><span class="p">}</span>
+
+<span class="n">STD_PY_VAR</span> <span class="o">=</span> <span class="p">{</span><span class="n">PY_2_EXE</span><span class="p">:</span>
+                  <span class="p">{</span><span class="s2">&quot;GDAL_DATA&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python27_64\Lib\site-packages\osgeo\data&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;GDAL_DRIVER_PATH&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python27_64\Lib\site-packages\osgeo\gdalplugins&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;KERAS_BACKEND&quot;</span><span class="p">:</span> <span class="s2">&quot;cntk&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;CCP_TASK_NOTIFY&quot;</span><span class="p">:</span> <span class="s2">&quot;CTRL_C&quot;</span><span class="p">},</span>
+              <span class="n">PY_36_EXE</span><span class="p">:</span>
+                  <span class="p">{</span><span class="s2">&quot;GDAL_DATA&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python36\Lib\site-packages\osgeo\data&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;GDAL_DRIVER_PATH&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python36\Lib\site-packages\osgeo\gdalplugins&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;CCP_TASK_NOTIFY&quot;</span><span class="p">:</span> <span class="s2">&quot;CTRL_C&quot;</span><span class="p">},</span>
+              <span class="n">PY_38_EXE</span><span class="p">:</span>
+                  <span class="p">{</span><span class="s2">&quot;GDAL_DATA&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python38\Lib\site-packages\osgeo\data&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;CCP_TASK_NOTIFY&quot;</span><span class="p">:</span> <span class="s2">&quot;CTRL_C&quot;</span><span class="p">},</span>
+              <span class="n">PY_310_EXE</span><span class="p">:</span>
+                  <span class="p">{</span><span class="s2">&quot;GDAL_DATA&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\Python310\Lib\site-packages\osgeo\data&quot;</span><span class="p">,</span>
+                   <span class="s2">&quot;CCP_TASK_NOTIFY&quot;</span><span class="p">:</span> <span class="s2">&quot;CTRL_C&quot;</span><span class="p">},</span>
+              <span class="n">LIN_EXE</span><span class="p">:</span>
+                  <span class="p">{</span><span class="s2">&quot;CCP_TASK_NOTIFY&quot;</span><span class="p">:</span> <span class="s2">&quot;CTRL_C&quot;</span><span class="p">}</span>
+              <span class="p">}</span>
+
+<span class="n">TEMPL_EXC</span> <span class="o">=</span> <span class="s2">&quot;(Cluster|Short|WSN|Linux|MTS.?)_Test|Admin|DataMining|MeasDataCheck|IBEO|REF2KPI|LX_Fusion&quot;</span>
+
+<span class="n">LOW_NET_SPACE</span> <span class="o">=</span> <span class="mf">20.</span>  <span class="c1"># in percent</span>
+<span class="n">NO_NET_SPACE</span> <span class="o">=</span> <span class="mi">500000000000</span>  <span class="c1"># 500 GB left over: nearly nothing!</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SchedulerBase"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase">[docs]</a><span class="k">class</span> <span class="nc">SchedulerBase</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;meant to be base of all schedulers&quot;&quot;&quot;</span>
+
+    <span class="c1"># __slots__ = (&quot;_attr&quot;, &quot;_eattr&quot;, &quot;_tasks&quot;, &quot;_exe&quot;, &quot;_sim&quot;, &quot;__dict__&quot;,)</span>
+
+<div class="viewcode-block" id="SchedulerBase.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headnode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init scheduler base</span>
+
+<span class="sd">        :param str headnode: name of ...</span>
+<span class="sd">        :keyword dict kwargs: misc args</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span> <span class="o">=</span> <span class="n">headnode</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_deprecated</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;parent_jobs&quot;</span><span class="p">:</span> <span class="s2">&quot;depends&quot;</span><span class="p">}</span>
+
+        <span class="c1"># &quot;user_name&quot;: &quot;UserName&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Version&quot;</span><span class="p">,</span> <span class="s1">&#39;3.000&#39;</span><span class="p">],</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Name&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;project&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Project&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;template&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;JobTemplate&quot;</span><span class="p">,</span> <span class="s2">&quot;Default&quot;</span><span class="p">],</span> <span class="s2">&quot;priority&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Priority&quot;</span><span class="p">,</span> <span class="n">JobPriority</span><span class="p">(</span><span class="n">JobPriority</span><span class="o">.</span><span class="n">Lowest</span><span class="p">)],</span>
+                      <span class="s2">&quot;unit&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;UnitType&quot;</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="p">(</span><span class="n">JobUnitType</span><span class="o">.</span><span class="n">Socket</span><span class="p">)],</span> <span class="s2">&quot;is_exclusive&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;IsExclusive&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;run_until_canceled&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;RunUntilCanceled&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;fail_on_task&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;FailOnTask&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;email&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;EmailAddress&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;notify_on_completion&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;NotifyOnCompletion&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;notify_on_start&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;NotifyOnStart&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;node_groups&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;NodeGroups&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;min_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinCores&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxCores&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;min_node_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinCoresPerNode&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_node_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxCoresPerNode&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;min_memory&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinMemory&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;min_sockets&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinSockets&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_sockets&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxSockets&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;min_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+                      <span class="s2">&quot;auto_calculate_min&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AutoCalculateMin&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+                      <span class="s2">&quot;auto_calculate_max&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;AutoCalculateMax&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">],</span>
+                      <span class="s2">&quot;requested_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;RequestedNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;exit_codes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;JobValidExitCodes&quot;</span><span class="p">,</span> <span class="p">[]],</span>
+                      <span class="s2">&quot;depends&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;ParentJobIds&quot;</span><span class="p">,</span> <span class="p">[]],</span> <span class="s2">&quot;parent_jobs&quot;</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;hold_until&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;HoldUntil&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+                      <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tattrs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Name&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;Type&quot;</span><span class="p">,</span> <span class="n">TaskType</span><span class="o">.</span><span class="n">Basic</span><span class="p">],</span>
+            <span class="s2">&quot;runtime&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;RuntimeSeconds&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">STD_TASK_RUNTIME</span> <span class="o">*</span> <span class="mi">3600</span><span class="p">)],</span>
+            <span class="s2">&quot;command_line&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;CommandLine&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;work_directory&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;WorkDirectory&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;depends&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;DependsOn&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;increment_value&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;IncrementValue&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;required_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;RequiredNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;is_rerunable&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;IsRerunable&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;is_exclusive&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;IsExclusive&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;is_parametric&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;IsParametric&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;start_value&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;StartValue&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;end_value&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;EndValue&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;min_sockets&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinSockets&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_sockets&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxSockets&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;min_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinCores&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;max_cores&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxCores&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;min_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MinNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;MaxNodes&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+            <span class="s2">&quot;stdin&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;StdInFilePath&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;stdout&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;StdOutFilePath&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">&quot;stderr&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;StdErrFilePath&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jattr</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">kws</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sattrs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;excluded_nodes&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;min_hd_space&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sim</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sim&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_work_path</span> <span class="o">=</span> <span class="s2">&quot;/var/hpc&quot;</span> <span class="k">if</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;linux&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;D:</span><span class="se">\\</span><span class="s2">data&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_join</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;join&quot;</span><span class="p">)</span>
+
+        <span class="c1"># extended terms / attributes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mail</span> <span class="o">=</span> <span class="n">resolve_mail</span><span class="p">(</span><span class="n">UID_NAME</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;logger&quot;</span><span class="p">,</span> <span class="n">DummyLogger</span><span class="p">(</span><span class="kc">True</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpcversion</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="n">VERSION</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kws</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;template&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;template&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span> <span class="o">=</span> <span class="n">kws</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;exe&quot;</span><span class="p">,</span> <span class="n">executable</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">LIN_EXE</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">STD_PY_VAR</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;pyexe=</span><span class="si">%s</span><span class="s2"> =&gt; unknown, falling back to </span><span class="si">%s</span><span class="s2">!&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">,</span> <span class="n">PY_36_EXE</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span> <span class="o">=</span> <span class="n">PY_36_EXE</span>
+
+        <span class="c1"># to be able to set extra environment variables</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;venv&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span> <span class="o">=</span> <span class="n">SHORT_TEST_RUNTIME</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;short_test&quot;</span> <span class="k">else</span> <span class="n">STD_TASK_RUNTIME</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">**</span><span class="n">kws</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;xargs&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span><span class="p">),</span> <span class="n">MAX_TASK_RUNTIME</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tattrs</span><span class="p">[</span><span class="s2">&quot;runtime&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span> <span class="o">*</span> <span class="mi">3600</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;sockets&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">]:</span>
+                <span class="n">socks</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;sockets&quot;</span><span class="p">)</span>
+                <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">][</span><span class="s2">&quot;min_sockets&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">][</span><span class="s2">&quot;max_sockets&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">socks</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_tattrs</span><span class="p">[</span><span class="s2">&quot;min_sockets&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tattrs</span><span class="p">[</span><span class="s2">&quot;max_sockets&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">socks</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xargs&quot;</span><span class="p">])</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;with ...&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;end of block&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<div class="viewcode-block" id="SchedulerBase.close"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;do nothing as we don&#39;t have anything&quot;&quot;&quot;</span></div>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;try to grab from HPC first&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_deprecated</span><span class="p">:</span>
+            <span class="n">nkey</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_deprecated</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;method &#39;</span><span class="si">%s</span><span class="s2">&#39; is deprecated, please use &#39;</span><span class="si">%s</span><span class="s2">&#39; instead!!!&quot;</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">nkey</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">nkey</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">key</span> <span class="o">=</span> <span class="s2">&quot;_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+        <span class="k">return</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0915,R1260</span>
+        <span class="sd">&quot;&quot;&quot;set a value&quot;&quot;&quot;</span>
+        <span class="c1"># if key in self.__slots__:</span>
+        <span class="c1">#     super(SchedulerBase, self).__setattr__(key, value)</span>
+        <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">):</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span>  <span class="c1"># specific action: check naming convention</span>
+                <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;ambiguous usage of &#39;name&#39; param and create method usage!&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_paths</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s1">&#39;unit&#39;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">JobUnitType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>  <span class="c1"># special behaviour: Gpu mode</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">JobUnitType</span><span class="p">(</span><span class="n">JobUnitType</span><span class="o">.</span><span class="n">Socket</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span><span class="p">[</span><span class="s2">&quot;gpujob&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;GPUJob&quot;</span><span class="p">,</span> <span class="s2">&quot;True&quot;</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">JobUnitType</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+            <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;priority&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">JobPriority</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;notify_on_completion&#39;</span><span class="p">,</span> <span class="s1">&#39;notify_on_start&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mail</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;user </span><span class="si">%s</span><span class="s2"> has no email address&quot;</span><span class="p">,</span> <span class="n">UID_NAME</span><span class="p">)</span>
+                    <span class="k">return</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="s2">&quot;email&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mail</span>
+
+            <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;parent_jobs&quot;</span><span class="p">,</span> <span class="s2">&quot;requested_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;hold_until&quot;</span><span class="p">,</span> <span class="s2">&quot;depends&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;parent_jobs&quot;</span><span class="p">:</span>  <span class="c1"># old and deprecated, but take it here</span>
+                    <span class="n">key</span> <span class="o">=</span> <span class="s2">&quot;depends&quot;</span>
+                <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;hold_until&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">&lt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">():</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;&#39;hold_until&#39; date already past by, we cannot do that!&quot;</span><span class="p">)</span>
+
+                <span class="n">value</span> <span class="o">=</span> <span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;min_&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="s2">&quot;auto_calculate_min&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;max_&quot;</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="s2">&quot;auto_calculate_max&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sattrs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sattrs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jattr</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_jattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jattr</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SchedulerBase.update"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.update">[docs]</a>    <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;update several keys&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>  <span class="c1"># we sort to get template setting b4 unit setting to ease things</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;env&quot;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">):</span>
+                    <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>  <span class="c1"># ignore silently as others from Job coming as well</span>
+                <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="SchedulerBase.append_task"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.append_task">[docs]</a>    <span class="k">def</span> <span class="nf">append_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;append a task with given arguments&quot;&quot;&quot;</span>
+        <span class="n">tattrs</span><span class="p">,</span> <span class="n">tenvs</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tattrs</span><span class="p">),</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_exclusive&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">)</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;min_nodes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;max_nodes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;sockets&quot;</span><span class="p">:</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="s2">&quot;min_sockets&quot;</span>
+
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;resources&quot;</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;min_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;max_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;min_sockets&quot;</span><span class="p">,</span> <span class="s2">&quot;max_sockets&quot;</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">tattrs</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+                        <span class="n">tattrs</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;envs&quot;</span><span class="p">:</span>
+                <span class="n">tenvs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span> <span class="ow">and</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;name&quot;</span> <span class="ow">and</span> <span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;prepare&quot;</span><span class="p">:</span>
+                <span class="n">tenvs</span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env_path</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">))</span>
+                <span class="n">tattrs</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tattrs</span> <span class="ow">or</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>  <span class="c1"># ignore silently</span>
+                <span class="c1"># raise AttributeError(key)</span>
+
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;stderr&quot;</span><span class="p">,</span> <span class="s2">&quot;stdout&quot;</span><span class="p">]:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">makedirs</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">pass</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">TaskType</span><span class="o">.</span><span class="n">NodePrep</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;NodePrep&#39;</span>
+                <span class="k">elif</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="n">TaskType</span><span class="o">.</span><span class="n">NodeRelease</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="s1">&#39;NodeRelease&#39;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s1">&#39;Undefined TaskType&#39;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;runtime&quot;</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="o">*</span> <span class="mf">3600.</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;requested_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;required_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;depends&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+            <span class="n">tattrs</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;min_&quot;</span><span class="p">):</span>
+                <span class="n">mxname</span> <span class="o">=</span> <span class="s2">&quot;max_&quot;</span> <span class="o">+</span> <span class="n">key</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span>
+                <span class="k">if</span> <span class="n">tattrs</span><span class="p">[</span><span class="n">mxname</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">tattrs</span><span class="p">[</span><span class="n">mxname</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">tattrs</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">tattrs</span><span class="p">[</span><span class="n">mxname</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">tattrs</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">xml</span> <span class="o">=</span> <span class="n">Document</span><span class="p">()</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Task&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">tattrs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">xml</span><span class="o">.</span><span class="n">setAttribute</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_env</span><span class="p">(</span><span class="n">xml</span><span class="p">,</span> <span class="n">tenvs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xml</span><span class="p">)</span>
+
+        <span class="n">tattrs</span><span class="p">[</span><span class="s2">&quot;taskno&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;taskno&quot;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">DefDict</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">tattrs</span><span class="p">)})</span></div>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: length of job (how many tasks do we have</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_prepare_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create neccessary paths&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">validate_name</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;JobName &#39;</span><span class="si">{}</span><span class="s2">&#39; does not follow HPC rules, either class, type, function, &quot;</span>
+                           <span class="s2">&quot;checkpoint name, or free text comment is wrong, too long, &quot;</span>
+                           <span class="s2">&quot;or contains illegal characters (</span><span class="se">\\</span><span class="s2"> / : * ? </span><span class="se">\&quot;</span><span class="s2"> &lt; &gt; |)!&quot;</span>
+                           <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+
+        <span class="n">cc_name</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span> <span class="o">=</span> <span class="n">normpath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">,</span> <span class="n">cc_name</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;JobName&quot;</span><span class="p">:</span> <span class="n">cc_name</span><span class="p">,</span> <span class="s2">&quot;JobId&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">)})</span>
+
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">net_out_data_path</span><span class="p">,):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_add_env</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">env</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add environment vars</span>
+
+<span class="sd">        :param Document root: root to add this child to</span>
+<span class="sd">        :param dict env: environment vars</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">Document</span><span class="p">()</span>
+        <span class="n">envs</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;EnvironmentVariables&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">env</span><span class="p">):</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Variable&quot;</span><span class="p">)</span>
+            <span class="n">sub</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Name&quot;</span><span class="p">)</span>
+            <span class="n">sub</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">createTextNode</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+            <span class="n">var</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
+            <span class="n">sub</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Value&quot;</span><span class="p">)</span>
+            <span class="n">sub</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">createTextNode</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)))</span>
+            <span class="n">var</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
+            <span class="n">envs</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">envs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_env_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bpath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;bundle PATH&quot;&quot;&quot;</span>
+        <span class="n">epath</span> <span class="o">=</span> <span class="n">ntdirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ntjoin</span><span class="p">(</span><span class="n">bpath</span><span class="p">,</span> <span class="s2">&quot;Scripts;&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">STD_PATH</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span> <span class="o">+</span> <span class="n">epath</span> <span class="o">+</span> <span class="s2">&quot;;&quot;</span> <span class="o">+</span> \
+               <span class="s2">&quot;;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">ntjoin</span><span class="p">(</span><span class="n">epath</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">PY_PATH</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">]])</span>
+
+    <span class="k">def</span> <span class="nf">_to_xml</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create an xml-doc from job including tasks, which is used for submitting the job.&quot;&quot;&quot;</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">Document</span><span class="p">()</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Job&quot;</span><span class="p">)</span>
+
+        <span class="c1"># we place it here to not get overwritten</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;HPC_VERSION&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpcversion</span><span class="p">})</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">:</span>
+            <span class="n">vpath</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="s2">&quot;venv&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;PIP_INDEX_URL&quot;</span><span class="p">:</span>
+                                    <span class="s2">&quot;https://eu.artifactory.conti.de/artifactory/api/pypi/c_adas_cip_pypi_v/simple&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;PIP_TRUSTED_HOST&quot;</span><span class="p">:</span> <span class="s2">&quot;eu.artifactory.conti.de&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;PIP_CACHE_DIR&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;D:\pipcache&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;VIRTUAL_ENV&quot;</span><span class="p">:</span> <span class="n">vpath</span><span class="p">,</span> <span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="n">vpath</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">vpath</span> <span class="o">=</span> <span class="n">ntdirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">LIN_EXE</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">STD_PY_VAR</span><span class="p">[</span><span class="n">LIN_EXE</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_env_path</span><span class="p">(</span><span class="n">vpath</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="p">[</span><span class="s2">&quot;TEMP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="p">[</span><span class="s2">&quot;TMP&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">,</span>
+                                                                 <span class="s2">&quot;2_Output&quot;</span><span class="p">,</span> <span class="s2">&quot;tmp&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">STD_PY_VAR</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_exe</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_env</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jenvs</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">root</span><span class="o">.</span><span class="n">setAttribute</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">to_string</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+
+        <span class="c1"># add custom properties now</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span><span class="p">:</span>
+            <span class="n">arr</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;CustomProperties&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_eattr</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="n">v</span><span class="p">:</span>
+                    <span class="n">var</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Term&quot;</span><span class="p">)</span>
+                    <span class="n">sub</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Name&quot;</span><span class="p">)</span>
+                    <span class="n">sub</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">createTextNode</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
+                    <span class="n">var</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
+                    <span class="n">sub</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Value&quot;</span><span class="p">)</span>
+                    <span class="n">sub</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">createTextNode</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+                    <span class="n">var</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span>
+                    <span class="n">arr</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
+
+            <span class="n">root</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+
+        <span class="c1"># add tasks</span>
+        <span class="n">tasks</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">createElement</span><span class="p">(</span><span class="s2">&quot;Tasks&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span><span class="p">:</span>
+            <span class="n">tasks</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
+        <span class="n">root</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">tasks</span><span class="p">)</span>
+
+        <span class="c1"># end</span>
+        <span class="n">doc</span><span class="o">.</span><span class="n">appendChild</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">doc</span><span class="o">.</span><span class="n">toprettyxml</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="s2">&quot;   &quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_check_df</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;check disk free&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">drv</span> <span class="o">=</span> <span class="n">disk_usage</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">))</span>
+            <span class="k">if</span> <span class="mf">100.</span> <span class="o">-</span> <span class="n">drv</span><span class="o">.</span><span class="n">percent</span> <span class="o">&lt;</span> <span class="n">LOW_NET_SPACE</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;we&#39;re running low on diskspace @ </span><span class="si">%s</span><span class="s2">: </span><span class="si">%.1f%%</span><span class="s2"> used!&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">,</span> <span class="n">drv</span><span class="o">.</span><span class="n">percent</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">drv</span><span class="o">.</span><span class="n">free</span> <span class="o">&lt;</span> <span class="n">NO_NET_SPACE</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;nearly no space left over on </span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">,</span> <span class="n">human_size</span><span class="p">(</span><span class="n">drv</span><span class="o">.</span><span class="n">free</span><span class="p">)))</span>
+        <span class="k">except</span> <span class="n">HpcError</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">pass</span>  <span class="c1"># ignore silently</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job_folder_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Name of the Job Folder (e.g. 1025_MTS_Training)</span>
+
+<span class="sd">        :rtype: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">basename</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">work_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        WSN node working path</span>
+
+<span class="sd">        :return: usually, D:\data</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_work_path</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">client_out_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Local Client (WorkstationNode) Path to Job Out Folder</span>
+<span class="sd">        e.g. &quot;d:/data/3522_MTS_Training/2_Output&quot;</span>
+<span class="sd">        :type: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">,</span> <span class="n">OUTPUT_PATH</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">client_in_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Local Client (WorkstationNode) Path to Job Input Folder</span>
+<span class="sd">        e.g. &quot;d:/data/3522_MTS_Training/1_Input&quot;</span>
+<span class="sd">        :type: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">,</span> <span class="n">INPUT_PATH</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">net_out_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Complete URL to the Network Job Out Folder</span>
+<span class="sd">        e.g. &quot;\\LIFS010S/hpc/LUSS013/3522_MTS_Training/2_Output&quot;</span>
+
+<span class="sd">        :rtype: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">normpath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span><span class="p">,</span> <span class="n">OUTPUT_PATH</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">net_out_data_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Complete URL to the Network Job Out Data Folder</span>
+<span class="sd">        e.g. &quot;\\LIFS010S/hpc/LUSS013/3522_MTS_Training/2_Output/_data&quot;</span>
+
+<span class="sd">        :rtype: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">normpath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span><span class="p">,</span> <span class="n">OUTPUT_DATA_PATH</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">net_in_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Complete URL to the Network Job Input Folder</span>
+<span class="sd">        e.g. &quot;\\LIFS010S/hpc/LUSS013/3522_MTS_Training/1_Input&quot;</span>
+
+<span class="sd">        :rtype: string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">normpath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net_job_path</span><span class="p">,</span> <span class="n">INPUT_PATH</span><span class="p">))</span>
+
+<div class="viewcode-block" id="SchedulerBase.check_template"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.check_template">[docs]</a>    <span class="k">def</span> <span class="nf">check_template</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check if template is available</span>
+
+<span class="sd">        :raises hpc.HpcError: if Default template is being used</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="o">==</span> <span class="s2">&quot;Default&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;error: usage of &#39;Default&#39; template is not allowed.&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SchedulerBase.cancel_job"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.cancel_job">[docs]</a>    <span class="k">def</span> <span class="nf">cancel_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;virtual&quot;&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="SchedulerBase.submit"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.SchedulerBase.submit">[docs]</a>    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;virtual&quot;&quot;&quot;</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">jobstate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;virtual&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">JobState</span><span class="o">.</span><span class="n">All</span></div>
+
+    <span class="c1"># @staticmethod</span>
+    <span class="c1"># def _in_unittest():</span>
+    <span class="c1">#     &quot;&quot;&quot;are we unit test?&quot;&quot;&quot;</span>
+    <span class="c1">#     current_stack = stack()</span>
+    <span class="c1">#     for stack_frame in current_stack:</span>
+    <span class="c1">#         for program_line in stack_frame[4]:  # This element of the stack frame contains</span>
+    <span class="c1">#             if &quot;unittest&quot; in program_line:  # some contextual program lines</span>
+    <span class="c1">#                 return True</span>
+    <span class="c1">#     return False</span>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="to_string"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.base.to_string">[docs]</a><span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    convert a boolean, list or time value to a string</span>
+
+<span class="sd">    :param value: True/False, list with values, date and time</span>
+<span class="sd">    :type value: Boolean, List or DateTime</span>
+<span class="sd">    :return: True, False or csv as string, or time in &quot;dd.mm.yy HH:MM:SS&quot; format</span>
+<span class="sd">    :rtype: string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;true&#39;</span> <span class="k">if</span> <span class="n">value</span> <span class="k">else</span> <span class="s1">&#39;false&#39;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">to_string</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">value</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>  <span class="c1"># it should be UTC!!!</span>
+        <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%d</span><span class="s1">.%m.%Y %H:%M:%S&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

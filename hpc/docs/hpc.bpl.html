@@ -1,0 +1,812 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.bpl package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="next" title="hpc.core package" href="hpc.core.html" />
+    <link rel="prev" title="hpc package" href="hpc.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.core.html" title="hpc.core package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="hpc.html" title="hpc package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" accesskey="U">hpc package</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-bpl-package">
+<h1>hpc.bpl package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.bpl.base">
+<span id="hpc-bpl-base-module"></span><h2>hpc.bpl.base module</h2>
+<div class="section" id="base-py">
+<h3>base.py</h3>
+<p>Classes for BPL (BatchPlayList) Handling, supports BPL (of course), collection, ini and text files</p>
+<dl class="class">
+<dt id="hpc.bpl.base.Bpl">
+<em class="property">class </em><code class="descclassname">hpc.bpl.base.</code><code class="descname">Bpl</code><a class="reference internal" href="_modules/hpc/bpl/base.html#Bpl"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Possibility to read and write Batch Play Lists or Collections supported by mts.</p>
+<p>Currently *.ini, *.txt and *.bpl based BatchPlayLists are supported.
+The file structure is automatically selected by the ending.</p>
+<ul class="simple">
+<li>*.bpl files based on xml and support section definitions for the rec files</li>
+<li>*ini, *.txt files simply list the complete path and file name</li>
+<li>if filepath is not a readable file: a collection from DB is used (as created with TDSM tool)</li>
+</ul>
+<p><em>structure</em>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>`BplList`  -  list (`BplListEntry`)
+    |
+    +- filepath (str)
+    |
+    +- location (str)
+    |
+    -- sectionlist (list(`Section`))
+        |
+        +- start_ts (long)
+        +- end_ts (long)
+        +- rel (bool)
+</pre></div>
+</div>
+<p>In case of BplList read from *.ini or *.txt file the sectionlist is empty.</p>
+<p>The location is internal only (not directly visible in Bpl files) and provides the site abbreviation
+where the file is stored. Usage like if mybpllistentry.location in [‘LND’, ‘FFM’]: print(“file stored in Europe”)</p>
+<p><strong>example usage one</strong></p>
+<blockquote>
+<div><p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an instance of your BPL-Reader</span>
+<span class="n">bpl</span> <span class="o">=</span> <span class="n">hpc</span><span class="o">.</span><span class="n">Bpl</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;D:\testdir\MyBatchPlayList.bpl&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get whole RecFile List out from bpl file</span>
+<span class="n">bpllist</span> <span class="o">=</span> <span class="n">bpl</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>                        <span class="c1"># type: BplList</span>
+
+<span class="c1"># Iterate over whole list in a for loop</span>
+<span class="k">for</span> <span class="n">bplentry</span> <span class="ow">in</span> <span class="n">bpllist</span><span class="p">:</span>                    <span class="c1"># type: BplListEntry</span>
+    <span class="n">recfilename</span> <span class="o">=</span> <span class="n">bplentry</span><span class="o">.</span><span class="n">filepath</span>
+    <span class="n">storage_site</span> <span class="o">=</span> <span class="n">bplentry</span><span class="o">.</span><span class="n">location</span>
+    <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">bplentry</span><span class="o">.</span><span class="n">sectionlist</span><span class="p">:</span>     <span class="c1"># type: Section</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">section</span><span class="o">.</span><span class="n">start_ts</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">section</span><span class="o">.</span><span class="n">end_ts</span>
+        <span class="n">is_relative_timestamp</span> <span class="o">=</span> <span class="n">section</span><span class="o">.</span><span class="n">rel</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><strong>example usage two</strong></p>
+<blockquote>
+<div><p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;D:\another\file.bpl&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">:</span>  <span class="c1"># open a bpl</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ent</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bpl</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;saving </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ent</span><span class="p">))</span>
+        <span class="n">ent</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">job_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;bpl&quot;</span><span class="p">,</span> <span class="s2">&quot;part_</span><span class="si">{:0&gt;5d}</span><span class="s2">.bpl&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><strong>example usage three</strong></p>
+<blockquote>
+<div><p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># supported modes are &quot;w&quot; and &quot;r&quot; similar to files</span>
+<span class="c1"># for &quot;r&quot; it&#39;s automatically read, for &quot;w&quot; it&#39;s automatically written when using with statement</span>
+<span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="s2">&quot;sample.bpl&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">,</span> <span class="n">BaseDB</span><span class="p">(</span><span class="s2">&quot;VGA&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">executex</span><span class="p">(</span><span class="s2">&quot;SELECT FILEPATH FROM CAT_DMT_FILES WHERE .....&quot;</span><span class="p">):</span>
+        <span class="n">bpl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p><strong>example usage four</strong></p>
+<blockquote>
+<div><p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># go throught a Falcon based collection:</span>
+<span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="s2">&quot;my_falcon_collection&quot;</span><span class="p">,</span> <span class="n">collbase</span><span class="o">=</span><span class="s2">&quot;falcon&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">ent</span> <span class="ow">in</span> <span class="n">bpl</span><span class="p">:</span>
+        <span class="n">task_fact</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">ent</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>The internal Bpl structure is ported from mts, but you can convert it to a dict if needed.
+Similar there is a method to convert the Section to a list:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">list_dict</span> <span class="o">=</span> <span class="n">bpllist</span><span class="o">.</span><span class="n">bpl2dict</span><span class="p">()</span>
+<span class="n">secttupel</span> <span class="o">=</span> <span class="n">bpllist</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sectionlist</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sect2list</span><span class="p">()</span>  <span class="c1"># tuple(&lt;start_ts&gt;, &lt;end_ts&gt;, &lt;rel&gt;)</span>
+</pre></div>
+</div>
+<p>Functions to create a BPL files for different usecases are available in module <code class="xref py py-obj docutils literal notranslate"><span class="pre">bpl</span></code> .</p>
+<dl class="method">
+<dt id="hpc.bpl.base.Bpl.append">
+<code class="descname">append</code><span class="sig-paren">(</span><em>_</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/base.html#Bpl.append"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append item</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.base.Bpl.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/base.html#Bpl.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>read file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.base.Bpl.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/base.html#Bpl.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>write file</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_cls">
+<span id="hpc-bpl-bpl-cls-module"></span><h2>hpc.bpl.bpl_cls module</h2>
+<div class="section" id="bpl-func-py">
+<h3>bpl_func.py</h3>
+<p>functions, helping the user to manipulate bpl files</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_cls.BplList">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_cls.</code><code class="descname">BplList</code><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplList"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+<p>data-container for the Bpl()-Class.
+It is build out of a list of BplListEntries</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplList.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplList.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init myself</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplList.bpl2dict">
+<code class="descname">bpl2dict</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplList.bpl2dict"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>convert a BplList to a dictionary, it leaves out the relative Timestamp flag!!</p>
+<p>You need to know / check by yourself if the Timestamps are relative or absolute</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">dict with all sections per recfile {‘rec1’:[(23, 34), (47, 52)], ‘rec2:[(31, 78)], …}</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">dictionary</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplList.clear">
+<code class="descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplList.clear"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>delete the whole internal RecFileList.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.bpl.bpl_cls.BplListEntry">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_cls.</code><code class="descname">BplListEntry</code><span class="sig-paren">(</span><em>entry</em>, <em>parent=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplListEntry"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="docutils">
+<dt>Data-Container which holds following Information:</dt><dd><ul class="simple">
+<li>RecFilePath</li>
+<li>list of all Sections applied to the file.</li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>entry</em>, <em>parent=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplListEntry.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>BPL version 2 explained:
+<a class="reference external" href="https://confluence.auto.continental.cloud/display/MTS26/Sequential+Merging" target="_blank">https://confluence.auto.continental.cloud/display/MTS26/Sequential+Merging</a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>entry</strong> (<em>lxml.etree.Element</em>) – full path to rec file</li>
+<li><strong>parent</strong> (<em>lxml.etree.Element</em>) – parent of element</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#hpc.bpl.bpl_ex.BplException" title="hpc.bpl.bpl_ex.BplException"><strong>BplException</strong></a> – on problem with a section</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.add_element">
+<code class="descname">add_element</code><span class="sig-paren">(</span><em>elem</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplListEntry.add_element"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add another element</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.append">
+<code class="descname">append</code><span class="sig-paren">(</span><em>start_ts</em>, <em>end_ts</em>, <em>rel</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplListEntry.append"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append one section entry into this BplListEntry.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start_ts</strong> (<em>int</em>) – StartTimestamp of Section</li>
+<li><strong>end_ts</strong> (<em>int</em>) – EndTimestamp of Section</li>
+<li><strong>rel</strong> (<em>tuple</em>) – relative Timestamp Format (True/False)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.extra_elements">
+<em class="property">property </em><code class="descname">extra_elements</code></dt>
+<dd><p>all other elements
+:rtype: list</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.save">
+<code class="descname">save</code><span class="sig-paren">(</span><em>fname</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplListEntry.save"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>save original content to file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplListEntry.sectionlist">
+<em class="property">property </em><code class="descname">sectionlist</code></dt>
+<dd><p>kept for backward compatibility</p>
+<p>please use iterator instead if possible::</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">listentry</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">section</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_cls.</code><code class="descname">BplReaderIfc</code><span class="sig-paren">(</span><em>filepath</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplList" title="hpc.bpl.bpl_cls.BplList"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplList</span></code></a></p>
+<p>interface for BplReader Subclasses, like BPLIni, BPLtxt, BPLxml</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>filepath</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>hold the path to file and rec list</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc.append">
+<code class="descname">append</code><span class="sig-paren">(</span><em>entry</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc.append"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append an entry</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>read stub</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc.validate">
+<code class="descname">validate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc.validate"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>validate the file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.BplReaderIfc.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#BplReaderIfc.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>write stub</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.bpl.bpl_cls.Section">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_cls.</code><code class="descname">Section</code><span class="sig-paren">(</span><em>start_ts</em>, <em>end_ts</em>, <em>rel=(False</em>, <em>False)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#Section"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Data-Container which holds section information for bpl-lists.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.Section.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>start_ts</em>, <em>end_ts</em>, <em>rel=(False</em>, <em>False)</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#Section.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set start and end, well rel as well</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_cls.Section.sect2list">
+<code class="descname">sect2list</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_cls.html#Section.sect2list"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>convert a section to a tuple (start_ts, end_ts, rel)</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_coll">
+<span id="hpc-bpl-bpl-coll-module"></span><h2>hpc.bpl.bpl_coll module</h2>
+<div class="section" id="bpl-coll-py">
+<h3>bpl_coll.py</h3>
+<p>class for BPL (xml-style) (BatchPlayList) handling</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_coll.BPLColl">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_coll.</code><code class="descname">BPLColl</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_coll.html#BPLColl"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplReaderIfc" title="hpc.bpl.bpl_cls.BplReaderIfc"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplReaderIfc</span></code></a></p>
+<p>Specialized BPL Class which handles only writing and reading of *.bpl Files.
+This class is not a customer Interface, it should only be used internal of hpc.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_coll.BPLColl.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_coll.html#BPLColl.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init collection, as it can and will be recursive, we call ourself again and again and again</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>tuple</em>) – args for the interface</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – kwargs, loc is taken out immediately, others are passed through</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_coll.BPLColl.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_coll.html#BPLColl.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Read the whole content of the Batch Play List into internal storage,
+and return all entries as a list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">List of Recording Objects</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BplList</span></code></td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="#hpc.bpl.bpl_ex.BplException" title="hpc.bpl.bpl_ex.BplException"><strong>BplException</strong></a> – once file cannot be read</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_coll.BPLColl.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_coll.html#BPLColl.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>do not write</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_db">
+<span id="hpc-bpl-bpl-db-module"></span><h2>hpc.bpl.bpl_db module</h2>
+<div class="section" id="bpl-db-py">
+<h3>bpl_db.py</h3>
+<p>class for collection (BatchPlayList) handling</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_db.BPLDb">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_db.</code><code class="descname">BPLDb</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_db.html#BPLDb"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplReaderIfc" title="hpc.bpl.bpl_cls.BplReaderIfc"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplReaderIfc</span></code></a></p>
+<p>Specialized BPL Class which handles only reading of a collection.
+This class is not a customer Interface, it should only be used internal of hpc.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_db.BPLDb.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_db.html#BPLDb.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init collection, as it can and will be recursive, we call ourself again and again and again</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>tuple</em>) – args for the interface</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – kwargs, db, recur are taken out immediately, others are passed through</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_db.BPLDb.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_db.html#BPLDb.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Read the whole content of the Batch Play List into internal storage,
+and return all entries as a list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">List of Recording Objects</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference internal" href="#hpc.bpl.bpl_cls.BplList" title="hpc.bpl.bpl_cls.BplList">BplList</a></td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="#hpc.bpl.bpl_ex.BplException" title="hpc.bpl.bpl_ex.BplException"><strong>BplException</strong></a> – once a recording is not available for location</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_db.BPLDb.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_db.html#BPLDb.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>to write to a collection is not supported!</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_ex">
+<span id="hpc-bpl-bpl-ex-module"></span><h2>hpc.bpl.bpl_ex module</h2>
+<div class="section" id="bpl-ex-py">
+<h3>bpl_ex.py</h3>
+<p>Classes for BPL (BatchPlayList) Handling, supports BPL (of course), collection, ini and text files</p>
+<dl class="exception">
+<dt id="hpc.bpl.bpl_ex.BplException">
+<em class="property">exception </em><code class="descclassname">hpc.bpl.bpl_ex.</code><code class="descname">BplException</code><span class="sig-paren">(</span><em>msg</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ex.html#BplException"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>used by Bpl class to indicate file handling problems</p>
+<p><strong>errno:</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li>1: file format wrong</li>
+<li>2: file cannot be opened</li>
+</ul>
+</div></blockquote>
+<dl class="method">
+<dt id="hpc.bpl.bpl_ex.BplException.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>msg</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ex.html#BplException.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>overwrite</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_fnc">
+<span id="hpc-bpl-bpl-fnc-module"></span><h2>hpc.bpl.bpl_fnc module</h2>
+<div class="section" id="id1">
+<h3>bpl_func.py</h3>
+<p>functions, helping the user to manipulate bpl files</p>
+<dl class="function">
+<dt id="hpc.bpl.bpl_fnc.create">
+<code class="descclassname">hpc.bpl.bpl_fnc.</code><code class="descname">create</code><span class="sig-paren">(</span><em>entries</em>, <em>path</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_fnc.html#create"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a single bpl-file out of some given bpllistentries.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>entries</strong> (<em>list</em><em>[</em><a class="reference internal" href="#hpc.bpl.bpl_cls.BplListEntry" title="hpc.bpl.bpl_cls.BplListEntry"><em>BplListEntry</em></a><em>]</em>) – list of BplListEntries</li>
+<li><strong>path</strong> (<em>str</em>) – path to the file to be created.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.bpl.bpl_fnc.split">
+<code class="descclassname">hpc.bpl.bpl_fnc.</code><code class="descname">split</code><span class="sig-paren">(</span><em>bplfilepath</em>, <em>task_size</em>, <em>outfolder='D:\\sandboxes\\PyHPC\\hpc_two\\sphinx\\source'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_fnc.html#split"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Split a bpl-file into bpl’s with the given task_size which
+contians the original section information.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bplfilepath</strong> (<em>str</em>) – Filepath(url) to the bpl file..</li>
+<li><strong>task_size</strong> (<em>str</em>) – Number of recordings per file.</li>
+<li><strong>outfolder</strong> (<em>str</em>) – Folder to store the generated bpl files.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">Array of created bpl files.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list of bpl paths.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_ini">
+<span id="hpc-bpl-bpl-ini-module"></span><h2>hpc.bpl.bpl_ini module</h2>
+<div class="section" id="bpl-ini">
+<h3>bpl.ini</h3>
+<p>class for BPL ini (BatchPlayList) handling</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_ini.BPLIni">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_ini.</code><code class="descname">BPLIni</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ini.html#BPLIni"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplReaderIfc" title="hpc.bpl.bpl_cls.BplReaderIfc"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplReaderIfc</span></code></a></p>
+<p>Specialized BPL Class which handles only writing and reading of *.ini Files.
+This class is not a customer Interface, it should only be used internal of hpc.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_ini.BPLIni.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ini.html#BPLIni.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init collection, as it can and will be recursive, we call ourself again and again and again</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>tuple</em>) – args for the interface</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – kwargs, loc is taken out immediately, others are passed through</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_ini.BPLIni.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ini.html#BPLIni.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>read the batch play list file content</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">The list of file entries or None if there is no entry.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">self</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_ini.BPLIni.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_ini.html#BPLIni.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>do not write</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_splt">
+<span id="hpc-bpl-bpl-splt-module"></span><h2>hpc.bpl.bpl_splt module</h2>
+<div class="section" id="bpl-splt-py">
+<h3>bpl_splt.py</h3>
+<p>Bpl splitter</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_splt.BplSplitter">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_splt.</code><code class="descname">BplSplitter</code><span class="sig-paren">(</span><em>job</em>, <em>_net_job_in_path</em>, <em>bpl_file_path</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_splt.html#BplSplitter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>The BplSplitter will create the needed bpl folder inside 1_Input,
+reads the whole *.bpl and provide either the path to rec file, or if bpl entry contains a section
+a newly created *.bpl file with corrected path inside the new created bpl is created.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_splt.BplSplitter.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>job</em>, <em>_net_job_in_path</em>, <em>bpl_file_path</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_splt.html#BplSplitter.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>job</strong> (<a class="reference internal" href="hpc.html#hpc.Job" title="hpc.Job"><em>hpc.Job</em></a>) – HPC job instance</li>
+<li><strong>_net_job_in_path</strong> (<em>str</em>) – path to input folder of job</li>
+<li><strong>bpl_file_path</strong> (<em>str</em>) – path to batch play list</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>ignore_missing</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): ignore missing recordings on destination location</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_txt">
+<span id="hpc-bpl-bpl-txt-module"></span><h2>hpc.bpl.bpl_txt module</h2>
+<div class="section" id="bpl-txt-py">
+<h3>bpl_txt.py</h3>
+<p>class for BPL text (BatchPlayList) handling</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_txt.BPLTxt">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_txt.</code><code class="descname">BPLTxt</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_txt.html#BPLTxt"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplReaderIfc" title="hpc.bpl.bpl_cls.BplReaderIfc"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplReaderIfc</span></code></a></p>
+<p>Specialized BPL Class which handles only writing and reading of *.txt Files.
+This class is not a customer Interface, it should only be used internal of hpc.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_txt.BPLTxt.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_txt.html#BPLTxt.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init collection, as it can and will be recursive, we call ourself again and again and again</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>tuple</em>) – args for the interface</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – kwargs, loc is taken out immediately, others are passed through</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_txt.BPLTxt.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_txt.html#BPLTxt.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>read the batch play list file content</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">list of file entries or None if there is no entry</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">self</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_txt.BPLTxt.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_txt.html#BPLTxt.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>do not write</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl.bpl_xml">
+<span id="hpc-bpl-bpl-xml-module"></span><h2>hpc.bpl.bpl_xml module</h2>
+<div class="section" id="bpl-xml-py">
+<h3>bpl_xml.py</h3>
+<p>class for BPL (xml-style) (BatchPlayList) handling</p>
+<dl class="class">
+<dt id="hpc.bpl.bpl_xml.BPLXml">
+<em class="property">class </em><code class="descclassname">hpc.bpl.bpl_xml.</code><code class="descname">BPLXml</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_xml.html#BPLXml"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.bpl.bpl_cls.BplReaderIfc" title="hpc.bpl.bpl_cls.BplReaderIfc"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.bpl.bpl_cls.BplReaderIfc</span></code></a></p>
+<p>Specialized BPL Class which handles only writing and reading of *.bpl Files.
+This class is not a customer Interface, it should only be used internal of hpc.</p>
+<dl class="method">
+<dt id="hpc.bpl.bpl_xml.BPLXml.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_xml.html#BPLXml.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init collection, as it can and will be recursive, we call ourself again and again and again</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>tuple</em>) – args for the interface</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – kwargs, loc is taken out immediately, others are passed through</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_xml.BPLXml.read">
+<code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_xml.html#BPLXml.read"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Read the whole content of the Batch Play List into internal storage,
+and return all entries as a list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">List of Recording Objects</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BplList</span></code></td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="#hpc.bpl.bpl_ex.BplException" title="hpc.bpl.bpl_ex.BplException"><strong>BplException</strong></a> – once file cannot be read</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.bpl.bpl_xml.BPLXml.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/bpl/bpl_xml.html#BPLXml.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Write the complete list inside the internal storage into a file.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">written chars</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.bpl">
+<span id="module-contents"></span><h2>Module contents</h2>
+<div class="section" id="init-py">
+<h3>__init__.py</h3>
+<p>sub-package for bpl handling</p>
+<p><strong>Following Classes are available for the User-API:</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">Bpl</span></code></li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.core.html" title="hpc.core package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="hpc.html" title="hpc package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" >hpc package</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

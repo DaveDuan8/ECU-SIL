@@ -1,0 +1,79 @@
+#!/usr/bin/env groovy
+// CIP Jenkins library provides access to convenience functions for the CIP infrastructure
+@Library('cip_jenkins_lib') _
+import com.continental.adcu.agileci.api.model.InstanceType
+windowsLabel = 'windows'
+podLabel = "cip-py-hpc-${env.BRANCH_NAME}-${env.BUILD_NUMBER}".replaceAll('/','-')
+
+def startLinuxPod() {
+    launchCustomPod(
+        'c-adas-cip-docker-v.eu.artifactory.conti.de/custom/python3:3.6.8', //docker image used for the execution
+        podLabel, //pod Label
+        'aws-eks', // Kubernetes Cloud as specified in Jenkins
+        InstanceType.CPU,  //Instance type available in Kubernetes (REG, MEMORY, CPU, GPU, DEFAULT)
+        1, // number of vcpus requested (has to match available vcpus of instances)
+        1, // memory in GB requested (has to match available memory of instances)
+        0,  // retention period of this pod (keeps pod available for future jobs)
+        {
+            linuxTest()
+        }   // closure with commands executed on the pod
+    )
+}
+
+def linuxTest(){
+    stage("Checkout") {
+        checkout scm
+    }
+    withEnv([
+            "PIP_HOST=eu.artifactory.conti.de",
+            "PIP_MIRROR=https://eu.artifactory.conti.de/artifactory/api/pypi/c_adas_cip_pypi_v/simple",
+            "PIP_INDEX_URL=https://eu.artifactory.conti.de/artifactory/api/pypi/c_adas_cip_pypi_v/simple",
+            "PIP_TRUSTED_HOST=eu.artifactory.conti.de"
+    ]){
+        stage("setup venv") {
+            sh 'python3 -m venv ${WORKSPACE}/venv'
+            sh '''#!/bin/bash
+                    source ${WORKSPACE}/venv/bin/activate
+                    pip install --upgrade pip wheel setuptools
+                    pip install -r requirements.txt
+                    cd ${WORKSPACE}
+                    '''
+        }
+        if (env.TAG_NAME && env.TAG_NAME ==~ /(releases?\/|v)?[0-9]+\.[0-9]+\.[0-9]+(-?[a-z]+[0-9]+)?/) {
+            stage("Release") {
+                env.VERSION_TAG = (env.TAG_NAME =~ /(releases?\/|v)?([0-9]+\.[0-9]+\.[0-9]+(-?[a-z]+[0-9]+)?)/ )[0][2]
+                withCredentials([usernamePassword(credentialsId: "artifactory_pypi", usernameVariable: "PYPI_USER", passwordVariable: "PYPI_TOKEN")]) {
+                    sh """#! /bin/bash
+                            echo "Deploying release tag '${env.VERSION_TAG}' to artifactory."
+                            echo "[distutils]\nindex-servers = artifactory\n[artifactory]\nrepository: https://eu.artifactory.conti.de/artifactory/api/pypi/c_adas_cip_pypi_l\nusername: ${PYPI_USER}\npassword: ${PYPI_TOKEN}\n" > ~/.pypirc
+                            source venv/bin/activate
+                            pip install twine
+                            echo starting the build...
+                            python3 setup.py bdist_wheel --universal
+                            ls -l dist
+                            twine upload --verbose -r artifactory dist/*.whl
+                            """
+                }
+            }
+        }
+    }
+}
+
+/*
+*  Main function responsible for calling all other steps.
+*/
+def main(){
+    def stages = [:]
+
+  /*   stages['linux'] = {
+        stage('Linux'){
+            startLinuxPod()
+        }
+    } */
+    startLinuxPod()
+
+    // Execute the stages in parallel
+    parallel stages
+}
+
+main()

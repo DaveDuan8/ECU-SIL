@@ -1,0 +1,230 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.exitcodes</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.exitcodes</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">exitcodes.py</span>
+<span class="sd">------------</span>
+
+<span class="sd">This Module contains ExitCodes class.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.error</span> <span class="kn">import</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="n">ERR_APPLICATION_UNSPECIFIED_ERROR_FOUND</span><span class="p">,</span> <span class="n">ERR_HPC_USER_CANCEL_TASK_DETECTED</span>
+<span class="kn">from</span> <span class="nn">..rdb.base</span> <span class="kn">import</span> <span class="n">BaseDB</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="ExitCodes"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes">[docs]</a><span class="k">class</span> <span class="nc">ExitCodes</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;exit code class&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ExitCodes.__init__"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;retrieve exit codes&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_error</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warn</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;init_code&quot;</span><span class="p">,</span> <span class="n">ERR_OK</span><span class="p">),</span> <span class="n">ERR_OK</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_canceled</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_skipon</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unfailing&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ignore_codes&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">other</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;prio&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">exc</span><span class="p">,</span> <span class="n">pri</span><span class="p">,</span> <span class="n">des</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;prios&quot;</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">[</span><span class="n">exc</span><span class="p">]</span> <span class="o">=</span> <span class="n">pri</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span><span class="p">[</span><span class="n">exc</span><span class="p">]</span> <span class="o">=</span> <span class="n">des</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;db&#39;</span><span class="p">,</span> <span class="s1">&#39;HPC&#39;</span><span class="p">))</span> <span class="k">as</span> <span class="n">bdb</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">bdb</span><span class="p">(</span><span class="s2">&quot;SELECT EXITCODE, PRIO, DESCR FROM HPC_EXITCODES&quot;</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">ExitCodes</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_skipon</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">internals</span>
+            <span class="c1"># take over if specified explicitly</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;unfailing&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ignore_codes&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not of same class!&quot;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: code and desc</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">desc</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: error code</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="o">!=</span> <span class="n">ERR_OK</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warn</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: state of ecode</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;Canceled&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canceled</span> <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;Finished&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span> <span class="k">else</span> <span class="s2">&quot;Failed&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">lasterror</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: last error code</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">error</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">history</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: error code history</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">desc</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: description of exitcode</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">explain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ExitCodes.explain"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes.explain">[docs]</a>    <span class="k">def</span> <span class="nf">explain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param int ecode: exitcode</span>
+<span class="sd">        :return: string representation of it</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ecode</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        do a repriorization</span>
+
+<span class="sd">        :param int ecode: new exitcode</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ecode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="o">=</span> <span class="n">ERR_OK</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ecode</span><span class="p">,</span> <span class="n">ExitCodes</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">exc</span><span class="p">,</span> <span class="n">dtm</span> <span class="ow">in</span> <span class="n">ecode</span><span class="o">.</span><span class="n">history</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_priorize</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">dtm</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_priorize</span><span class="p">(</span><span class="n">ecode</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_priorize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="p">,</span> <span class="n">dtime</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;priorize the code&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ecode</span> <span class="o">==</span> <span class="n">ERR_HPC_USER_CANCEL_TASK_DETECTED</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_canceled</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">ecode</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">ecode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">:</span>
+            <span class="n">ecode</span> <span class="o">=</span> <span class="n">ERR_APPLICATION_UNSPECIFIED_ERROR_FOUND</span>
+        <span class="k">if</span> <span class="n">ecode</span> <span class="o">!=</span> <span class="n">ERR_OK</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">ecode</span><span class="p">,</span> <span class="n">dtime</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_code</span><span class="p">(</span><span class="n">ecode</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_set_code</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set the final code to be either a warning or error&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ecode</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">ecode</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">prio</span><span class="p">(</span><span class="n">ecode</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prio</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_warn</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_warn</span> <span class="o">=</span> <span class="n">ecode</span>
+        <span class="k">elif</span> <span class="n">ecode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">prio</span><span class="p">(</span><span class="n">ecode</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prio</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_error</span> <span class="o">=</span> <span class="n">ecode</span>
+
+<div class="viewcode-block" id="ExitCodes.prio"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes.prio">[docs]</a>    <span class="k">def</span> <span class="nf">prio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;priority of exit code&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ecode</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">[</span><span class="n">ERR_OK</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="ExitCodes.reprioritize"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes.reprioritize">[docs]</a>    <span class="k">def</span> <span class="nf">reprioritize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ecode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;remove or suppress a certain exit code&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ecode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_error</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warn</span> <span class="o">=</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="n">ERR_OK</span>
+
+        <span class="k">for</span> <span class="n">code</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_set_code</span><span class="p">(</span><span class="n">code</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">internals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: db queried stuff to parents</span>
+<span class="sd">        :rtype: tuple</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strings</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prios</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_skipon</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unfail</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ignore</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span>
+
+<div class="viewcode-block" id="ExitCodes.clear"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.exitcodes.ExitCodes.clear">[docs]</a>    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;reset history&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hist</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_error</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warn</span> <span class="o">=</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="n">ERR_OK</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

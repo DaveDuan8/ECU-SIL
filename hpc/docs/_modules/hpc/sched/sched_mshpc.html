@@ -1,0 +1,511 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sched.sched_mshpc</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sched.sched_mshpc</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">sched_mshpc.py</span>
+<span class="sd">--------------</span>
+
+<span class="sd">Interface to MS HPC.</span>
+<span class="sd">This Module reflects some scheduler interfaces from HPC into Python.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">unlink</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span><span class="p">,</span> <span class="n">time</span>
+<span class="c1"># from threading import Event</span>
+<span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">NamedTemporaryFile</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostbyaddr</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">LOGINNAME</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">server_path</span><span class="p">,</span> <span class="n">resolve_alias</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">LOC_HEAD_MAP</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">DEVS</span>
+<span class="kn">from</span> <span class="nn">..core.hpc_defs</span> <span class="kn">import</span> <span class="n">JobState</span><span class="p">,</span> <span class="n">JobUnitType</span>
+<span class="kn">from</span> <span class="nn">..core.registry</span> <span class="kn">import</span> <span class="n">WinReg</span><span class="p">,</span> <span class="n">HKEY_CLASSES_ROOT</span> <span class="k">as</span> <span class="n">HKCR</span><span class="p">,</span> <span class="n">HKEY_LOCAL_MACHINE</span> <span class="k">as</span> <span class="n">HKLM</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">deprecated</span>
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">SchedulerBase</span>
+
+
+<span class="c1"># - classes / functions ------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="MsHpcScheduler"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler">[docs]</a><span class="k">class</span> <span class="nc">MsHpcScheduler</span><span class="p">(</span><span class="n">SchedulerBase</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class, which reflects a bit of IScheduler Interface from Microsoft HPC.</span>
+<span class="sd">    See http://msdn.microsoft.com/en-us/library/microsoft.hpc.scheduler.ischeduler(v=vs.85)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="MsHpcScheduler.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headnode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0915,R1260</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        connect to scheduler and open / create a new job</span>
+
+<span class="sd">        :param str headnode: name of head</span>
+<span class="sd">        :param list kwargs: misc arguments for scheduler base</span>
+<span class="sd">        :raises hpc.HpcError: e.g. when not being able to connect to Microsoft HPC scheduler</span>
+<span class="sd">        :raises Exception: on unknown error</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">SchedulerBase</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">headnode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jattr</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;retry_limit&quot;</span><span class="p">:</span> <span class="s2">&quot;TaskExecutionFailureRetryLimit&quot;</span><span class="p">})</span>
+
+        <span class="c1"># self._state_event = Event()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">All</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_location</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">LOC_HEAD_MAP</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span> <span class="ow">in</span> <span class="n">v</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span> <span class="o">=</span> <span class="n">server_path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">)</span>
+
+        <span class="c1"># some exceptions: Sven, Cedrik, Mohan, Joachim and our HPC user</span>
+        <span class="k">if</span> <span class="n">LOGINNAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DEVS</span><span class="p">:</span>
+            <span class="n">loc</span> <span class="o">=</span> <span class="n">location</span><span class="p">(</span><span class="s2">&quot;(unknown)&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">:</span>  <span class="c1"># or self._location not in [loc, X_SUBMIT_EXC.get(loc)]:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;it&#39;s not allowed to submit a job from </span><span class="si">{}</span><span class="s2"> to </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">loc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_df</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+
+        <span class="k">try</span><span class="p">:</span>  <span class="c1"># good to start here: http://pythonnet.github.io/</span>
+            <span class="n">_import_hpcdll</span><span class="p">(</span><span class="s2">&quot;Microsoft.Hpc.Scheduler.Scheduler&quot;</span><span class="p">)</span>
+            <span class="kn">from</span> <span class="nn">Microsoft.Hpc.Scheduler</span> <span class="kn">import</span> <span class="n">Scheduler</span>  <span class="c1"># pylint: disable=C0415,E0401</span>
+            <span class="kn">from</span> <span class="nn">System</span> <span class="kn">import</span> <span class="n">IntPtr</span>  <span class="c1"># pylint: disable=C0415,E0401</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span> <span class="o">=</span> <span class="n">Scheduler</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">Connect</span><span class="p">(</span><span class="n">gethostbyaddr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">SetInterfaceMode</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">IntPtr</span><span class="o">.</span><span class="n">Zero</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="o">!=</span> <span class="s1">&#39;Default&#39;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">check_template</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">CreateJob</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">OnJobState</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_state</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">AddJob</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Id</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>  <span class="c1"># fallback to older OCX integration</span>
+            <span class="kn">from</span> <span class="nn">win32com.client</span> <span class="kn">import</span> <span class="n">Dispatch</span>  <span class="c1"># pylint: disable=C0415</span>
+            <span class="kn">from</span> <span class="nn">pythoncom</span> <span class="kn">import</span> <span class="n">CoInitializeEx</span><span class="p">,</span> <span class="n">COINIT_MULTITHREADED</span><span class="p">,</span> <span class="n">com_error</span>  <span class="c1"># pylint: disable=C0415</span>
+
+            <span class="k">if</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;2019&quot;</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;please, install missing pythonnet library!&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;please, install pythonnet, we&#39;ll need it in short-term!&quot;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">CoInitializeEx</span><span class="p">(</span><span class="n">COINIT_MULTITHREADED</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">com_error</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">pass</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">WinReg</span><span class="p">(</span><span class="n">HKLM</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;SOFTWARE\Classes\TypeLib\{C45D10A1-54E8-420B-A052-719D47EC7C16}&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">wr</span><span class="p">:</span>
+                    <span class="n">ver</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">wr</span><span class="o">.</span><span class="n">keys</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">ver</span> <span class="o">!=</span> <span class="mi">5</span><span class="p">:</span>  <span class="c1"># 5 =&gt; HPC pack 2016, 2 =&gt; HPC pack 2012 (not supported any more)</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;to submit to </span><span class="si">{}</span><span class="s2">, you need HPC pack 2016 client utilities!&quot;</span>
+                                   <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">))</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span> <span class="o">=</span> <span class="n">Dispatch</span><span class="p">(</span><span class="s2">&quot;Microsoft.Hpc.Scheduler.Scheduler&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">Connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="o">!=</span> <span class="s1">&#39;Default&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">check_template</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">CreateJob</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">AddJob</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Id</span>
+            <span class="k">except</span> <span class="n">com_error</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">hresult</span> <span class="o">==</span> <span class="o">-</span><span class="mi">2147221005</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;Microsoft HPC Client Components are not found, please install the correct version!&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">hresult</span> <span class="o">==</span> <span class="o">-</span><span class="mi">2147352567</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span> <span class="o">!=</span> <span class="s2">&quot;OTHER&quot;</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;Seems, you have no rights on that cluster or connection failed!&quot;</span><span class="p">)</span>
+                <span class="c1"># elif exc.hresult != -2147352567:  # not connected</span>
+                <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;MS HPC error: </span><span class="si">{}</span><span class="s2"> -&gt; </span><span class="si">{}</span><span class="s2">&quot;</span>
+                           <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;get_HResult&quot;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))(),</span>
+                                   <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;get_Message&quot;</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;msg&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)))()))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: nice representation</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;MS HPC scheduler: head=</span><span class="si">{}</span><span class="s2">, id=</span><span class="si">{}</span><span class="s2">, name=</span><span class="si">{}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MsHpcScheduler.close"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close connection to scheduler&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">Close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="MsHpcScheduler.submit"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.submit">[docs]</a>    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_prio</span><span class="p">,</span> <span class="n">runas</span><span class="p">,</span> <span class="n">dbase</span><span class="p">):</span>  <span class="c1"># pylint: disable=W0221</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        configure the job and finalize (submit) it</span>
+
+<span class="sd">        :param hpc.JobPriority _prio: wished job priority</span>
+<span class="sd">        :param str runas: &lt;username&gt;:&lt;password&gt;</span>
+<span class="sd">        :param BaseDB dbase: database connection</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># create xml file to be used to reconfigure HPC job</span>
+        <span class="n">raw_xml</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_xml</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_dir</span><span class="p">),</span> <span class="s2">&quot;HPC_submit&quot;</span><span class="p">,</span> <span class="s2">&quot;job&quot;</span><span class="p">,</span>
+                       <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">_</span><span class="si">{}</span><span class="s2">.xml&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jobid</span><span class="p">)),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">raw_xml</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;hpc_&quot;</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.xml&quot;</span><span class="p">,</span> <span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">tf</span><span class="p">:</span>
+            <span class="n">tf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">raw_xml</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">RestoreFromXml</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">unlink</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="c1"># set some more attributes out of xml</span>
+        <span class="n">excl</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sattrs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">v</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;excluded_nodes&quot;</span><span class="p">:</span>
+                    <span class="n">excl</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;min_hd_space&quot;</span><span class="p">:</span>
+                    <span class="n">sqx</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="s2">&quot;unit&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="n">JobUnitType</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="o">.</span><span class="n">GPU</span><span class="p">]</span>\
+                        <span class="k">else</span> <span class="s2">&quot;/ </span><span class="si">{}</span><span class="s2">S&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_attr</span><span class="p">[</span><span class="s2">&quot;unit&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+                    <span class="n">excl</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT NAME FROM HPC_SLAVE INNER JOIN HPC_NODE USING(NODEID) &quot;</span>
+                                                     <span class="s2">&quot;WHERE NODENAME = :clus AND DTOTAL </span><span class="si">{}</span><span class="s2"> &lt; :minhd &quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sqx</span><span class="p">),</span>
+                                                     <span class="n">clus</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_head_node</span><span class="p">,</span> <span class="n">minhd</span><span class="o">=</span><span class="n">v</span><span class="p">)])</span>
+
+        <span class="k">if</span> <span class="n">excl</span><span class="p">:</span>  <span class="c1"># add some nodes to excluded list (cannot be done via xml)</span>
+            <span class="n">strcoll</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">CreateStringCollection</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">excl</span><span class="p">):</span>
+                <span class="n">strcoll</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">AddExcludedNodes</span><span class="p">(</span><span class="n">strcoll</span><span class="p">)</span>
+
+        <span class="c1"># do the final commit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Commit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">SubmitJob</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">runas</span> <span class="o">+</span> <span class="s2">&quot;:&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)[:</span><span class="mi">2</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+        <span class="c1"># increase prio if possible, some people have more rights and can do, we we won&#39;t want</span>
+        <span class="c1"># if prio &gt; JobPriority.Lowest:</span>
+        <span class="c1">#     for i in range(int(prio), 0, -1):</span>
+        <span class="c1">#         try:</span>
+        <span class="c1">#             self._job.Priority = i</span>
+        <span class="c1">#             self._job.Commit()</span>
+        <span class="c1">#             break</span>
+        <span class="c1">#         except Exception as _:</span>
+        <span class="c1">#             sleep(1.5)</span>
+
+<div class="viewcode-block" id="MsHpcScheduler.check_template"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.check_template">[docs]</a>    <span class="k">def</span> <span class="nf">check_template</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check if template is available</span>
+
+<span class="sd">        :raises hpc.HpcError: if Default or non-existing template is being used</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">template</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">GetJobTemplateList</span><span class="p">()}</span> <span class="o">-</span> <span class="p">{</span><span class="s2">&quot;Default&quot;</span><span class="p">}:</span>  <span class="c1"># pylint: disable=R1721</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;error: template &#39;</span><span class="si">{}</span><span class="s2">&#39; does not exist!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">template</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="MsHpcScheduler.cancel_job"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.cancel_job">[docs]</a>    <span class="k">def</span> <span class="nf">cancel_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        cancel specified job. here, we remove the job from the queue,</span>
+<span class="sd">        but the job remains in the scheduler.</span>
+
+<span class="sd">        :param str message: message to display at HPC Job Manager</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">CancelJob</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Id</span><span class="p">,</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">message</span><span class="p">[:</span><span class="mi">127</span><span class="p">])</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">jobstate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: state of job</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">Refresh</span><span class="p">()</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mf">0.222</span><span class="p">)</span>
+
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">State</span>
+        <span class="k">if</span> <span class="n">state</span> <span class="o">==</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Failed</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="c1"># Due an Microsoft HPC Bug it can happen that all basic tasks are done without Error and only</span>
+            <span class="c1"># the Node Release Task is failed. This will be check here, and if this happens, the Error Code will be set</span>
+            <span class="c1"># back to finished, even if it job is failed.</span>
+            <span class="n">task_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="o">.</span><span class="n">GetTaskList</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">unreachable_error</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">other_error</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">task_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">ErrorMessage</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span> <span class="ow">or</span> <span class="n">task</span><span class="o">.</span><span class="n">ExitCode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">ErrorMessage</span> <span class="o">==</span> <span class="s1">&#39;Job failed to start on some nodes or some nodes became unreachable.&#39;</span><span class="p">:</span>
+                        <span class="n">unreachable_error</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">other_error</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">other_error</span> <span class="ow">is</span> <span class="kc">False</span> <span class="ow">and</span> <span class="n">unreachable_error</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Finished</span>
+
+        <span class="k">return</span> <span class="n">state</span>
+
+<div class="viewcode-block" id="MsHpcScheduler.wait_until_finished"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MsHpcScheduler.wait_until_finished">[docs]</a>    <span class="k">def</span> <span class="nf">wait_until_finished</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        wait until job finishes</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *timeout* (``int``): wait timeout [s]</span>
+<span class="sd">        :return `JobState`: final state of job</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># with HpcSched(self._head_node) as sch:</span>
+        <span class="c1">#     state = sch.wait_until_finished(self._jobid, kwargs.get(&quot;timeout&quot;, 12 * 24 * 60 * 60), self._logger)</span>
+        <span class="c1"># return state</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span><span class="p">:</span>
+            <span class="n">timeout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">,</span> <span class="mi">12</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;waiting until max (</span><span class="si">%s</span><span class="s2"> | finished | failed | canceled)....&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{:.0f}</span><span class="s2">s&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">timeout</span><span class="p">))</span>
+
+            <span class="n">end_tm</span> <span class="o">=</span> <span class="n">time</span><span class="p">()</span> <span class="o">+</span> <span class="n">timeout</span>
+            <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">JobState</span><span class="o">.</span><span class="n">Finished</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Failed</span><span class="p">,</span> <span class="n">JobState</span><span class="o">.</span><span class="n">Canceled</span><span class="p">,)</span> <span class="ow">and</span> <span class="n">time</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">end_tm</span><span class="p">:</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mf">2.9</span><span class="p">)</span>
+                <span class="c1"># if not self._state_event.wait(end_tm - time()):</span>
+                <span class="c1">#     break</span>
+                <span class="c1"># self._state_event.clear()</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span></div>
+
+    <span class="k">def</span> <span class="nf">_job_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_src</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;job state change handler&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_state</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">NewState</span><span class="p">)</span>
+        <span class="c1"># print(&quot;state: {} =&gt; {}&quot;.format(args.PreviousState, args.NewState))</span>
+        <span class="c1"># self._state_event.set()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job state changed from </span><span class="si">%s</span><span class="s2"> to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                          <span class="nb">str</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">PreviousState</span><span class="p">))),</span> <span class="nb">str</span><span class="p">(</span><span class="n">JobState</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">NewState</span><span class="p">))))</span>
+
+    <span class="k">def</span> <span class="nf">_set_jattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set a job attribute&quot;&quot;&quot;</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HpcSched"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.HpcSched">[docs]</a><span class="k">class</span> <span class="nc">HpcSched</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;connection object encapsulating HPC Scheduler&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HpcSched.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.HpcSched.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">head</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init this&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_head</span> <span class="o">=</span> <span class="n">head</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_props</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propid</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize connection to an HPC scheduler using IScheduler interface from</span>
+<span class="sd">        https://learn.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.ischeduler?view=hpc-sdk-5.1.6115</span>
+
+<span class="sd">        :return: self</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        :raise Exception: connection exception</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">_import_hpcdll</span><span class="p">(</span><span class="s2">&quot;Microsoft.Hpc.Scheduler.Scheduler&quot;</span><span class="p">)</span>
+            <span class="kn">from</span> <span class="nn">Microsoft.Hpc.Scheduler</span> <span class="kn">import</span> <span class="n">Scheduler</span><span class="p">,</span> <span class="n">Properties</span><span class="p">,</span> <span class="n">PropId</span>  <span class="c1"># pylint: disable=C0415,E0401</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span> <span class="o">=</span> <span class="n">Scheduler</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span><span class="o">.</span><span class="n">Connect</span><span class="p">(</span><span class="n">resolve_alias</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_props</span> <span class="o">=</span> <span class="n">Properties</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_propid</span> <span class="o">=</span> <span class="n">PropId</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    unable to connect to scheduler </span><span class="si">%s</span><span class="s2">!&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;cleanup&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sched</span><span class="o">.</span><span class="n">Close</span><span class="p">()</span>
+
+    <span class="n">connect</span> <span class="o">=</span> <span class="fm">__enter__</span>
+
+    <span class="n">close</span> <span class="o">=</span> <span class="fm">__exit__</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: name of head</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">props</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        refer to https://docs.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.properties?view=hpc-sdk-5.1.6115</span>
+<span class="sd">        for further information</span>
+
+<span class="sd">        :return: MS-HPC scheduler properties</span>
+<span class="sd">        :rtype: `Scheduler.Properties`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_props</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">propid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;refer to https://docs.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.propid?view=hpc-sdk-5.1.6115&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propid</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: scheduler attribute</span>
+<span class="sd">        :rtype: `Scheduler.__getattr__`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sched</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;represet myself&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;HpcScheduler @ </span><span class="si">{}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">)</span></div>
+
+    <span class="c1"># def wait_until_finished(self, jobid, timeout=12 * 24 * 60 * 60, logger=None):</span>
+    <span class="c1">#     r&quot;&quot;&quot;</span>
+    <span class="c1">#     wait until job finishes</span>
+    <span class="c1">#</span>
+    <span class="c1">#     :param jobid int: id of job</span>
+    <span class="c1">#     :keyword \**kwargs:</span>
+    <span class="c1">#         * *timeout* (``int``): wait timeout [s]</span>
+    <span class="c1">#     :return `JobState`: final state of job</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     logger.info(&quot;waiting until max(%s | finished | failed | canceled)....&quot;, &quot;{:.0f}s&quot;.format(timeout))</span>
+    <span class="c1">#</span>
+    <span class="c1">#     job = self._sched.OpenJob(jobid)</span>
+    <span class="c1">#     ostate, end_tm = job.State, time() + timeout</span>
+    <span class="c1">#</span>
+    <span class="c1">#     while int(job.State) not in (JobState.Finished, JobState.Failed, JobState.Canceled,) and time() &lt; end_tm:</span>
+    <span class="c1">#         sleep(12)</span>
+    <span class="c1">#         job.Refresh()</span>
+    <span class="c1">#         if job.State != ostate:</span>
+    <span class="c1">#             logger.info(&quot;job state changed from %s to %s&quot;,</span>
+    <span class="c1">#                         str(JobState(int(ostate))), str(JobState(int(job.State))))</span>
+    <span class="c1">#             ostate = job.State</span>
+    <span class="c1">#</span>
+    <span class="c1">#     return int(job.State)</span>
+
+
+<div class="viewcode-block" id="HpcClus"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.HpcClus">[docs]</a><span class="k">class</span> <span class="nc">HpcClus</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;connection object encapsulating HPC Scheduler&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="HpcClus.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.HpcClus.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">head</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init this&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_head</span> <span class="o">=</span> <span class="n">head</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize connection to an HPC cluster using ICluster interface from</span>
+<span class="sd">        https://learn.microsoft.com/en-us/dotnet/api/microsoft.computecluster.icluster?view=hpc-sdk-5.1.6115</span>
+
+<span class="sd">        :return: self</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        :raise Exception: connection exception</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">_import_hpcdll</span><span class="p">(</span><span class="s2">&quot;Microsoft.ComputeCluster.Cluster&quot;</span><span class="p">)</span>
+            <span class="kn">from</span> <span class="nn">Microsoft.ComputeCluster</span> <span class="kn">import</span> <span class="n">Cluster</span>  <span class="c1"># pylint: disable=C0415,E0401</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span> <span class="o">=</span> <span class="n">Cluster</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span><span class="o">.</span><span class="n">Connect</span><span class="p">(</span><span class="n">resolve_alias</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;    unable to connect to scheduler </span><span class="si">%s</span><span class="s2">!&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;cleanup&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_clus</span><span class="o">.</span><span class="n">Close</span><span class="p">()</span>
+
+    <span class="n">connect</span> <span class="o">=</span> <span class="fm">__enter__</span>
+
+    <span class="n">close</span> <span class="o">=</span> <span class="fm">__exit__</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: name of head</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_head</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: scheduler attribute</span>
+<span class="sd">        :rtype: `Scheduler.__getattr__`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_clus</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;represet myself&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;HpcCluster @ </span><span class="si">{}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_head</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MiniSched"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MiniSched">[docs]</a><span class="k">class</span> <span class="nc">MiniSched</span><span class="p">(</span><span class="n">HpcSched</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;keep it backward compatible for a while backward&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="MiniSched.__init__"><a class="viewcode-back" href="../../../hpc.sched.html#hpc.sched.sched_mshpc.MiniSched.__init__">[docs]</a>    <span class="nd">@deprecated</span><span class="p">(</span><span class="s2">&quot;please, use &#39;from hpc import HpcSched&#39; in future!&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init me&quot;&quot;&quot;</span>
+        <span class="n">HpcSched</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span></div></div>
+
+
+<span class="k">def</span> <span class="nf">_import_hpcdll</span><span class="p">(</span><span class="n">namespace</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;import HPC .Net components&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">WinReg</span><span class="p">(</span><span class="n">HKCR</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">\CLSID&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">namespace</span><span class="p">))</span> <span class="k">as</span> <span class="n">wr</span><span class="p">:</span>
+            <span class="n">basis</span> <span class="o">=</span> <span class="n">wr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">WinReg</span><span class="p">(</span><span class="n">HKCR</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;CLSID\</span><span class="si">{}</span><span class="s2">\InprocServer32&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">basis</span><span class="p">))</span> <span class="k">as</span> <span class="n">wr</span><span class="p">:</span>
+            <span class="n">basis</span> <span class="o">=</span> <span class="n">wr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CodeBase&quot;</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">basis</span><span class="p">[:</span><span class="mi">8</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;file:///&quot;</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;seems, you&#39;re missing HPC pack client utilities installation!&quot;</span><span class="p">)</span>
+
+    <span class="kn">from</span> <span class="nn">clr</span> <span class="kn">import</span> <span class="n">AddReference</span>  <span class="c1"># pylint: disable=C0415</span>
+    <span class="n">AddReference</span><span class="p">(</span><span class="n">basis</span><span class="p">[</span><span class="mi">8</span><span class="p">:])</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

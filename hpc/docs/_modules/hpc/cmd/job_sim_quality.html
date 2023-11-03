@@ -1,0 +1,248 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.cmd.job_sim_quality</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.cmd.job_sim_quality</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">provide job simulation quality of projects</span>
+
+<span class="sd">1. Connect to production head node</span>
+<span class="sd">2. Get finished jobs for each project from production</span>
+<span class="sd">3. Clone jobs and execute on test cluster</span>
+<span class="sd">4. map production and test cluster job ids</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">abspath</span><span class="p">,</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="kn">import</span> <span class="n">ArgumentParser</span>
+<span class="kn">from</span> <span class="nn">fnmatch</span> <span class="kn">import</span> <span class="n">fnmatch</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">tostring</span><span class="p">,</span> <span class="n">parse</span>
+<span class="kn">from</span> <span class="nn">xml.dom.minidom</span> <span class="kn">import</span> <span class="n">parseString</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">json</span> <span class="kn">import</span> <span class="n">loads</span><span class="p">,</span> <span class="n">dumps</span><span class="p">,</span> <span class="n">load</span>
+<span class="kn">from</span> <span class="nn">scandir</span> <span class="kn">import</span> <span class="n">listdir</span>
+<span class="kn">from</span> <span class="nn">win32api</span> <span class="kn">import</span> <span class="n">GetUserNameEx</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="n">HPC_FOLDER</span> <span class="o">=</span> <span class="n">abspath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="sa">r</span><span class="s2">&quot;..\..&quot;</span><span class="p">))</span>
+<span class="k">if</span> <span class="n">HPC_FOLDER</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">HPC_FOLDER</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">hpc</span> <span class="kn">import</span> <span class="n">HpcSched</span>
+<span class="kn">from</span> <span class="nn">hpc.rdb.env_data</span> <span class="kn">import</span> <span class="n">EnvData</span>
+<span class="kn">from</span> <span class="nn">hpc.core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span><span class="p">,</span> <span class="n">tointlist</span>
+<span class="kn">from</span> <span class="nn">hpc.core.tds</span> <span class="kn">import</span> <span class="n">resolve_alias</span><span class="p">,</span> <span class="n">server_path</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">,</span> <span class="n">DEV_HEAD</span><span class="p">,</span> <span class="n">DEV_DB_CONN</span>
+<span class="kn">from</span> <span class="nn">hpc.core.robocopy</span> <span class="kn">import</span> <span class="n">Robocopy</span>
+
+<span class="c1"># - Defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">SIM_JOBS</span> <span class="o">=</span> <span class="n">abspath</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="sa">r</span><span class="s2">&quot;..\..\simjobs.json&quot;</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="job_clone_sim_quality"><a class="viewcode-back" href="../../../hpc.cmd.html#hpc.cmd.job_sim_quality.job_clone_sim_quality">[docs]</a><span class="k">def</span> <span class="nf">job_clone_sim_quality</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0914,R0915,R1260</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    clone job from production to test cluster and simulate in test cluster to check quality of job</span>
+
+<span class="sd">    :param dict kwargs: production headnode, test headnode, top finished jobs and project</span>
+<span class="sd">    :return: success state</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">headnode</span> <span class="o">=</span> <span class="n">resolve_alias</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;pheadnode&#39;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">))</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">server_path</span><span class="p">(</span><span class="n">headnode</span><span class="p">)</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">_*&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;jobid&#39;</span><span class="p">]</span>
+    <span class="n">o_folder</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">listdir</span><span class="p">(</span><span class="n">base</span><span class="p">)</span> <span class="k">if</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">match</span><span class="p">)),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">o_folder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="c1"># connect</span>
+    <span class="k">with</span> <span class="n">HpcSched</span><span class="p">(</span><span class="n">headnode</span><span class="p">)</span> <span class="k">as</span> <span class="n">sched</span><span class="p">:</span>
+        <span class="c1"># find failed task names</span>
+        <span class="n">ecodes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exitcodes&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">codes2check</span> <span class="o">=</span> <span class="n">tointlist</span><span class="p">(</span><span class="n">ecodes</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ecodes</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">ecodes</span>
+        <span class="n">hpcjob</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">OpenJob</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;jobid&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">codes2check</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">codes2check</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">hpcjob</span><span class="o">.</span><span class="n">ValidExitCodes</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span>
+            <span class="n">failed</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="n">i</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">codes2check</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">codes2check</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">failed</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">codes2check</span>
+
+        <span class="n">failed_tasks</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="o">.</span><span class="n">Name</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">hpcjob</span><span class="o">.</span><span class="n">GetTaskList</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">IsParametric</span> <span class="ow">and</span> <span class="n">failed</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">ExitCode</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">failed_tasks</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># no failed task at all</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="c1"># create new job and copy all sources</span>
+    <span class="n">test_headnode</span> <span class="o">=</span> <span class="n">resolve_alias</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;theadnode&#39;</span><span class="p">,</span> <span class="n">DEV_HEAD</span><span class="p">))</span>
+    <span class="n">test_base</span> <span class="o">=</span> <span class="n">server_path</span><span class="p">(</span><span class="n">test_headnode</span><span class="p">)</span>
+    <span class="n">sched</span> <span class="o">=</span> <span class="n">HpcSched</span><span class="p">(</span><span class="n">test_headnode</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Connect to test cluster: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">test_headnode</span><span class="p">)</span>
+    <span class="n">env_data</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;headnode&quot;</span><span class="p">:</span> <span class="n">test_headnode</span><span class="p">,</span> <span class="s2">&quot;submitstart&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()}</span>
+    <span class="n">n_job</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">CreateJob</span><span class="p">()</span>
+    <span class="n">sched</span><span class="o">.</span><span class="n">AddJob</span><span class="p">(</span><span class="n">n_job</span><span class="p">)</span>
+    <span class="n">n_folder</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">_</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">n_job</span><span class="o">.</span><span class="n">Id</span><span class="p">,</span> <span class="n">o_folder</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Clone job </span><span class="si">%d</span><span class="s2"> on test cluster&quot;</span> <span class="o">%</span> <span class="n">n_job</span><span class="o">.</span><span class="n">Id</span><span class="p">)</span>
+    <span class="n">env_data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;jobid&quot;</span><span class="p">:</span> <span class="n">n_job</span><span class="o">.</span><span class="n">Id</span><span class="p">})</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cloning...&quot;</span><span class="p">)</span>
+    <span class="n">Robocopy</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">o_folder</span><span class="p">),</span> <span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Job </span><span class="si">%s</span><span class="s2"> cloned successfully on test cluster&quot;</span> <span class="o">%</span> <span class="n">n_folder</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">o_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">ojenv</span><span class="p">:</span>
+        <span class="n">o_jenv</span> <span class="o">=</span> <span class="n">load</span><span class="p">(</span><span class="n">ojenv</span><span class="p">)</span>
+    <span class="n">env_data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;tasks&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;1&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;0&#39;</span><span class="p">,</span> <span class="s1">&#39;0&#39;</span><span class="p">]}})</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">njenv</span><span class="p">:</span>
+        <span class="n">n_jenv</span> <span class="o">=</span> <span class="n">loads</span><span class="p">(</span><span class="n">njenv</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+    <span class="c1"># n_jenv = loads(join(base, n_folder, &quot;1_Input&quot;, o_folder + &quot;.env&quot;))</span>
+    <span class="n">n_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;jobid&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">n_job</span><span class="o">.</span><span class="n">Id</span>
+    <span class="n">n_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">o_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+    <span class="n">n_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;head&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">test_headnode</span>
+    <span class="n">n_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;errorlevel&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">o_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;errorlevel&#39;</span><span class="p">]</span>
+    <span class="n">n_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;skipon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">o_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;skipon&#39;</span><span class="p">]</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">dumps</span><span class="p">(</span><span class="n">n_jenv</span><span class="p">))</span>
+
+    <span class="c1"># open hpc file and reduce it</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;job.xml&quot;</span><span class="p">))</span>
+    <span class="n">o_root</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+    <span class="n">env_data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;project&#39;</span><span class="p">:</span> <span class="n">o_root</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;Project&#39;</span><span class="p">],</span> <span class="s1">&#39;template&#39;</span><span class="p">:</span> <span class="n">o_root</span><span class="o">.</span><span class="n">attrib</span><span class="p">[</span><span class="s1">&#39;JobTemplate&#39;</span><span class="p">],</span>
+                     <span class="s1">&#39;jname&#39;</span><span class="p">:</span> <span class="n">o_jenv</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]})</span>
+
+    <span class="c1"># from copy import deepcopy</span>
+    <span class="n">n_root</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">getroot</span><span class="p">()</span>
+    <span class="n">tlist</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">GetJobTemplateList</span><span class="p">()</span>
+    <span class="n">templates</span> <span class="o">=</span> <span class="p">[</span><span class="n">tlist</span><span class="o">.</span><span class="n">Item</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">tlist</span><span class="o">.</span><span class="n">Count</span><span class="p">)]</span>
+    <span class="n">temp2set</span> <span class="o">=</span> <span class="s2">&quot;Short_Test&quot;</span> <span class="k">if</span> <span class="n">headnode</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="n">DEV_HEAD</span><span class="p">]</span> <span class="k">else</span> <span class="s2">&quot;Analysis_Test&quot;</span>
+    <span class="k">if</span> <span class="n">temp2set</span> <span class="ow">in</span> <span class="n">templates</span><span class="p">:</span>
+        <span class="n">n_root</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;JobTemplate&quot;</span><span class="p">,</span> <span class="n">temp2set</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">n_root</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;JobTemplate&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">variable</span> <span class="ow">in</span> <span class="n">n_root</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;EnvironmentVariables/Variable&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">variable</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;Name&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span> <span class="o">==</span> <span class="s1">&#39;JOB_NET_PATH&#39;</span><span class="p">:</span>
+            <span class="n">variable</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;Value&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">o_root</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">tag</span> <span class="o">!=</span> <span class="s2">&quot;Tasks&quot;</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">removals</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">task</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">task</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Name&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">failed_tasks</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="n">task</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Type&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;NodePrep&quot;</span><span class="p">,</span> <span class="s2">&quot;NodeRelease&quot;</span><span class="p">]:</span>
+                <span class="n">task</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;CommandLine&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CommandLine&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">o_folder</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">))</span>
+                <span class="n">task</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;WorkDirectory&quot;</span><span class="p">,</span> <span class="n">task</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;WorkDirectory&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">o_folder</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">removals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">removals</span><span class="p">:</span>
+            <span class="n">n_root</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">break</span>
+
+    <span class="n">n_name</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">test_base</span><span class="p">,</span> <span class="n">n_folder</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;job.xml&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">n_name</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fpo</span><span class="p">:</span>
+        <span class="n">fpo</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">parseString</span><span class="p">(</span><span class="n">tostring</span><span class="p">(</span><span class="n">n_root</span><span class="p">,</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">toprettyxml</span><span class="p">(</span><span class="n">indent</span><span class="o">=</span><span class="s1">&#39;   &#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))</span>
+
+    <span class="c1"># finalize job</span>
+    <span class="n">env_data</span><span class="p">[</span><span class="s2">&quot;submitstop&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">EnvData</span><span class="p">(</span><span class="n">DEV_DB_CONN</span><span class="p">)</span> <span class="k">as</span> <span class="n">env</span><span class="p">:</span>
+        <span class="n">env</span><span class="o">.</span><span class="n">insert_job</span><span class="p">(</span><span class="o">**</span><span class="n">env_data</span><span class="p">)</span>
+    <span class="n">n_job</span><span class="o">.</span><span class="n">RestoreFromXml</span><span class="p">(</span><span class="n">n_name</span><span class="p">)</span>
+    <span class="n">n_job</span><span class="o">.</span><span class="n">Commit</span><span class="p">()</span>
+    <span class="n">sched</span><span class="o">.</span><span class="n">SubmitJobById</span><span class="p">(</span><span class="n">n_job</span><span class="o">.</span><span class="n">Id</span><span class="p">,</span> <span class="n">GetUserNameEx</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+    <span class="n">sched</span><span class="o">.</span><span class="n">Close</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">n_job</span><span class="o">.</span><span class="n">Id</span></div>
+
+
+<div class="viewcode-block" id="parse_job_args"><a class="viewcode-back" href="../../../hpc.cmd.html#hpc.cmd.job_sim_quality.parse_job_args">[docs]</a><span class="k">def</span> <span class="nf">parse_job_args</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>  <span class="c1"># pragma: nocover</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    parse job argument to simulate on test cluster</span>
+
+<span class="sd">    :param list args: production head node, test head node, no of finished jobs and project</span>
+<span class="sd">    :return: success code</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">opts</span> <span class="o">=</span> <span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="vm">__doc__</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-p&quot;</span><span class="p">,</span> <span class="s2">&quot;--pheadnode&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_HEAD_NODE</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;production cluster&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-t&quot;</span><span class="p">,</span> <span class="s2">&quot;--theadnode&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DEV_HEAD</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;test cluster&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-pt&#39;</span><span class="p">,</span> <span class="s2">&quot;--ptop&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;top finished jobs&quot;</span><span class="p">)</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-pr&#39;</span><span class="p">,</span> <span class="s2">&quot;--project&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;ALL&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;project&#39;</span><span class="p">)</span>
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">DefDict</span><span class="p">())</span>
+    <span class="n">map_jobids</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">HpcSched</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="s2">&quot;pheadnode&quot;</span><span class="p">])</span> <span class="k">as</span> <span class="n">sched</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Connect to scheduler: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">args</span><span class="p">[</span><span class="s1">&#39;pheadnode&#39;</span><span class="p">])</span>
+            <span class="n">fltr</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">CreateFilterCollection</span><span class="p">()</span>
+            <span class="n">fltr</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="n">sched</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">FilterOperator_Equal</span><span class="p">,</span> <span class="n">sched</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">PropId_Job_State</span><span class="p">,</span> <span class="n">sched</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">JobState_Finished</span><span class="p">)</span>
+            <span class="n">fltr</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="n">sched</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">FilterOperator_Equal</span><span class="p">,</span> <span class="n">sched</span><span class="o">.</span><span class="n">const</span><span class="o">.</span><span class="n">PropId_Job_Project</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="s1">&#39;project&#39;</span><span class="p">])</span>
+            <span class="n">jobids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">id</span> <span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="n">sched</span><span class="o">.</span><span class="n">GetJobIdList</span><span class="p">(</span><span class="n">fltr</span><span class="p">,</span> <span class="kc">None</span><span class="p">)]</span>  <span class="c1"># pylint: disable=R1721</span>
+
+        <span class="k">for</span> <span class="n">jobid</span> <span class="ow">in</span> <span class="n">jobids</span><span class="p">[:</span><span class="n">args</span><span class="p">[</span><span class="s1">&#39;ptop&#39;</span><span class="p">]]:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Finished job </span><span class="si">%d</span><span class="s2"> from scheduler&quot;</span> <span class="o">%</span> <span class="n">jobid</span><span class="p">)</span>
+            <span class="n">args</span><span class="p">[</span><span class="s1">&#39;jobid&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jobid</span>
+            <span class="n">tc_jobid</span> <span class="o">=</span> <span class="n">job_clone_sim_quality</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span>
+            <span class="n">map_jobids</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">jobid</span><span class="p">,</span> <span class="n">tc_jobid</span><span class="p">))</span>
+            <span class="n">dict_jobids</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;jobids&#39;</span><span class="p">:</span> <span class="n">map_jobids</span><span class="p">}</span>
+            <span class="n">json_obj</span> <span class="o">=</span> <span class="n">dumps</span><span class="p">(</span><span class="n">dict_jobids</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">SIM_JOBS</span><span class="p">,</span> <span class="s1">&#39;w+&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_obj</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Map production and test cluster job ids&quot;</span><span class="p">,</span> <span class="n">map_jobids</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;user interrupt!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+<span class="c1"># - main main ----------------------------------------------------------------------------------------------------------</span>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">parse_job_args</span><span class="p">(</span><span class="kc">None</span> <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">else</span> <span class="p">[</span><span class="s1">&#39;-h&#39;</span><span class="p">]))</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

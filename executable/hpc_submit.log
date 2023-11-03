@@ -1,0 +1,29 @@
+2023-02-09 09:29:21,358 [ERROR] __main__: Configuration file 'V:\Chang-an-Carmaker\MTS\05_Testing\06_Test_Tools\mts_measurement\cfg\00_Projects\MFC5J3\JOINT\jointsim_eba.cfg' could not be found.
+2023-02-15 02:28:49,767 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-15 02:33:34,803 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-15 02:41:20,984 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-15 09:03:18,364 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-15 09:03:18,365 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-15 09:24:25,342 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-15 09:29:14,250 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-15 09:35:48,622 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-15 09:35:48,625 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-16 02:08:28,714 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-16 02:08:28,720 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:26:36,720 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:26:36,723 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:26:36,737 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:26:36,737 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:26:36,750 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:26:36,750 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:26:36,762 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:26:36,765 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:34:27,148 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:34:27,148 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:34:27,161 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:34:27,161 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:34:27,176 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:34:27,176 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-02-17 05:34:27,187 [ERROR] __main__: Project of running ECU SIL is not properly defined
+2023-02-17 05:34:27,190 [ERROR] __main__: SW CP of running ECU SIL is not properly defined
+2023-07-04 06:21:42,385 [ERROR] __main__: Configuration file 'V:\SW_ARS513LM14_70.01.02\MTS\mts_measurement\cfg\00_Projects\ARS513LM14\JOINT\jointsim_rsp.cfg' could not be found.

@@ -1,0 +1,249 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.bpl.bpl_db</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.bpl.bpl_db</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">bpl_db.py</span>
+<span class="sd">---------</span>
+
+<span class="sd">class for collection (BatchPlayList) handling</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - Python imports -----------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">sep</span><span class="p">,</span> <span class="n">environ</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">split</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.bpl_ex</span> <span class="kn">import</span> <span class="n">BplException</span>
+<span class="kn">from</span> <span class="nn">.bpl_cls</span> <span class="kn">import</span> <span class="n">BplReaderIfc</span><span class="p">,</span> <span class="n">BplListEntry</span><span class="p">,</span> <span class="n">Section</span>
+<span class="kn">from</span> <span class="nn">..rdb.catalog</span> <span class="kn">import</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">CollManager</span><span class="p">,</span> <span class="n">CollException</span><span class="p">,</span> <span class="n">ERR_NO_REC</span>
+<span class="kn">from</span> <span class="nn">..rdb.base</span> <span class="kn">import</span> <span class="n">crc</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">replace_server_path</span><span class="p">,</span> <span class="n">LOCATION</span><span class="p">,</span> <span class="n">DEV_LOC</span><span class="p">,</span> <span class="n">LND_LOC</span>
+<span class="kn">from</span> <span class="nn">..core.path</span> <span class="kn">import</span> <span class="n">splitdrive</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="BPLDb"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_db.BPLDb">[docs]</a><span class="k">class</span> <span class="nc">BPLDb</span><span class="p">(</span><span class="n">BplReaderIfc</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specialized BPL Class which handles only reading of a collection.</span>
+<span class="sd">    This class is not a customer Interface, it should only be used internal of hpc.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="BPLDb.__init__"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_db.BPLDb.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init collection, as it can and will be recursive, we call ourself again and again and again</span>
+
+<span class="sd">        :param tuple args: args for the interface</span>
+<span class="sd">        :param dict kwargs: kwargs, db, recur are taken out immediately, others are passed through</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">BplReaderIfc</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="s2">&quot;VGA_PWR&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uname</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_recur</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;recur&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_meass</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># if self._mode == &quot;w&quot;:  # a parent is mandatory!!!</span>
+        <span class="c1">#     with Collection(self._db, mode=CollManager.READ, **self._xargs) as coll:</span>
+        <span class="c1">#         coll.dbase.sql(&quot;DELETE FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP WHERE COLLID = :cid&quot;, cid=coll.id)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="p">[</span><span class="s2">&quot;parent&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">[</span><span class="s2">&quot;parent&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;parent&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_local</span> <span class="o">=</span> <span class="s2">&quot;PRIMARY_LOCATION&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">environ</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span> <span class="o">=</span> <span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;,|;&#39;</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;loc&quot;</span><span class="p">,</span> <span class="n">LOCATION</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">DEV_LOC</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="p">:</span>
+            <span class="c1"># Dev server is located in LND, to get the correct files we set this here</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">DEV_LOC</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">LND_LOC</span><span class="p">)</span>
+        <span class="c1"># set mainfiles to use only original rec files and no copies from other sites at the current location</span>
+        <span class="c1"># used for submit_ww created jobs on Jenkins submits</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mainfiles</span> <span class="o">=</span> <span class="s2">&quot;MASTERID&quot;</span> <span class="ow">in</span> <span class="n">environ</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ign</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">locs</span> <span class="o">=</span> <span class="p">[</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;PRIMARY_LOCATION&quot;</span><span class="p">],</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SECONDARY_LOCATION&quot;</span><span class="p">],</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TERTIARY_LOCATION&quot;</span><span class="p">]]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">locs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;none&quot;</span><span class="p">]:</span>
+                    <span class="k">break</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_ign</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_written</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="BPLDb.read"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_db.BPLDb.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Read the whole content of the Batch Play List into internal storage,</span>
+<span class="sd">        and return all entries as a list.</span>
+
+<span class="sd">        :return:        List of Recording Objects</span>
+<span class="sd">        :rtype:         BplList</span>
+<span class="sd">        :raises BplException: once a recording is not available for location</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="p">[:]</span>
+
+        <span class="k">def</span> <span class="nf">_flatten</span><span class="p">(</span><span class="n">rec</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;recurse _flatten a rec&quot;&quot;&quot;</span>
+            <span class="k">yield</span> <span class="n">rec</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rec</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">i</span>
+
+        <span class="k">def</span> <span class="nf">_add2self</span><span class="p">(</span><span class="n">rec</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;add rec to self&quot;&quot;&quot;</span>
+            <span class="n">ble</span> <span class="o">=</span> <span class="n">BplListEntry</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">beg</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">relts</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">beg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">end</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">ble</span><span class="o">.</span><span class="n">sectionlist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Section</span><span class="p">(</span><span class="n">beg</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,)))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ble</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ble</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_meass</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ble</span><span class="o">.</span><span class="n">sectionlist</span><span class="p">:</span>  <span class="c1"># pylint: disable=E1133</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_meass</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">start_ts</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">end_ts</span><span class="p">,))</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">Collection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">READ</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="p">)</span> <span class="k">as</span> <span class="n">coll</span><span class="p">:</span>
+                <span class="k">def</span> <span class="nf">_recur</span><span class="p">(</span><span class="n">icoll</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912</span>
+                    <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">icoll</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recur</span><span class="p">:</span>
+                                <span class="n">cnt</span> <span class="o">+=</span> <span class="n">_recur</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                        <span class="k">elif</span> <span class="n">i</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recur</span><span class="p">:</span>
+                                <span class="n">cnt</span> <span class="o">+=</span> <span class="n">_recur</span><span class="p">(</span><span class="n">Collection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">i</span><span class="o">.</span><span class="n">label</span><span class="p">))</span>
+                        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mainfiles</span><span class="p">:</span>
+                            <span class="c1"># use only original rec files and no copies from other sites</span>
+                            <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">location</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="p">:</span>
+                                <span class="n">_add2self</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                                <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">frf</span> <span class="ow">in</span> <span class="n">_flatten</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                                <span class="k">if</span> <span class="n">frf</span><span class="o">.</span><span class="n">location</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="p">:</span>
+                                    <span class="n">_add2self</span><span class="p">(</span><span class="n">frf</span><span class="p">)</span>
+                                    <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                                    <span class="k">break</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ignore_missing&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+                                    <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_REC</span><span class="p">,</span> <span class="s2">&quot;child of </span><span class="si">{}</span><span class="s2"> @ </span><span class="si">{}</span><span class="s2"> missing!&quot;</span>
+                                                        <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="p">)))</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">rec</span> <span class="o">=</span> <span class="kc">None</span>
+                            <span class="k">for</span> <span class="n">frf</span> <span class="ow">in</span> <span class="n">_flatten</span><span class="p">(</span><span class="n">i</span><span class="p">):</span>
+                                <span class="k">if</span> <span class="n">frf</span><span class="o">.</span><span class="n">location</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ign</span><span class="p">:</span>
+                                    <span class="n">rec</span> <span class="o">=</span> <span class="kc">None</span>
+                                    <span class="k">break</span>
+                                <span class="k">if</span> <span class="n">frf</span><span class="o">.</span><span class="n">location</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locs</span><span class="p">:</span>
+                                    <span class="n">rec</span> <span class="o">=</span> <span class="n">frf</span>
+                            <span class="k">if</span> <span class="n">rec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="n">_add2self</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span>
+                                <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">return</span> <span class="n">cnt</span>
+
+                <span class="n">_recur</span><span class="p">(</span><span class="n">coll</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CollException</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BplException</span><span class="p">(</span><span class="n">ex</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+<div class="viewcode-block" id="BPLDb.write"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.bpl.bpl_db.BPLDb.write">[docs]</a>    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;to write to a collection is not supported!&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_written</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">with</span> <span class="n">Collection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_xargs</span><span class="p">)</span> <span class="k">as</span> <span class="n">coll</span><span class="p">:</span>
+                <span class="n">usr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">uname</span> <span class="o">=</span> <span class="n">coll</span><span class="o">.</span><span class="n">user</span>
+                <span class="n">meass</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>  <span class="c1"># read in details of each recording</span>
+                    <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)</span> <span class="ow">in</span> <span class="n">meass</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">parts</span> <span class="o">=</span> <span class="n">splitdrive</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">))</span>
+                    <span class="n">srv</span><span class="p">,</span> <span class="n">base</span> <span class="o">=</span> <span class="n">replace_server_path</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                    <span class="n">meas</span> <span class="o">=</span> <span class="n">coll</span><span class="o">.</span><span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT MEASID, BEGINABSTS, PARENT &quot;</span>  <span class="c1"># pylint: disable=E1102</span>
+                                      <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_DMT_FILES &quot;</span>
+                                      <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_LOCATION l USING(LOCATION) &quot;</span>
+                                      <span class="s2">&quot;WHERE CRC_NAME = :crc AND l.SERVERSHARE = :loc AND BASEPATH = :bph&quot;</span><span class="p">,</span>
+                                      <span class="n">crc</span><span class="o">=</span><span class="n">crc</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">srv</span><span class="p">,</span> <span class="n">base</span><span class="p">)),</span> <span class="n">loc</span><span class="o">=</span><span class="n">srv</span><span class="p">,</span> <span class="n">bph</span><span class="o">=</span><span class="n">base</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">meas</span><span class="p">:</span>
+                        <span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)]</span> <span class="o">=</span> <span class="p">[</span><span class="n">meas</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="n">meas</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="k">else</span> <span class="n">meas</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">meas</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]]</span>
+
+                <span class="k">for</span> <span class="n">rec</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">sectionlist</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">0</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meass</span><span class="p">:</span>
+                            <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">coll</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">0</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">usr</span><span class="p">,))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">sec</span> <span class="ow">in</span> <span class="n">rec</span><span class="o">.</span><span class="n">sectionlist</span><span class="p">:</span>
+                            <span class="n">beg</span> <span class="o">=</span> <span class="n">sec</span><span class="o">.</span><span class="n">start_ts</span> <span class="k">if</span> <span class="n">sec</span><span class="o">.</span><span class="n">rel</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="p">(</span><span class="n">sec</span><span class="o">.</span><span class="n">start_ts</span> <span class="o">-</span> <span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">1</span><span class="p">])</span>
+                            <span class="n">end</span> <span class="o">=</span> <span class="n">sec</span><span class="o">.</span><span class="n">end_ts</span> <span class="k">if</span> <span class="n">sec</span><span class="o">.</span><span class="n">rel</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="p">(</span><span class="n">sec</span><span class="o">.</span><span class="n">end_ts</span> <span class="o">-</span> <span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">1</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">0</span><span class="p">],</span> <span class="n">beg</span><span class="p">,</span> <span class="n">end</span><span class="p">,)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_meass</span><span class="p">:</span>
+                                <span class="n">values</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">coll</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">meass</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="p">)][</span><span class="mi">0</span><span class="p">],</span> <span class="n">beg</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">usr</span><span class="p">,))</span>
+
+                <span class="k">if</span> <span class="n">values</span><span class="p">:</span>
+                    <span class="n">coll</span><span class="o">.</span><span class="n">dbase</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span><span class="s2">&quot;INSERT INTO VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP (COLLID, MEASID, BEGINRELTS, &quot;</span>
+                                   <span class="s2">&quot;ENDRELTS, USERID) VALUES (:cid, :mid, :beg, :end, :usr)&quot;</span><span class="p">,</span> <span class="n">insertmany</span><span class="o">=</span><span class="n">values</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_written</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+        <span class="k">except</span> <span class="n">CollException</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">BplException</span><span class="p">(</span><span class="n">ex</span><span class="o">.</span><span class="n">message</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

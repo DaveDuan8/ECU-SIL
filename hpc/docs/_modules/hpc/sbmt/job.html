@@ -1,0 +1,878 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sbmt.job</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sbmt.job</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">job.py</span>
+<span class="sd">------</span>
+
+<span class="sd">job module for HPC.</span>
+
+<span class="sd">**User-API Interfaces**</span>
+
+<span class="sd">    - `Job` (complete package)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+<span class="c1"># pylint: disable=E1101</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">environ</span><span class="p">,</span> <span class="n">makedirs</span><span class="p">,</span> <span class="n">linesep</span><span class="p">,</span> <span class="n">name</span> <span class="k">as</span> <span class="n">osname</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">splitext</span><span class="p">,</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">basename</span><span class="p">,</span> <span class="n">abspath</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostname</span>
+<span class="kn">from</span> <span class="nn">platform</span> <span class="kn">import</span> <span class="n">architecture</span><span class="p">,</span> <span class="n">python_version_tuple</span>
+<span class="kn">from</span> <span class="nn">zlib</span> <span class="kn">import</span> <span class="n">decompress</span> <span class="k">as</span> <span class="n">zdeco</span>
+<span class="kn">from</span> <span class="nn">traceback</span> <span class="kn">import</span> <span class="n">extract_stack</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">search</span>
+<span class="kn">from</span> <span class="nn">json</span> <span class="kn">import</span> <span class="n">dump</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span><span class="p">,</span> <span class="n">iteritems</span>
+
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">StringIO</span> <span class="kn">import</span> <span class="n">StringIO</span>  <span class="c1"># pylint: disable=E0401</span>
+    <span class="ne">PermissionError</span> <span class="o">=</span> <span class="ne">IOError</span>  <span class="c1"># pylint: disable=W0622</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">dill</span> <span class="kn">import</span> <span class="n">loads</span> <span class="k">as</span> <span class="n">dloads</span>
+    <span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">StringIO</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..version</span> <span class="kn">import</span> <span class="n">VERSION</span>
+<span class="kn">from</span> <span class="nn">..sched.sched_defs</span> <span class="kn">import</span> <span class="n">SHORT_TEST_RUNTIME</span><span class="p">,</span> <span class="n">STD_SWEEP_RUNTIME</span><span class="p">,</span> <span class="n">MAX_SWEEP_RUNTIME</span>
+<span class="kn">from</span> <span class="nn">..sched.scheduler</span> <span class="kn">import</span> <span class="n">Scheduler</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">UID_NAME</span><span class="p">,</span> <span class="n">LOGINNAME</span><span class="p">,</span> <span class="n">proc_vals</span> <span class="k">as</span> <span class="n">pvs</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">VALID_PYVER</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">,</span> <span class="n">LIN_EXE</span><span class="p">,</span> <span class="n">HPC_SHARES</span><span class="p">,</span> <span class="n">MAX_TASKS</span><span class="p">,</span> <span class="n">DEVS</span><span class="p">,</span> <span class="n">DEV_HEAD</span><span class="p">,</span>\
+    <span class="n">PY_2_EXE</span><span class="p">,</span> <span class="n">SHORT_VER</span><span class="p">,</span> <span class="n">validate_project</span>
+<span class="kn">from</span> <span class="nn">..core.hpc_defs</span> <span class="kn">import</span> <span class="n">JobPriority</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="p">,</span> <span class="n">TaskType</span>
+<span class="kn">from</span> <span class="nn">..core.convert</span> <span class="kn">import</span> <span class="n">arg_trans</span>
+<span class="kn">from</span> <span class="nn">..core.logger</span> <span class="kn">import</span> <span class="n">get_logger</span><span class="p">,</span> <span class="n">deprecated</span><span class="p">,</span> <span class="n">suppress_warnings</span><span class="p">,</span> <span class="n">HpcPassword</span>
+<span class="kn">from</span> <span class="nn">..core.robocopy</span> <span class="kn">import</span> <span class="n">Robocopy</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span><span class="p">,</span> <span class="n">ERR_OK</span><span class="p">,</span> <span class="n">UNFAILING_EXITCODES</span><span class="p">,</span> <span class="n">SKIP_EXITCODES</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">JobDict</span><span class="p">,</span> <span class="n">BSIG_CHK</span>
+<span class="kn">from</span> <span class="nn">..core.path</span> <span class="kn">import</span> <span class="n">win2linux</span><span class="p">,</span> <span class="n">linux2win</span>
+<span class="kn">from</span> <span class="nn">..rdb.sqlite_defs</span> <span class="kn">import</span> <span class="n">create_sqlite</span>
+<span class="kn">from</span> <span class="nn">..rdb.base</span> <span class="kn">import</span> <span class="n">BaseDB</span>
+<span class="kn">from</span> <span class="nn">..rdb.env_data</span> <span class="kn">import</span> <span class="n">EnvData</span>
+<span class="kn">from</span> <span class="nn">.task</span> <span class="kn">import</span> <span class="n">Task</span>
+
+<span class="kn">from</span> <span class="nn">.task_factory</span> <span class="kn">import</span> <span class="n">TaskFactory</span>
+<span class="kn">from</span> <span class="nn">.task_factory_mts</span> <span class="kn">import</span> <span class="n">TaskFactoryMTS</span>
+<span class="kn">from</span> <span class="nn">.subtask_factory</span> <span class="kn">import</span> <span class="n">SubTaskFactory</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="Job"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job">[docs]</a><span class="k">class</span> <span class="nc">Job</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902,R0904</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    **main Interface of HPC.**</span>
+
+<span class="sd">    - You can use this class to submit jobs onto the ADAS HPC Cluster.</span>
+<span class="sd">    - For minimum functionality you need at least the `hpc` and :class:`hpc.TaskFactory`.</span>
+<span class="sd">    - To simulate a whole submit and execute a testrun, you can use instead of</span>
+<span class="sd">      the Hpc the `HpcSim` class.</span>
+
+<span class="sd">    **1. Example:**::</span>
+
+<span class="sd">        # Import hpc</span>
+<span class="sd">        import hpc</span>
+
+<span class="sd">        #Connect to the HPC Server</span>
+<span class="sd">        with hpc.Job(name=&#39;Trainging_Ping&#39;, project=&#39;MFC310&#39;) as job:</span>
+<span class="sd">            factory = hpc.TaskFactory(job)</span>
+<span class="sd">            factory.create_task(&#39;ping 127.0.0.1&#39;)</span>
+
+<span class="sd">    **2. Example**::</span>
+
+<span class="sd">        # Import hpc</span>
+<span class="sd">        import hpc</span>
+
+<span class="sd">        # calls the init and start job creation</span>
+<span class="sd">        with hpc.Job(name=&quot;my first job&quot;, project=&quot;Short_Test&quot;) as job:</span>
+<span class="sd">            # create a factory from myJob to be able to create your tasks</span>
+<span class="sd">            fact = hpc.TaskFactory(job)</span>
+<span class="sd">            # now create the task(s) finally</span>
+<span class="sd">            fact.create_task(&#39;ping 127.0.0.1&#39;)</span>
+<span class="sd">        # when *with* exits, job is going to get submitted automagically.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">__opt_args__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;robo_retry&quot;</span><span class="p">,</span> <span class="s2">&quot;robo_wait&quot;</span><span class="p">,</span> <span class="s2">&quot;eoe&quot;</span><span class="p">,</span> <span class="s2">&quot;task_out&quot;</span><span class="p">,</span> <span class="s2">&quot;wdog_init&quot;</span><span class="p">,</span> <span class="s2">&quot;wdog_loop&quot;</span><span class="p">,</span> <span class="s2">&quot;wdog_prns&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;mem_max&quot;</span><span class="p">,</span> <span class="s2">&quot;virt_max&quot;</span><span class="p">,</span> <span class="s2">&quot;ignore_codes&quot;</span><span class="p">,</span> <span class="s2">&quot;mtscheck&quot;</span><span class="p">,</span> <span class="s2">&quot;procdump&quot;</span><span class="p">,</span> <span class="s2">&quot;bsig_ext&quot;</span><span class="p">]</span>
+
+    <span class="n">__xml_slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;is_exclusive&quot;</span><span class="p">,</span> <span class="s2">&quot;run_until_canceled&quot;</span><span class="p">,</span> <span class="s2">&quot;notify_on_completion&quot;</span><span class="p">,</span> <span class="s2">&quot;notify_on_start&quot;</span><span class="p">,</span>
+                     <span class="s2">&quot;fail_on_task&quot;</span><span class="p">,</span> <span class="s2">&quot;auto_calculate_max&quot;</span><span class="p">,</span> <span class="s2">&quot;auto_calculate_min&quot;</span><span class="p">,</span> <span class="s2">&quot;requested_nodes&quot;</span><span class="p">,</span>
+                     <span class="s2">&quot;min_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;min_sockets&quot;</span><span class="p">,</span> <span class="s2">&quot;min_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;max_node_cores&quot;</span><span class="p">,</span>
+                     <span class="s2">&quot;max_sockets&quot;</span><span class="p">,</span> <span class="s2">&quot;max_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;unit&quot;</span><span class="p">,</span> <span class="s2">&quot;project&quot;</span><span class="p">,</span> <span class="s2">&quot;template&quot;</span><span class="p">,</span> <span class="s2">&quot;priority&quot;</span><span class="p">,</span>
+                     <span class="s2">&quot;hold_until&quot;</span><span class="p">,</span> <span class="s2">&quot;depends&quot;</span><span class="p">,</span> <span class="s2">&quot;parent_jobs&quot;</span><span class="p">,</span> <span class="s2">&quot;TaskExecutionFailureRetryLimit&quot;</span><span class="p">]</span>
+
+    <span class="n">__deprecated__</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;set_project&quot;</span><span class="p">:</span> <span class="s2">&quot;project&quot;</span><span class="p">,</span> <span class="s2">&quot;set_priority&quot;</span><span class="p">:</span> <span class="s2">&quot;priority&quot;</span><span class="p">,</span> <span class="s2">&quot;set_job_unit&quot;</span><span class="p">:</span> <span class="s2">&quot;unit&quot;</span><span class="p">,</span>
+                      <span class="s2">&quot;set_hold_until&quot;</span><span class="p">:</span> <span class="s2">&quot;hold_until&quot;</span><span class="p">,</span> <span class="s2">&quot;set_requested_nodes&quot;</span><span class="p">:</span> <span class="s2">&quot;requested_nodes&quot;</span><span class="p">,</span>
+                      <span class="s2">&quot;set_max_core_count&quot;</span><span class="p">:</span> <span class="s2">&quot;max_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;set_max_socket_count&quot;</span><span class="p">:</span> <span class="s2">&quot;max_sockets&quot;</span><span class="p">,</span>
+                      <span class="s2">&quot;set_max_node_count&quot;</span><span class="p">:</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">,</span>
+                      <span class="s2">&quot;set_parent_job_ids&quot;</span><span class="p">:</span> <span class="s2">&quot;parent_jobs&quot;</span><span class="p">}</span>
+
+<div class="viewcode-block" id="Job.__init__"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R1260,R0912,R0915</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize HPC job</span>
+
+<span class="sd">        :param \*args: *head_node*, *name* and *project* must be given, others are optional (kwargs)</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *head_node* (``str``): head node to use, default: site local simulation cluster</span>
+<span class="sd">            * *name* (``str``): :py:meth:`name of job &lt;hpc.core.tds.validate_name&gt;`</span>
+<span class="sd">            * *project* (``str``): name of project to use</span>
+<span class="sd">            * *template* (``str``): name of template</span>
+<span class="sd">            * *priority* (``JobPriority``): initial priority, int and string values are allowed, e.g. &#39;Normal+100&#39;</span>
+<span class="sd">            * *unit* (``JobUnit``): job unit (JobUnit), can be either Node, Core or Socket</span>
+<span class="sd">            * *pyexe* (``str``): python.exe including path pointing to another interpreter job should execute on</span>
+<span class="sd">            * *notify_on_start* (``bool``): receive an email when job starts</span>
+<span class="sd">            * *notify_on_completion* (``bool``): receive an email when job completes</span>
+<span class="sd">            * *hold_time* (``datetime``): local date/time for first try to start job.</span>
+<span class="sd">            * *depends* (``list``): job ID(&#39;s) this job should depend upon</span>
+<span class="sd">            * *requested_nodes* (``list``): list of nodes this job should run</span>
+<span class="sd">            * *excluded_nodes* (``list``): list of nodes to be excluded</span>
+<span class="sd">            * *min_hd_space* (``float``): minimum HD space requirement for a node</span>
+<span class="sd">            * *env* (``dict``): dictionary containing additional environment variables</span>
+<span class="sd">            * *venv* (``list`` | ``str``): list of requirements.txt entries or requirements file name</span>
+<span class="sd">            * *venv_sys* (``bool``): use system-site-packages on venv, default: True</span>
+<span class="sd">            * *popts* (``str``): extra options to pip when using venv next to -r</span>
+<span class="sd">                (=&gt; https://pip.pypa.io/en/stable/cli/pip_install/#options)</span>
+<span class="sd">            * *xlog* (``Logger``): extra logger to use and to log to</span>
+<span class="sd">            * *mtscheck* (``bool``): check MTS errmon / crashrep log files, default: True</span>
+<span class="sd">            * *procdump* (``bool``): do a procdump on &quot;frozen&quot; MTS, default: False</span>
+<span class="sd">            * *bsig_check* (``bool``): check bsig outputs from MTS, default: True</span>
+<span class="sd">            * *bsig_ext* (``list``): bsig extensions to be used, default: [&quot;.bsig&quot;]</span>
+<span class="sd">            * *precmd* (``str``): prepare command to be executed after preparation is done</span>
+<span class="sd">            * *relcmd* (``str``): release command to be executed before release is done</span>
+<span class="sd">            * *exit_codes* (``list``): list of codes to Finish each task</span>
+<span class="sd">            * *add_exit_codes* (``list``): list of codes to append to exit_codes</span>
+<span class="sd">            * *ignore_codes* (``list``): list of codes to completely ignore</span>
+<span class="sd">            * *robo_retry* (``int``): retry count for result copy back (starter)</span>
+<span class="sd">            * *robo_wait* (``int``): wait time between those retries (starter)</span>
+<span class="sd">            * *task_out* (``bool``): copy back task&#39;s output data to task folder instead of _data folder</span>
+<span class="sd">            * *runas* (``str``): &lt;username&gt;[:&lt;password&gt;] to run the job as (password is only needed for first time)</span>
+<span class="sd">            * *eoe* (``bool``): on first failure subtask execution stops, no further processing done if set</span>
+
+<span class="sd">        :raises hpc.HpcError: on any</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hver</span> <span class="o">=</span> <span class="n">VERSION</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cancel</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">kwargs</span> <span class="o">=</span> <span class="n">arg_trans</span><span class="p">([[</span><span class="s1">&#39;head_node&#39;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">],</span> <span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;project&#39;</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">loglevel</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;loglevel&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">errorlevel</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;errorlevel&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maxtasks</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;max_tasks&#39;</span><span class="p">,</span> <span class="n">MAX_TASKS</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bpl_cnt</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_streamer</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">()</span>  <span class="c1"># TemporaryFile(prefix=&#39;hpc_&#39;)</span>
+        <span class="n">loggers</span> <span class="o">=</span> <span class="p">[[</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="kc">False</span><span class="p">],</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_streamer</span><span class="p">,</span> <span class="kc">True</span><span class="p">]]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">loglevel</span> <span class="o">&gt;=</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">[[</span><span class="bp">self</span><span class="o">.</span><span class="n">_streamer</span><span class="p">,</span> <span class="kc">True</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="s2">&quot;xlog&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">loggers</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;xlog&quot;</span><span class="p">],</span> <span class="kc">False</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="s1">&#39;PyHPC:&#39;</span><span class="p">,</span> <span class="n">loggers</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loglevel</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">VALID_PYVER</span><span class="p">:</span>
+            <span class="n">warnfo</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="p">,</span> <span class="s2">&quot;info&quot;</span> <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;BUILD_URL&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;warning&quot;</span><span class="p">)</span>
+            <span class="n">warnfo</span><span class="p">(</span><span class="s2">&quot;you&#39;re submitting from a non-supported Python version: </span><span class="si">%s</span><span class="s2">!&quot;</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+            <span class="n">warnfo</span><span class="p">(</span><span class="s2">&quot;please, use latest official: &quot;</span>
+                   <span class="s2">&quot;https://confluence.auto.continental.cloud/display/GITTE/Python+Installers&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">PY2</span> <span class="ow">and</span> <span class="n">LOGINNAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DEVS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Python 2 is dead (https://www.python.org/dev/peps/pep-0373)&quot;</span><span class="p">)</span>
+            <span class="n">memorate</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">-</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2020</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">15</span><span class="p">))</span><span class="o">.</span><span class="n">days</span> <span class="o">//</span> <span class="mi">32</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;we commemorate a bit (</span><span class="si">%d</span><span class="s2">s), giving you time to switch to Python 3 in the meanwhile....&quot;</span><span class="p">,</span>
+                              <span class="n">memorate</span><span class="p">)</span>
+            <span class="n">sleep</span><span class="p">(</span><span class="n">memorate</span><span class="p">)</span>
+
+        <span class="n">msgadd</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CCP_TASKCONTEXT&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">msgadd</span><span class="p">:</span>
+            <span class="n">msgadd</span> <span class="o">=</span> <span class="s2">&quot; from </span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CCP_CLUSTER_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;???&quot;</span><span class="p">),</span> <span class="n">msgadd</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;using HPC V </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) on host </span><span class="si">%s%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hver</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">python_version_tuple</span><span class="p">()),</span>
+                          <span class="n">architecture</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">gethostname</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">msgadd</span><span class="p">)</span>
+
+        <span class="n">head_node</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;head_node&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sim&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># check for latest version</span>
+        <span class="k">if</span> <span class="n">LOGINNAME</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">DEVS</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head_node</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;HPC_Python&quot;</span><span class="p">,</span> <span class="s2">&quot;latest&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                    <span class="n">latest</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;seems, you don&#39;t have HPC_User rights yet?!.&quot;</span><span class="p">)</span>
+                <span class="n">latest</span> <span class="o">=</span> <span class="n">VERSION</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;unknown error: </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+                <span class="n">latest</span> <span class="o">=</span> <span class="n">VERSION</span>
+            <span class="k">if</span> <span class="n">latest</span> <span class="o">!=</span> <span class="n">VERSION</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Please, upgrade HPC package, submission might fail very soon!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># check deprecations.....</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;job_name&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;do not use &#39;job_name&#39; any more, just use &#39;name&#39; instead!&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;please, specify a &#39;name&#39; for the job!!!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;template&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;please, specify a &#39;template&#39; for the job!!!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;project_name&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;do not use &#39;project_name&#39; any more, just use &#39;project&#39; instead!&quot;</span><span class="p">)</span>
+            <span class="n">project</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;project_name&#39;</span><span class="p">)[:</span><span class="mi">80</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">project</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;project&quot;</span><span class="p">][:</span><span class="mi">80</span><span class="p">]</span>
+        <span class="n">spid</span> <span class="o">=</span> <span class="n">validate_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spid</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="c1"># also activate in module_tests/test_sched/test_job.py:53</span>
+            <span class="c1"># raise HpcError(&quot;SPARCS responded with: {}, please, contact your data lifecycle manager!&quot;.format(spid))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;SPARCS responded with: </span><span class="si">%s</span><span class="s2">, please, contact your data lifecycle manager!&quot;</span><span class="p">,</span> <span class="n">spid</span><span class="p">)</span>
+            <span class="n">spid</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;SPARCS ID = </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">spid</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="s2">&quot;sockets&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span> <span class="ow">and</span> <span class="s2">&quot;mem_max&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;mem_max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pvs</span><span class="o">.</span><span class="n">MIN_MEM_FREE</span> <span class="o">*</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;sockets&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="mf">1.5</span>
+
+        <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;BUILD_URL&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;build on Jenkins </span><span class="si">%s</span><span class="s1"> by </span><span class="si">%s</span><span class="s1"> (</span><span class="si">%s</span><span class="s1">)&#39;</span><span class="p">,</span>
+                              <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;BUILD_URL&quot;</span><span class="p">),</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;BUILD_USER&quot;</span><span class="p">),</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;BUILD_USER_ID&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_popts</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;venv&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;popts&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_venv_sys</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;venv_sys&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;pyexe&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">PY_2_EXE</span> <span class="ow">or</span> <span class="n">PY2</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;pyexe&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;&#39;venv&#39; is not supported on Python 2!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span> <span class="o">=</span> <span class="n">linesep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;seems we cannot read the venv file!&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">linux</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;pyexe&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">LIN_EXE</span><span class="p">)</span>
+
+        <span class="n">defprio</span> <span class="o">=</span> <span class="n">JobPriority</span><span class="o">.</span><span class="n">Highest</span> <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;template&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;short_test&quot;</span><span class="p">,</span> <span class="s2">&quot;Admin&quot;</span><span class="p">]</span> \
+            <span class="k">else</span> <span class="n">JobPriority</span><span class="o">.</span><span class="n">Lowest</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;priority&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">JobPriority</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;priority&#39;</span><span class="p">,</span> <span class="n">defprio</span><span class="p">))</span>
+
+        <span class="n">unit</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;unit_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unit</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;please, use &#39;unit&#39; instead of &#39;unit_type&#39; in future!&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">unit</span> <span class="o">=</span> <span class="n">JobUnitType</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;unit&quot;</span><span class="p">,</span> <span class="n">JobUnitType</span><span class="o">.</span><span class="n">Socket</span><span class="p">))</span>
+
+        <span class="n">add</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;add_exit_codes&#39;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">add</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">add</span> <span class="o">=</span> <span class="p">[</span><span class="n">add</span><span class="p">]</span>
+        <span class="n">unfailing</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">ERR_OK</span><span class="p">]</span> <span class="o">+</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;exit_codes&#39;</span><span class="p">,</span> <span class="n">UNFAILING_EXITCODES</span><span class="p">)</span> <span class="o">+</span> <span class="n">add</span><span class="p">))</span>
+        <span class="k">with</span> <span class="n">HpcPassword</span><span class="p">()</span> <span class="k">as</span> <span class="n">hset</span><span class="p">:</span>
+            <span class="n">restsched</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;restsched&quot;</span><span class="p">,</span> <span class="n">osname</span> <span class="o">!=</span> <span class="s1">&#39;nt&#39;</span> <span class="ow">or</span> <span class="n">hset</span><span class="p">[</span><span class="n">UID_NAME</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bsig_ext&quot;</span><span class="p">,</span> <span class="p">[]),</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;bsig_ext option must be a list!&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span> <span class="o">=</span> <span class="n">Scheduler</span><span class="p">(</span><span class="n">head_node</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">sim</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">,</span>
+                                    <span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="p">,</span> <span class="n">linux</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">linux</span><span class="p">,</span> <span class="n">join</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="n">unit</span><span class="p">,</span>
+                                    <span class="n">version</span><span class="o">=</span><span class="n">VERSION</span><span class="p">,</span> <span class="n">priority</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;priority&quot;</span><span class="p">),</span> <span class="n">template</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;template&quot;</span><span class="p">],</span>
+                                    <span class="n">venv</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">),</span> <span class="n">exe</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pyexe&quot;</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">),</span>
+                                    <span class="n">exit_codes</span><span class="o">=</span><span class="n">unfailing</span><span class="p">,</span> <span class="n">restsched</span><span class="o">=</span><span class="n">restsched</span><span class="p">,</span> <span class="n">xargs</span><span class="o">=</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_usr_log</span> <span class="o">=</span> <span class="n">get_logger</span><span class="p">(</span><span class="s1">&#39;job </span><span class="si">{}</span><span class="s1">:&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">jobid</span><span class="p">),</span> <span class="n">loggers</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loglevel</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&#39;s job arguments: user=</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">UID_NAME</span><span class="p">,</span>
+                          <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">=</span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_info</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_portal_link</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">/job/</span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2">&quot;</span> \
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">][</span><span class="mi">5</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span> <span class="k">else</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span>
+        <span class="c1"># .format(&quot;&quot; if not self._venv else &quot;%VIRTUAL_ENV%\\Scripts\\&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">starter</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">hpc</span><span class="si">{}</span><span class="s2">starter.py&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;./&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span> <span class="k">else</span> <span class="s2">&quot;python.exe -u &quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sep</span><span class="p">)</span>
+        <span class="c1"># self.starter = (&quot;./&quot; if self.linux else &quot;python.exe -u &quot;) + self.join(&quot;hpc&quot;, &quot;starter.py&quot;)</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;starter_opts&quot;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">starter</span> <span class="o">+=</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;starter_opts&quot;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">records</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">taskmeas</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sweep</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sweep_task&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># self._scheduler.update(**kwargs)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;headnode&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="s2">&quot;jname&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">&quot;jobid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">jobid</span><span class="p">,</span>
+                          <span class="s2">&quot;tasks&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">taskmeas</span><span class="p">,</span> <span class="s2">&quot;project&quot;</span><span class="p">:</span> <span class="n">project</span><span class="p">,</span> <span class="s2">&quot;template&quot;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;template&quot;</span><span class="p">],</span> <span class="s2">&quot;spid&quot;</span><span class="p">:</span> <span class="n">spid</span><span class="p">,</span>
+                          <span class="s2">&quot;submitstart&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">(),</span> <span class="s2">&quot;records&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">records</span><span class="p">,</span> <span class="s2">&quot;logger&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_streamer</span><span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span> <span class="o">=</span> <span class="p">[[],</span> <span class="p">[]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jrelcmd</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jprecmd</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nrelcmd</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">nm</span><span class="p">,</span> <span class="n">func</span> <span class="ow">in</span> <span class="p">([</span><span class="s2">&quot;precmd&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;relcmd&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noderelcmd</span><span class="p">],):</span>
+            <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">nm</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">func</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_skipon</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;skipon&#39;</span><span class="p">,</span> <span class="n">SKIP_EXITCODES</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runas</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runas&quot;</span><span class="p">,</span> <span class="n">UID_NAME</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">changes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mts_zips</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configuring job </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="s2">&quot;green&quot;</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db_env</span> <span class="o">=</span> <span class="n">EnvData</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_db</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_hpc</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span> <span class="ow">or</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span> <span class="o">==</span> <span class="n">DEV_HEAD</span> <span class="ow">or</span>
+                                             <span class="n">LOGINNAME</span> <span class="ow">in</span> <span class="n">DEVS</span><span class="p">)</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;copy_hpc&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)))</span>
+
+        <span class="c1"># create local DB with all needed entries for tasks and subtasks</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="n">JobDict</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">jobid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">head</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span>
+                           <span class="n">unit</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">unit</span><span class="p">),</span> <span class="n">errorlevel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">errorlevel</span><span class="p">,</span> <span class="n">skipon</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_skipon</span><span class="p">,</span> <span class="n">unfailing</span><span class="o">=</span><span class="n">unfailing</span><span class="p">,</span>
+                           <span class="n">bsig_check</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">BSIG_CHK</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span> <span class="n">mail</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">mail</span><span class="p">,</span>
+                           <span class="n">wdog_log</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wdog_log&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                           <span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__opt_args__</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtaskfactory</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;self repr&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s1">&#39;&lt;</span><span class="si">{}</span><span class="s1"> head=&quot;</span><span class="si">{}</span><span class="s1">&quot;, id=&quot;</span><span class="si">{!s}</span><span class="s1">&quot;&gt;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;provide with statement support&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_enter</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">etype</span><span class="p">,</span> <span class="n">exval</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        on with cleanup, we just submit the job</span>
+
+<span class="sd">        :param `Exception` etype: if set skip the final submit during exiting Job instance</span>
+<span class="sd">        :param `str` exval: exception message to show in case of skipping the exit</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">etype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cancel</span><span class="p">(</span><span class="n">exval</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cancel</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">check_template</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">HpcError</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">cancel_job</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">)))</span>
+            <span class="k">raise</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;without a &#39;name&#39;, job is invalid!&quot;</span><span class="p">)</span>
+
+        <span class="n">env</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">environ</span><span class="p">)</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;HPC_&quot;</span><span class="p">)}</span>
+        <span class="n">net_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_job_path</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">HPC_SHARES</span><span class="p">[</span><span class="s2">&quot;win32&quot;</span><span class="p">]):</span>
+                <span class="c1"># if self.head_node == AZR_HEAD and i &lt; 8:</span>
+                <span class="c1">#     continue</span>
+                <span class="k">if</span> <span class="n">net_path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+                    <span class="n">net_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HPC_SHARES</span><span class="p">[</span><span class="s2">&quot;linux&quot;</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span>
+                                         <span class="n">basename</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">net_path</span><span class="p">)),</span> <span class="n">basename</span><span class="p">(</span><span class="n">net_path</span><span class="p">))</span>
+                    <span class="k">break</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;CLIENT_IN_PATH&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="s2">&quot;JOB_NET_PATH&quot;</span><span class="p">:</span> <span class="n">net_path</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">env</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;CLIENT_IN_PATH&quot;</span><span class="p">:</span> <span class="n">linux2win</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">),</span>
+                        <span class="s2">&quot;JOB_NET_PATH&quot;</span><span class="p">:</span> <span class="n">linux2win</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_job_path</span><span class="p">)})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;writing environment data&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">changes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span><span class="p">[</span><span class="s2">&quot;changes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">StringIO</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">changes</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">prios</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_db</span><span class="p">(</span><span class="s2">&quot;SELECT EXITCODE, PRIO, DESCR FROM HPC_EXITCODES &quot;</span>  <span class="c1"># pylint: disable=E1102</span>
+                                      <span class="s2">&quot;WHERE EXITCODE &gt;= 0&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_test_bat</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set a value, either to provided xml slot or internal variable, use on your own risk!&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__xml_slots__</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submitted</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;please, set any attribute before submission!&quot;</span><span class="p">)</span>
+
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">(</span><span class="n">Job</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        get any missing attribute</span>
+
+<span class="sd">        :param str key: name of attribute</span>
+<span class="sd">        :return: value of attribute</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__xml_slots__</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">method_missing</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">_</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__deprecated__</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;method &#39;</span><span class="si">%s</span><span class="s2">&#39; is deprecated, please use init param &#39;</span><span class="si">%s</span><span class="s2">&#39; instead!!!&quot;</span><span class="p">,</span>
+                                     <span class="n">key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__deprecated__</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+
+            <span class="k">return</span> <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__deprecated__</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">method_missing</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return int: number of tasks&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Job.join"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.join">[docs]</a>    <span class="k">def</span> <span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        join arguments</span>
+
+<span class="sd">        :param list args: join those with destination separator</span>
+<span class="sd">        :return: path join</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Job.create"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.create">[docs]</a>    <span class="nd">@deprecated</span><span class="p">(</span><span class="s2">&quot;please, use initparam &#39;name&#39; in future!&quot;</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;remove me 2011: compat: create&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">job_name</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_folder</span></div>
+
+<div class="viewcode-block" id="Job.submit"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.submit">[docs]</a>    <span class="k">def</span> <span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;be compatible to hpc_one&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enter</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;with &#39;with&#39; statements you shouldn&#39;t use submit method!&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Job.cancel"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.cancel">[docs]</a>    <span class="k">def</span> <span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;canceled on purpose&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;cancel the already submitted job&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">msg</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Exception:</span><span class="se">\n</span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">msg</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">cancel_job</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_cancel</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">jobid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return int: the id of job&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">jobid</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: name of job&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">name</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job_folder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: folder of job on hpc share&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_job_path</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">client_folder</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: folder of job on client&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">portal_link</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: portal link&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_portal_link</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">head_node</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return str: head node name&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sched</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return `Scheduler`: scheduler instance&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">base_db</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return `BaseDb`: HPC DB connection&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="o">=</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">create_sqlite</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s2">&quot;hpc.sqlite&quot;</span><span class="p">)))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span> <span class="o">=</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">][</span><span class="mi">3</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job_sim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return bool: wether it&#39;s sim or real&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">logger</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return submit logger&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_usr_log</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">precmd</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return preparation command&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@precmd</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">precmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:param str value: set preparation command&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;deprecated: prefer using the nodeprecmd() method!&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">relcmd</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:return release command&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nd">@relcmd</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">relcmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;:param str value: set release command&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;deprecated: prefer using the noderelcmd() method!&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="Job.nodeprecmd"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.nodeprecmd">[docs]</a>    <span class="k">def</span> <span class="nf">nodeprecmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmds</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a node prepare command to be done on first node prepare</span>
+
+<span class="sd">        :param str cmds: command (plus arguments) to be executed</span>
+<span class="sd">        :param dict kwargs: arguments for cmds to used, e.g. cwd, ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">cmds</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="Job.noderelcmd"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.noderelcmd">[docs]</a>    <span class="k">def</span> <span class="nf">noderelcmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmds</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a node release command to be done on last node release</span>
+
+<span class="sd">        :param str cmds: command (plus arguments) to be executed</span>
+<span class="sd">        :param dict kwargs: arguments for cmds to used, e.g. cwd, ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nrelcmd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">cmds</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;added release cmd(s): &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">cmds</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Job.jobprecmd"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.jobprecmd">[docs]</a>    <span class="k">def</span> <span class="nf">jobprecmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmds</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a job prepare command to be done on the very first prepare</span>
+
+<span class="sd">        :param str cmds: command (plus arguments) to be executed</span>
+<span class="sd">        :param dict kwargs: arguments for cmds to used, e.g. cwd, ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jprecmd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">cmds</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="Job.jobrelcmd"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.jobrelcmd">[docs]</a>    <span class="k">def</span> <span class="nf">jobrelcmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmds</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        append a job release command to be done on the very last node release</span>
+
+<span class="sd">        :param str cmds: command (plus arguments) to be executed</span>
+<span class="sd">        :param dict kwargs: arguments for cmds to used, e.g. cwd, ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_jrelcmd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">cmds</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;added release cmd(s): &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">cmds</span><span class="p">))</span></div>
+
+    <span class="k">def</span> <span class="nf">_log_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;log some info&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;connected to scheduler </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="n">extra</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="s2">&quot;green&quot;</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;we&#39;ll use </span><span class="si">%s</span><span class="s2"> to execute on cluster&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">exe</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job&#39;s path is </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_job_path</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;trace back to here:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">cnt</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">extract_stack</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="vm">__file__</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(</span><span class="se">\\</span><span class="s2">|/)(pydev|pycharm)(</span><span class="se">\\</span><span class="s2">|/)|C:</span><span class="se">\\</span><span class="s2">LegacyApp&quot;</span><span class="p">,</span> <span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">, line </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cnt</span><span class="p">,</span> <span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">frame</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">_prepare_hpc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">real_copy</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;copy the whole hpc package into the input folder for the job&quot;&quot;&quot;</span>
+        <span class="n">hpath</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s1">&#39;hpc&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">real_copy</span><span class="p">:</span>  <span class="c1"># copy local hpc with just py / pyc files</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;copying HPC package&quot;</span><span class="p">)</span>
+            <span class="n">ign</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">s</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="p">{</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">k</span> <span class="k">if</span> <span class="s1">&#39;.&#39;</span> <span class="ow">in</span> <span class="n">i</span> <span class="ow">and</span> <span class="n">splitext</span><span class="p">(</span><span class="n">i</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;.py&quot;</span> <span class="ow">or</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;__pycache__&quot;</span><span class="p">,</span> <span class="s2">&quot;docs&quot;</span><span class="p">)}</span>
+            <span class="n">Robocopy</span><span class="p">(</span><span class="n">ignore</span><span class="o">=</span><span class="n">ign</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">stat</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))),</span> <span class="n">hpath</span><span class="p">)</span>
+            <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s1">&#39;HPC_V</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hver</span><span class="p">)),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;hpc package copy finished&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">makedirs</span><span class="p">(</span><span class="n">hpath</span><span class="p">)</span>
+            <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">hpath</span><span class="p">,</span> <span class="s2">&quot;__init__.py&quot;</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">makedirs</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s1">&#39;bpl&#39;</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">_write_test_bat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;write test.bat to input folder&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span><span class="p">:</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;#!/bin/bash&#39;</span><span class="p">,</span> <span class="s1">&#39;if [ $# -eq 1 ]; then&#39;</span><span class="p">,</span> <span class="s1">&#39;  task=$1&#39;</span><span class="p">,</span> <span class="s1">&#39;else&#39;</span><span class="p">,</span> <span class="s1">&#39;  task=1&#39;</span><span class="p">,</span> <span class="s1">&#39;fi&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;export CCP_SCHEDULER=&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head_node</span><span class="p">),</span>
+                    <span class="s1">&#39;export CCP_JOBID=&quot;</span><span class="si">{}</span><span class="s1">&quot;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">),</span> <span class="s1">&#39;export CCP_TASKID=&quot;$task&quot;&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;cp </span><span class="si">{}</span><span class="s1">/HPC_Python/</span><span class="si">{}</span><span class="s1"> ./hpc -r&#39;</span>
+                    <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">win2linux</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">base_dir</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">hpcversion</span><span class="p">),</span>
+                    <span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> -ot $task&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">starter</span><span class="p">)]</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="s2">&quot;test&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;@echo off&#39;</span><span class="p">,</span> <span class="s1">&#39;if &quot;%1&quot; == &quot;&quot; (set task=1) else (set task=%1)&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;set CCP_SCHEDULER=</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head_node</span><span class="p">),</span> <span class="s1">&#39;set CCP_JOBID=</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">),</span>
+                    <span class="s1">&#39;set CCP_TASKID=%task%&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;xcopy </span><span class="si">{}</span><span class="se">\\</span><span class="s1">HPC_Python</span><span class="se">\\</span><span class="si">{}</span><span class="s1"> .</span><span class="se">\\</span><span class="s1">hpc /S /I /Y /Q &gt; NUL&#39;</span>
+                            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">hpcversion</span><span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">:</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="s1">&#39;call .</span><span class="se">\\</span><span class="s1">venv</span><span class="se">\\</span><span class="s1">Scripts</span><span class="se">\\</span><span class="s1">activate.bat&#39;</span><span class="p">,</span>
+                             <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]])</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> -ot %task%&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">starter</span><span class="p">),</span> <span class="s1">&#39;pause&#39;</span><span class="p">])</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="s2">&quot;test.bat&quot;</span>
+        <span class="c1"># folder = self._scheduler.client_in_path if self._job_sim else self._scheduler.net_in_path</span>
+        <span class="k">for</span> <span class="n">fldr</span> <span class="ow">in</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">]</span> <span class="o">+</span> <span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span> <span class="k">else</span> <span class="p">[]):</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">fldr</span><span class="p">,</span> <span class="n">fname</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bfile</span><span class="p">:</span>
+                <span class="n">bfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">linesep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cmds</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_submit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;submit!&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sweep</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span><span class="p">:</span>
+                <span class="n">cmd</span><span class="p">,</span> <span class="n">wdir</span> <span class="o">=</span> <span class="s2">&quot;/usr/local/bin/node.py prepare&quot;</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cmd</span><span class="p">,</span> <span class="n">wdir</span> <span class="o">=</span> <span class="s2">&quot;python.exe -u node.py prepare&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\HPC&quot;</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_handle_venv</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">base_dir</span><span class="p">),</span> <span class="s2">&quot;HPC_submit&quot;</span><span class="p">,</span> <span class="s2">&quot;job&quot;</span><span class="p">))</span>
+
+            <span class="c1"># finalize environment file</span>
+            <span class="n">jents</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;portal&quot;</span><span class="p">:</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">][</span><span class="mi">5</span><span class="p">]}</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jrelcmd</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jprecmd</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nrelcmd</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">tnm</span><span class="p">,</span> <span class="n">cmds</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="s2">&quot;npre&quot;</span><span class="p">,</span> <span class="s2">&quot;nrel&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_xcmds</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">cmds</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmds</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="n">cmds</span><span class="p">]</span>
+                        <span class="n">jents</span><span class="p">[</span><span class="n">tnm</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cmds&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="n">i</span><span class="p">,</span> <span class="p">{}]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">cmds</span><span class="p">]}</span>
+
+                <span class="k">for</span> <span class="n">nm</span><span class="p">,</span> <span class="n">cmds</span> <span class="ow">in</span> <span class="p">([</span><span class="s2">&quot;jrel&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jrelcmd</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;jpre&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jprecmd</span><span class="p">],</span>
+                                 <span class="p">[</span><span class="s2">&quot;nrel&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nrelcmd</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;npre&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nprecmd</span><span class="p">],):</span>
+                    <span class="k">if</span> <span class="n">cmds</span><span class="p">:</span>
+                        <span class="n">jents</span><span class="p">[</span><span class="n">nm</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cmds&quot;</span><span class="p">:</span> <span class="n">cmds</span><span class="p">}</span>
+
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">linux2win</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">net_job_path</span><span class="p">,</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;par.json&quot;</span><span class="p">)),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                    <span class="n">dump</span><span class="p">(</span><span class="n">jents</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="s2">&quot;npre&quot;</span> <span class="ow">in</span> <span class="n">jents</span> <span class="ow">or</span> <span class="s2">&quot;jpre&quot;</span> <span class="ow">in</span> <span class="n">jents</span><span class="p">:</span>
+                <span class="n">runtime</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">runtime</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">runtime</span> <span class="o">=</span> <span class="n">SHORT_TEST_RUNTIME</span> <span class="o">*</span> <span class="mi">2</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">append_task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;prepare&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">TaskType</span><span class="o">.</span><span class="n">NodePrep</span><span class="p">,</span> <span class="n">sockets</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">resources</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                        <span class="n">command_line</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span> <span class="n">work_directory</span><span class="o">=</span><span class="n">wdir</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">runtime</span><span class="o">=</span><span class="n">runtime</span><span class="p">,</span>
+                                        <span class="n">envs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;TASKNAME&quot;</span><span class="p">:</span> <span class="s2">&quot;prepare&quot;</span><span class="p">})</span>
+
+            <span class="c1"># create release task</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">linux</span><span class="p">:</span>
+                <span class="n">cmd</span><span class="p">,</span> <span class="n">wdir</span> <span class="o">=</span> <span class="s2">&quot;/usr/local/bin/node.py release&quot;</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cmd</span><span class="p">,</span> <span class="n">wdir</span> <span class="o">=</span> <span class="s2">&quot;python.exe -u node.py release&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;C:\LegacyApp\HPC&quot;</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">append_task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">TaskType</span><span class="o">.</span><span class="n">NodeRelease</span><span class="p">,</span> <span class="n">sockets</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">resources</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                        <span class="n">command_line</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span> <span class="n">work_directory</span><span class="o">=</span><span class="n">wdir</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                        <span class="n">runtime</span><span class="o">=</span><span class="n">MAX_SWEEP_RUNTIME</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jrelcmd</span> <span class="k">else</span> <span class="n">STD_SWEEP_RUNTIME</span><span class="p">,</span>
+                                        <span class="n">envs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;TASKNAME&quot;</span><span class="p">:</span> <span class="s2">&quot;release&quot;</span><span class="p">})</span>
+
+        <span class="c1"># update env vars in case we packed some</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mts_zips</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;HPC_ZIPS&quot;</span><span class="p">:</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mts_zips</span><span class="p">)})</span>
+
+        <span class="c1"># self._forecast()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span><span class="p">[</span><span class="s2">&quot;taskcnt&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="mi">2</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sweep</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">jid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_db</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;committing now =&gt; </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">portal_link</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">priority</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dbase</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_db</span><span class="p">(</span><span class="n">jid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="mi">2</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sweep</span> <span class="k">else</span> <span class="mi">0</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;you don&#39;t have any tasks</span><span class="si">%s</span><span class="s2">!&quot;</span><span class="p">,</span> <span class="s2">&quot; besides prepare/release&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sweep</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;total submission finished.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="n">err</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+            <span class="n">err</span> <span class="o">=</span> <span class="n">err</span> <span class="k">if</span> <span class="n">err</span> <span class="k">else</span> <span class="s2">&quot;unknown error occurred!&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">cancel_job</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_db</span><span class="p">(</span><span class="n">jid</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="c1"># finally:</span>
+        <span class="c1">#     self._scheduler.close()</span>
+
+    <span class="k">def</span> <span class="nf">_handle_venv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">folder</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;add extra xcmds for venv&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">folder</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">_</span><span class="si">{}</span><span class="s2">.txt&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobid</span><span class="p">)),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">fp</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_venv</span><span class="p">)</span>
+
+        <span class="n">pybase</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="se">\\</span><span class="s2">venv</span><span class="se">\\</span><span class="s2">Scripts</span><span class="se">\\</span><span class="s2">python.exe -m&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_venv_sys</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">(</span><span class="s2">&quot;python.exe -m venv </span><span class="si">{}</span><span class="s2"> --system-site-packages&quot;</span>
+                            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="s2">&quot;venv&quot;</span><span class="p">)))</span>
+            <span class="c1"># self._xcmds[0].append(&quot;{} ensurepip&quot;.format(pybase))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> pip install -U pip setuptools wheel&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pybase</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">(</span><span class="s2">&quot;python.exe -m venv </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">client_in_path</span><span class="p">,</span> <span class="s2">&quot;venv&quot;</span><span class="p">)))</span>
+            <span class="c1"># self._xcmds[0].append(&quot;{} ensurepip&quot;.format(pybase))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> pip install --prefer-binary -U -r </span><span class="si">{}</span><span class="s2">\hpc\HPC_Python\hpcreq_</span><span class="si">{}</span><span class="s2">.txt&quot;</span>
+                            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pybase</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span>
+                                    <span class="n">SHORT_VER</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">exe</span><span class="p">]))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_popts</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_popts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_popts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nodeprecmd</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> pip install -r </span><span class="si">{}{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pybase</span><span class="p">,</span> <span class="n">fp</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_popts</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">_update_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobid</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create a fallback database</span>
+
+<span class="sd">        :return int: ident of job</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">jobid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_env</span><span class="o">.</span><span class="n">insert_job</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db_env</span><span class="o">.</span><span class="n">update_job</span><span class="p">(</span><span class="n">jobid</span><span class="o">=</span><span class="n">jobid</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">],</span> <span class="n">resource</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">unit</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Job.wait_until_finished"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.wait_until_finished">[docs]</a>    <span class="k">def</span> <span class="nf">wait_until_finished</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        wait until job finishes</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *timeout* (``int``): wait timeout [s]</span>
+<span class="sd">        :return `JobState`: final state of job</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">wait_until_finished</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+    <span class="nd">@suppress_warnings</span>
+    <span class="k">def</span> <span class="nf">_forecast</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;calc job forecast&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;running under Python2: no forecast available!&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_sim</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;running locally: no forecast available!&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">taskmeas</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;no measurements mapped, no forecast available!&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ncst</span> <span class="o">=</span> <span class="n">dloads</span><span class="p">(</span><span class="n">zdeco</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">base_db</span><span class="p">(</span><span class="s2">&quot;SELECT NETCAST FROM HPC_NODE &quot;</span>  <span class="c1"># pylint: disable=E1102</span>
+                                             <span class="s2">&quot;WHERE NODENAME = :head&quot;</span><span class="p">,</span>
+                                             <span class="n">head</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">head_node</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()),</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;bytes&#39;</span><span class="p">)</span>
+            <span class="n">regr</span> <span class="o">=</span> <span class="n">ncst</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;job_regs&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">regr</span><span class="p">:</span>
+                <span class="n">eta</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">regr</span><span class="o">.</span><span class="n">predict</span><span class="p">([</span><span class="n">i</span><span class="o">.</span><span class="n">tolist</span><span class="p">()])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">taskmeas</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">all</span><span class="p">()])</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">eta</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+                    <span class="n">eta</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">eta</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">eta</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job estimation is zero, seems no measurements are used.&quot;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job estimation: </span><span class="si">{}</span><span class="s2">s (</span><span class="si">{:02d}</span><span class="s2">:</span><span class="si">{:02d}</span><span class="s2">:</span><span class="si">{:02d}</span><span class="s2">)&quot;</span>
+                                     <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">eta</span><span class="p">,</span> <span class="n">eta</span> <span class="o">//</span> <span class="mi">3600</span><span class="p">,</span> <span class="n">eta</span> <span class="o">//</span> <span class="mi">60</span> <span class="o">%</span> <span class="mi">60</span><span class="p">,</span> <span class="n">eta</span> <span class="o">%</span> <span class="mi">60</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job estimation for project &#39;</span><span class="si">%s</span><span class="s2">&#39; not available (yet).&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scheduler</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;job estimation didn&#39;t work: </span><span class="si">%s</span><span class="s2"> (just ignore it)!&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Job.add_task"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.add_task">[docs]</a>    <span class="k">def</span> <span class="nf">add_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;add a task to job&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Job.task_factory"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.task_factory">[docs]</a>    <span class="k">def</span> <span class="nf">task_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create a taskfactory and return it, see :class:`hpc.TaskFactoy` for more information&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span> <span class="o">=</span> <span class="n">TaskFactory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span></div>
+
+<div class="viewcode-block" id="Job.create_task"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.create_task">[docs]</a>    <span class="k">def</span> <span class="nf">create_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create a task&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span> <span class="o">=</span> <span class="n">TaskFactory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Job.task_factory_mts"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.task_factory_mts">[docs]</a>    <span class="k">def</span> <span class="nf">task_factory_mts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create a taskfactory and return it, see :class:`hpc.TaskFactoyMTS` for more information&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span> <span class="o">=</span> <span class="n">TaskFactoryMTS</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span></div>
+
+<div class="viewcode-block" id="Job.create_mts_task"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.create_mts_task">[docs]</a>    <span class="k">def</span> <span class="nf">create_mts_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create a task&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span> <span class="o">=</span> <span class="n">TaskFactory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskfactory_mts</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Job.subtask_factory"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.Job.subtask_factory">[docs]</a>    <span class="k">def</span> <span class="nf">subtask_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;create a taskfactory and return it, see :class:`hpc.SubTaskFactoy` for more information&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtaskfactory</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_subtaskfactory</span> <span class="o">=</span> <span class="n">SubTaskFactory</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subtaskfactory</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,274 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts.parser</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.mts.parser</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">parser.py</span>
+<span class="sd">---------</span>
+
+<span class="sd">class for checking the mts output.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=W0702,C0103</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">xml.sax.handler</span> <span class="kn">import</span> <span class="n">ContentHandler</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">match</span><span class="p">,</span> <span class="n">search</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">hashlib</span> <span class="kn">import</span> <span class="n">sha256</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span> <span class="k">as</span> <span class="n">dt</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">gmtime</span><span class="p">,</span> <span class="n">mktime</span><span class="p">,</span> <span class="n">strptime</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">PY2</span>
+
+<span class="c1"># - import HPC modules ------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">ERR_MTS_CRASH_DUMP_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_EXCEPTION_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_ALERT_FOUND</span><span class="p">,</span> \
+    <span class="n">ERR_MTS_LOG_ERROR_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_WARNING_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_INFO_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_DEBUG_FOUND</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+
+
+<span class="c1"># - classes -----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="XlogHandler"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler">[docs]</a><span class="k">class</span> <span class="nc">XlogHandler</span><span class="p">(</span><span class="n">ContentHandler</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;handles xml LogEntries and extracts its data&quot;&quot;&quot;</span>
+
+    <span class="c1"># define levels, counters and attributes</span>
+    <span class="n">levels</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;crash&quot;</span><span class="p">,</span> <span class="s2">&quot;exception&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;alert&quot;</span><span class="p">,</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span> <span class="s2">&quot;information&quot;</span><span class="p">,</span> <span class="s2">&quot;debug&quot;</span><span class="p">]</span>
+    <span class="n">codes</span> <span class="o">=</span> <span class="p">[</span><span class="n">ERR_MTS_CRASH_DUMP_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_EXCEPTION_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_ERROR_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_ALERT_FOUND</span><span class="p">,</span>
+             <span class="n">ERR_MTS_LOG_WARNING_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_INFO_FOUND</span><span class="p">,</span> <span class="n">ERR_MTS_LOG_DEBUG_FOUND</span><span class="p">]</span>
+
+<div class="viewcode-block" id="XlogHandler.__init__"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;local saves for the entry&quot;&quot;&quot;</span>
+        <span class="n">ContentHandler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span> <span class="o">=</span> <span class="n">logger</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;LogEntry&quot;</span><span class="p">,</span> <span class="s2">&quot;general&quot;</span><span class="p">,</span> <span class="s2">&quot;symbol&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_results</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_elem</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_time</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mts_ts</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tm_frmt</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">/%m/%Y-%H:%M:%S:</span><span class="si">%f</span><span class="s2">&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_gpu</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpu_err</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="XlogHandler.reset"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set to default&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_elem</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_time</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mts_ts</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="XlogHandler.startElement"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.startElement">[docs]</a>    <span class="k">def</span> <span class="nf">startElement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">attrs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;entry starts&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>  <span class="c1"># LogEntry</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;Severity&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;Code&#39;</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;Reporter&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_code</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_time</span> <span class="o">=</span> <span class="p">(</span><span class="n">dt</span><span class="p">(</span><span class="o">*</span><span class="n">gmtime</span><span class="p">(</span><span class="n">mktime</span><span class="p">(</span><span class="n">strptime</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;SystemTime&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tm_frmt</span><span class="p">)))[:</span><span class="mi">6</span><span class="p">])</span> <span class="o">+</span>
+                          <span class="n">timedelta</span><span class="p">(</span><span class="n">microseconds</span><span class="o">=</span><span class="n">dt</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;SystemTime&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tm_frmt</span><span class="p">)</span><span class="o">.</span><span class="n">microsecond</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_mts_ts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;Timestamp&#39;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>  <span class="c1"># general</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># crash</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_elem</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># symbol</span>
+            <span class="k">if</span> <span class="s2">&quot;srcfile&quot;</span> <span class="ow">and</span> <span class="s2">&quot;srcline&quot;</span> <span class="ow">in</span> <span class="n">attrs</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># crash</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="p">[</span><span class="s2">&quot;fault_module&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot; (</span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;srcfile&quot;</span><span class="p">],</span> <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;srcline&quot;</span><span class="p">]))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="mi">2</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">+=</span> <span class="mi">1</span></div>
+
+<div class="viewcode-block" id="XlogHandler.endElement"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.endElement">[docs]</a>    <span class="k">def</span> <span class="nf">endElement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R1260</span>
+        <span class="sd">&quot;&quot;&quot;end of entry&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># care about special GPU message:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpu</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Opened file .*\.MF4&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpu_err</span><span class="p">:</span>  <span class="c1"># raise up severity as there wasn&#39;t any GPU success before!</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">=</span> <span class="mi">1</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">=</span> <span class="s2">&quot;No GPU success msg after &#39;</span><span class="si">{}</span><span class="s2">!&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_gpu_err</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpu_err</span> <span class="ow">and</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;SRepro_Reprocessing_Debug: GPU Success RTT&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_gpu_err</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="n">eit</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_severity</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_time</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mts_ts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_mts_ts</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_severity</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># exception and lower</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\sTs:\s(\d+)\s&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">msg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">regs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                    <span class="n">eit</span><span class="o">.</span><span class="n">mts_ts</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>  <span class="c1"># update MTS timestamp if Ts given</span>
+
+                <span class="c1"># Try to read xml format 1</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\[(.*)\][,:]\s?Exception:\s?(0x[0-9A-F]*)\s?\((.*)\)\s?at\sAddress:\s?(0x[0-9A-F]*)$&quot;</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">msg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">regs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+                    <span class="n">eit</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;err_code&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">16</span><span class="p">),</span> <span class="s1">&#39;err_desc&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;err_src&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="mi">0</span><span class="p">]})</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Reading of xml format one crashed</span>
+                    <span class="c1"># Try to read format 2</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\[(.*)\][,:]\s?(.*)&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">msg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">regs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+                        <span class="n">eit</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;err_code&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;err_desc&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">&#39;err_src&#39;</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="mi">0</span><span class="p">]})</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">eit</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;err_code&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_code</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="s1">&#39;err_desc&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">,</span>
+                                    <span class="s1">&#39;err_src&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span><span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="n">eit</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;err_code&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_code</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="s1">&#39;err_desc&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span><span class="p">,</span> <span class="s1">&#39;err_src&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reporter</span><span class="p">})</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_insert</span><span class="p">(</span><span class="n">eit</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_elem</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span></div>
+
+<div class="viewcode-block" id="XlogHandler.characters"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.characters">[docs]</a>    <span class="k">def</span> <span class="nf">characters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;save content&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;&quot; </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;&#39;&#39;&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_content</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;&quot; </span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;&#39;&#39;&quot;</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="XlogHandler.endDocument"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.endDocument">[docs]</a>    <span class="k">def</span> <span class="nf">endDocument</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;end of document&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">dfrmt</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">/%m/%Y %H:%M&quot;</span>
+            <span class="n">time</span> <span class="o">=</span> <span class="n">dt</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;crash_time&quot;</span><span class="p">,</span> <span class="n">dt</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">dfrmt</span><span class="p">)),</span> <span class="n">dfrmt</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_insert</span><span class="p">(</span><span class="n">DefDict</span><span class="p">(</span><span class="n">severity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_severity</span><span class="p">,</span> <span class="n">err_code</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;except_code&quot;</span><span class="p">,</span> <span class="s2">&quot;-1&quot;</span><span class="p">),</span> <span class="mi">16</span><span class="p">),</span>
+                                 <span class="n">err_desc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;except_descr&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+                                 <span class="n">err_src</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_sdata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fault_module&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span> <span class="n">mts_ts</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage</span> <span class="o">=</span> <span class="mi">0</span></div>
+
+    <span class="k">def</span> <span class="nf">_insert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eit</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;insert element&quot;&quot;&quot;</span>
+        <span class="n">hasher</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">()</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">eit</span><span class="o">.</span><span class="n">severity</span><span class="p">)</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">eit</span><span class="o">.</span><span class="n">err_code</span><span class="p">)</span> <span class="o">+</span> <span class="n">eit</span><span class="o">.</span><span class="n">err_desc</span> <span class="o">+</span> <span class="n">eit</span><span class="o">.</span><span class="n">err_src</span>
+        <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;latin1&#39;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+        <span class="n">ehash</span> <span class="o">=</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">ehash</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="p">[</span><span class="n">ehash</span><span class="p">]</span><span class="o">.</span><span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="p">[</span><span class="n">ehash</span><span class="p">]</span> <span class="o">=</span> <span class="n">eit</span>
+
+<div class="viewcode-block" id="XlogHandler.results"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.results">[docs]</a>    <span class="k">def</span> <span class="nf">results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        return result entries of a certain type</span>
+
+<span class="sd">        :param int type_: type of results to return</span>
+<span class="sd">        :return: list[ErrorItem, ...]</span>
+<span class="sd">        :rtype: list</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">severity</span> <span class="ow">in</span> <span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span></div>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;handle those attributes defined in levels&#39; list&quot;&quot;&quot;</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">&#39;s&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">(</span><span class="n">XlogHandler</span><span class="o">.</span><span class="n">levels</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+                <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+    <span class="c1"># those methods are taken from xml.sax.handler.ErrorHandler, they are called by the parser on problems</span>
+<div class="viewcode-block" id="XlogHandler.error"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.error">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">error</span><span class="p">(</span><span class="n">exception</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+        <span class="sd">&quot;&quot;&quot;Handle a recoverable error.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="n">exception</span></div>
+
+<div class="viewcode-block" id="XlogHandler.fatalError"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.fatalError">[docs]</a>    <span class="k">def</span> <span class="nf">fatalError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exception</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle a non-recoverable error.&quot;&quot;&quot;</span>
+        <span class="c1"># let&#39;s call the endDocument, as otherwise we loose data taken until now</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">endDocument</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="n">exception</span></div>
+
+<div class="viewcode-block" id="XlogHandler.warning"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.mts.parser.XlogHandler.warning">[docs]</a>    <span class="k">def</span> <span class="nf">warning</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exception</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+        <span class="sd">&quot;&quot;&quot;Handle a warning.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">exception</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

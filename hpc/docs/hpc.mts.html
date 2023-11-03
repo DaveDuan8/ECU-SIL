@@ -1,0 +1,867 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="next" title="hpc.rdb package" href="hpc.rdb.html" />
+    <link rel="prev" title="hpc.core package" href="hpc.core.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.rdb.html" title="hpc.rdb package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="hpc.core.html" title="hpc.core package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" accesskey="U">hpc package</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-mts-package">
+<h1>hpc.mts package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.mts.bsig_check">
+<span id="hpc-mts-bsig-check-module"></span><h2>hpc.mts.bsig_check module</h2>
+<div class="section" id="bsig-check-py">
+<h3>bsig_check.py</h3>
+<p>check for bsig files and whether they are corrupt or having 0 length or no signal at all,
+used by command line tool bsig_check and starter.</p>
+<dl class="function">
+<dt id="hpc.mts.bsig_check.bsig_check">
+<code class="descclassname">hpc.mts.bsig_check.</code><code class="descname">bsig_check</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/bsig_check.html#bsig_check"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check all bsigs for given folder or just one</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>bsigs</em> (<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">|</span> <span class="pre">str</span></code>): input folder or file to check bsig file from or a bsig file directly</li>
+<li><em>logger</em> (<code class="docutils literal notranslate"><span class="pre">Logger</span></code>): use logger given, if done so</li>
+<li><em>rectms</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): expected recording begin and end timestamp</li>
+<li><em>recdiff</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): allowed recording difference, default: 10%</li>
+<li><em>exit_prio</em> (<code class="docutils literal notranslate"><span class="pre">ExitCode</span></code>): exit code priorizer, instance of ExitCode, default: None</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error found</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts.mts_check">
+<span id="hpc-mts-mts-check-module"></span><h2>hpc.mts.mts_check module</h2>
+<div class="section" id="mts-check-py">
+<h3>mts_check.py</h3>
+<p><strong>Checks after MTS Crashdumps, Errors and Exception in *.xlog files.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>Printing of Error Statistic Output from HPCErrorDB (Oracle)</li>
+<li>Scanning of a given Folder for Chrashdumps and xlog-Error File Entries.</li>
+<li>Scanning xlog-Error files for MTS Errors, Exceptions and …</li>
+<li>Writing all found errors into the Oracle Error DB.</li>
+</ul>
+</dd>
+<dt><strong>UseCase:</strong></dt><dd>Typically used as SubTask in the MTSTaskFactory for error checking.</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<blockquote>
+<div><ul>
+<li><p class="first"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">check</span> <span class="pre">\\LIFS010\hpc\liss006\3511_MFC3B0_JointSim\2_Output\T00008</span></code></p>
+</li>
+<li><p class="first"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">stat</span> <span class="pre">3511</span></code></p>
+</li>
+<li><div class="first line-block">
+<div class="line-block">
+<div class="line">scan for db file and add rec file mapping entries:</div>
+</div>
+<div class="line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">check</span> <span class="pre">\\LIFS010\hpc\liss006\3511_MFC3B0_JointSim</span> <span class="pre">-d</span></code></div>
+</div>
+</li>
+</ul>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">param check &lt;folder&gt;:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body">The given Input Folder URL which is used to scan after some errornous stuff.</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param stat &lt;jobid&gt;:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">JobId which must be used for getting the Error info out from the Oracle DB.</td>
+</tr>
+</tbody>
+</table>
+<dl class="function">
+<dt id="hpc.mts.mts_check.check_mts_ini">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">check_mts_ini</code><span class="sig-paren">(</span><em>fname</em>, <em>folder=None</em>, <em>checkonly=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#check_mts_ini"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check if the path to the mts_measurement folder is given in the correct
+way (Prepared for HPC). Otherwise, an error is thrown.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>fname</strong> (<em>str</em>) – path to mts.ini file</li>
+<li><strong>folder</strong> (<em>str</em>) – path to mts.ini</li>
+<li><strong>checkonly</strong> (<em>bool</em>) – only check, do not manipulate</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first"><a class="reference internal" href="hpc.core.html#hpc.core.error.HpcError" title="hpc.core.error.HpcError"><strong>error.HpcError</strong></a> – once file cannot be read</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">bool</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">success state</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.debug_lib_check">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">debug_lib_check</code><span class="sig-paren">(</span><em>folder</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#debug_lib_check"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check a folder for towards a debug compilation</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>folder</strong> (<em>str</em>) – folder / file to check</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">list of libraries being compiled in debug mode</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.mts_check">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">mts_check</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#mts_check"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Scan given Input Folder for MTS Chrashdumps and xlog-Files.
+Analyse the Files, and store dedicated infos inside the DB.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name, default: DEFAULT_HEAD_NODE</li>
+<li><em>folder</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): input folder to check crash xml or xlog files</li>
+<li><em>use_print</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): checker should use print instead of logger</li>
+<li><em>logger</em> (<code class="docutils literal notranslate"><span class="pre">Logger</span></code>): use logger given if given</li>
+<li><em>level</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): limit reporting to certain level</li>
+<li><em>log_corrupts</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): log corrupt log files, default: True</li>
+<li><em>verbose</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): print logs additionally (be a bit more verbose)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.mts_log_check">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">mts_log_check</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#mts_log_check"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>scan given Input Folder for MTS Chrashdumps and xlog-Files.
+Analyse the Files, and return dedicated infos.
+=&gt; used by the starter</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>folder</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): input folder to check crash xml or xlog files</li>
+<li><em>exitcodes</em> (<code class="docutils literal notranslate"><span class="pre">ExitCodes</span></code>): exit code object</li>
+<li><em>level</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): limit reporting to certain level</li>
+<li><em>log_corrupts</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): log corrupt log files, default: True</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.mts_recheck">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">mts_recheck</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#mts_recheck"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>scan given Input Folder for MTS Chrashdumps and xlog-Files.
+Analyse the Files, and store dedicated infos inside the DB.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name, default: DEFAULT_HEAD_NODE</li>
+<li><em>jobrange</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): range of jobid’s to take care of</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">always 0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.print_logs">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">print_logs</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#print_logs"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Open a connection to Oracle DB and return details of job / task.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name, default: DEFAULT_HEAD_NODE</li>
+<li><em>jobid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of HPC job</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.mts.mts_check.print_statistic">
+<code class="descclassname">hpc.mts.mts_check.</code><code class="descname">print_statistic</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#print_statistic"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>open a Connection to the Oracle DB and returns the number of issues
+given by the JobId.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name, default: DEFAULT_HEAD_NODE</li>
+<li><em>jobid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of HPC job</li>
+<li><em>taskid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of task to query, default: None</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts.parser">
+<span id="hpc-mts-parser-module"></span><h2>hpc.mts.parser module</h2>
+<div class="section" id="parser-py">
+<h3>parser.py</h3>
+<p>class for checking the mts output.</p>
+<dl class="class">
+<dt id="hpc.mts.parser.XlogHandler">
+<em class="property">class </em><code class="descclassname">hpc.mts.parser.</code><code class="descname">XlogHandler</code><span class="sig-paren">(</span><em>logger</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">xml.sax.handler.ContentHandler</span></code></p>
+<p>handles xml LogEntries and extracts its data</p>
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>logger</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>local saves for the entry</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.characters">
+<code class="descname">characters</code><span class="sig-paren">(</span><em>content</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.characters"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>save content</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.parser.XlogHandler.codes">
+<code class="descname">codes</code><em class="property"> = [121, 126, 127, 128, 129, 130, 131]</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.endDocument">
+<code class="descname">endDocument</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.endDocument"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>end of document</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.endElement">
+<code class="descname">endElement</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.endElement"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>end of entry</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.error">
+<em class="property">static </em><code class="descname">error</code><span class="sig-paren">(</span><em>exception</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.error"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Handle a recoverable error.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.fatalError">
+<code class="descname">fatalError</code><span class="sig-paren">(</span><em>exception</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.fatalError"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Handle a non-recoverable error.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.parser.XlogHandler.levels">
+<code class="descname">levels</code><em class="property"> = ['crash', 'exception', 'error', 'alert', 'warning', 'information', 'debug']</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.reset">
+<code class="descname">reset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.reset"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>set to default</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.results">
+<code class="descname">results</code><span class="sig-paren">(</span><em>type_</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.results"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>return result entries of a certain type</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>type</strong> (<em>int</em>) – type of results to return</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">list[ErrorItem, …]</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.startElement">
+<code class="descname">startElement</code><span class="sig-paren">(</span><em>name</em>, <em>attrs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.startElement"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>entry starts</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.parser.XlogHandler.warning">
+<code class="descname">warning</code><span class="sig-paren">(</span><em>exception</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/parser.html#XlogHandler.warning"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Handle a warning.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts.signal">
+<span id="hpc-mts-signal-module"></span><h2>hpc.mts.signal module</h2>
+<div class="section" id="signal-py">
+<h3>signal.py</h3>
+<p>signal processor to read and write bsig’s and csv’s</p>
+<dl class="class">
+<dt id="hpc.mts.signal.MetaData">
+<em class="property">class </em><code class="descclassname">hpc.mts.signal.</code><code class="descname">MetaData</code><a class="reference internal" href="_modules/hpc/mts/signal.html#MetaData"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">csv.Dialect</span></code></p>
+<p>Describe the usual properties of Excel-generated CSV files.</p>
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.delimiter">
+<code class="descname">delimiter</code><em class="property"> = ';'</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.doublequote">
+<code class="descname">doublequote</code><em class="property"> = True</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.lineterminator">
+<code class="descname">lineterminator</code><em class="property"> = '\r\n'</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.quotechar">
+<code class="descname">quotechar</code><em class="property"> = '&quot;'</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.quoting">
+<code class="descname">quoting</code><em class="property"> = 2</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.mts.signal.MetaData.skipinitialspace">
+<code class="descname">skipinitialspace</code><em class="property"> = False</em></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.mts.signal.Signal">
+<em class="property">class </em><code class="descclassname">hpc.mts.signal.</code><code class="descname">Signal</code><a class="reference internal" href="_modules/hpc/mts/signal.html#Signal"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p><strong>Signal File Read and Write</strong> (*.bsig (aka *.bin), *.csv)</p>
+<p>open, step through, read or write signals and close a signal file, provide list of signal names</p>
+<p>by default the <strong>values read are returned as numpy array</strong>, see <code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code> how to configure for python lists</p>
+<p>for csv files several options (like delimiter) are supported, see <code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code> for more details</p>
+<p>even if the usage looks like calling a dict <em>a Signal instance is no dict:</em></p>
+<ul class="simple">
+<li>when getting a signal using <code class="docutils literal notranslate"><span class="pre">sr['my_signal_name']</span></code> just that signal is read from the file;</li>
+<li>adding or deleting signals is not possible, it’s just a reader;</li>
+<li>there are no dict functions like d.keys(), d.values(), d.get() etc.</li>
+</ul>
+<p>supported functions (see also Examples below):</p>
+<blockquote>
+<div><ul class="simple">
+<li>with              open and integrated close for a signal file</li>
+<li>get               values of signal with name or index: <code class="docutils literal notranslate"><span class="pre">sr['my_name'],</span> <span class="pre">sr[2]</span></code></li>
+<li>len               number of signals: <code class="docutils literal notranslate"><span class="pre">len(sr)</span></code></li>
+<li>in                check if signal with name is available: <code class="docutils literal notranslate"><span class="pre">if</span> <span class="pre">'my_sig'</span> <span class="pre">in</span> <span class="pre">sr:</span></code></li>
+<li>for               loop over all signals with name and values: <code class="docutils literal notranslate"><span class="pre">for</span> <span class="pre">n,</span> <span class="pre">v</span> <span class="pre">in</span> <span class="pre">sr:</span></code></li>
+<li>signal_names      list of all signal names (like dict.keys()): <code class="docutils literal notranslate"><span class="pre">sr.signal_names</span></code></li>
+</ul>
+</div></blockquote>
+<p>for the writing use mode=’w’ and use type=’csv’ or type=’bsig’
+if later is used you might want to step back using V2 format: v2format=True</p>
+<p>Example 1:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># read csv files:</span>
+<span class="n">reader</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="o">&lt;</span><span class="n">file</span><span class="o">.</span><span class="n">csv</span><span class="o">&gt;</span><span class="p">,</span>
+                <span class="s1">&#39;delim&#39;</span><span class="o">=&lt;</span><span class="n">delimiter</span><span class="o">&gt;</span><span class="p">,</span>
+                <span class="s1">&#39;scan_type&#39;</span><span class="o">=&lt;</span><span class="s1">&#39;prefetch&#39;</span><span class="p">,</span><span class="s1">&#39;no_prefetch&#39;</span><span class="o">&gt;</span><span class="p">,</span>
+                <span class="s1">&#39;scan_opt&#39;</span><span class="o">=&lt;</span><span class="s1">&#39;scan_auto&#39;</span><span class="p">,</span><span class="s1">&#39;scan_raw&#39;</span><span class="p">,</span><span class="s1">&#39;float&#39;</span><span class="p">,</span><span class="o">...&gt;</span><span class="p">,</span>
+                <span class="s1">&#39;skip_lines&#39;</span><span class="o">=&lt;</span><span class="n">number_of_header_lines_to_skip</span><span class="o">&gt;</span><span class="p">,</span>
+                <span class="s1">&#39;skip_data_lines&#39;</span><span class="o">=&lt;</span><span class="n">number_of_data_lines_to_skip</span><span class="o">&gt;</span><span class="p">)</span>
+
+<span class="c1"># read bsig files (version 2 or 3)</span>
+<span class="n">reader</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="o">&lt;</span><span class="n">file</span><span class="o">.</span><span class="n">bsig</span><span class="o">&gt;</span><span class="p">)</span>
+
+<span class="c1"># check if signal with name is stored in file:</span>
+<span class="k">if</span> <span class="s2">&quot;MTS.Package.TimeStamp&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;TimeStamp missing in signal file&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Example 2:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">hpc</span> <span class="kn">import</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">SignalException</span>
+
+<span class="n">sr</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.txt&#39;</span><span class="p">,</span> <span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">scan_type</span><span class="o">=</span><span class="s1">&#39;NO_PREFETCH&#39;</span><span class="p">)</span>
+<span class="c1"># get values</span>
+<span class="n">read_values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;lux_R2G&#39;</span><span class="p">]</span>
+<span class="n">sr</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Example 3:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sr</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_sla_xyz.csv&#39;</span><span class="p">,</span><span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">,</span><span class="n">skip_lines</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="c1"># read only signal &#39;timestamp&#39;</span>
+<span class="n">values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="c1"># gets the timestamp signal</span>
+<span class="n">values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># gets the signal by index 0</span>
+<span class="n">sr</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Example 4:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="n">signals</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[[</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">,</span><span class="s1">&#39;Cycle counter&#39;</span><span class="p">]]</span> <span class="c1"># retrieves a list of both signals --&gt; [[&lt;sig1&gt;], [&lt;sig2&gt;]]</span>
+</pre></div>
+</div>
+<p>Example 5:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="n">signals</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">:</span><span class="mi">50</span><span class="p">:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+</pre></div>
+</div>
+<p>Example 6:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_fct.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">sr</span><span class="p">:</span>  <span class="c1"># iterate over names and signals</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="n">signals</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">:</span><span class="mi">50</span><span class="p">:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+</pre></div>
+</div>
+<p>Example 7:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">instance_ARS</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_ars_xyz.csv&#39;</span><span class="p">,</span> <span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;;&#39;</span><span class="p">,</span><span class="n">scan_opt</span> <span class="o">=</span> <span class="s1">&#39;float&#39;</span><span class="p">)</span>
+<span class="o">...</span>
+<span class="n">instance_ARS</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">hpc</span> <span class="kn">import</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">SignalException</span>
+</pre></div>
+</div>
+<p>Example 8:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sr</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.txt&#39;</span><span class="p">,</span> <span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">scan_type</span><span class="o">=</span><span class="s1">&#39;NO_PREFETCH&#39;</span><span class="p">)</span>
+<span class="c1"># get values</span>
+<span class="n">read_values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;lux_R2G&#39;</span><span class="p">]</span>
+<span class="n">sr</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Example 9:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sr</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_sla_xyz.csv&#39;</span><span class="p">,</span><span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">,</span><span class="n">skip_lines</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="c1"># read only signal &#39;timestamp&#39;</span>
+<span class="n">values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;timestamp&#39;</span><span class="p">]</span> <span class="c1"># gets the timestamp signal</span>
+<span class="n">values</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="c1"># gets the signal by index 0</span>
+<span class="n">sr</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Example 10:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="n">signals</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[[</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">,</span><span class="s1">&#39;Cycle counter&#39;</span><span class="p">]]</span> <span class="c1"># retrieves a list of both signals --&gt; [[&lt;sig1&gt;], [&lt;sig2&gt;]]</span>
+</pre></div>
+</div>
+<p>Example 11:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sr</span><span class="p">:</span>
+    <span class="n">signals</span> <span class="o">=</span> <span class="n">sr</span><span class="p">[</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">:</span><span class="mi">50</span><span class="p">:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+</pre></div>
+</div>
+<p>Example 12:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">instance_ARS</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_ars_xyz.csv&#39;</span><span class="p">,</span> <span class="n">delim</span> <span class="o">=</span><span class="s1">&#39;;&#39;</span><span class="p">,</span><span class="n">scan_opt</span> <span class="o">=</span> <span class="s1">&#39;float&#39;</span><span class="p">)</span>
+<span class="o">...</span>
+<span class="n">instance_ARS</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Example 13:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># just write some</span>
+
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sw</span><span class="p">:</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">]))</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Cycle counter&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Example 14:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># reorganize</span>
+
+<span class="n">bsig_in_file</span><span class="p">,</span> <span class="n">bsig_out_file</span> <span class="o">=</span> <span class="s1">&#39;Snapshot_201x.x.y_at_h.m.s_FCT.bsig&#39;</span><span class="p">,</span> <span class="s1">&#39;Snapshot_201x.x.y_at_h.m.s_all.bsig&#39;</span>
+<span class="n">sig_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MTS.Timestamp&#39;</span><span class="p">,</span> <span class="s1">&#39;MTS.Cyclecounter&#39;</span><span class="p">,</span> <span class="s1">&#39;SIM VFB.FCTVehicle.HEAD.Header.uiStructSize&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="n">bsig_in_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">sin</span><span class="p">,</span> <span class="n">Signal</span><span class="p">(</span><span class="n">bsig_out_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sout</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">sig</span> <span class="ow">in</span> <span class="n">sig_list</span><span class="p">:</span>
+        <span class="n">sout</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="n">sin</span><span class="p">[</span><span class="n">sig</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Example 15:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># CSV</span>
+
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;Snapshot_xyz.csv&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sw</span><span class="p">:</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;signal 1&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="o">.....</span><span class="p">]))</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="exception">
+<dt id="hpc.mts.signal.SignalException">
+<em class="property">exception </em><code class="descclassname">hpc.mts.signal.</code><code class="descname">SignalException</code><span class="sig-paren">(</span><em>msg</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signal.html#SignalException"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>general exception for SignalReader class</p>
+<dl class="method">
+<dt id="hpc.mts.signal.SignalException.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>msg</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signal.html#SignalException.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>derive from std error</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts.signalreader">
+<span id="hpc-mts-signalreader-module"></span><h2>hpc.mts.signalreader module</h2>
+<div class="section" id="signalreader-py">
+<h3>signalreader.py</h3>
+<p>signal reader class</p>
+<dl class="class">
+<dt id="hpc.mts.signalreader.SignalReader">
+<em class="property">class </em><code class="descclassname">hpc.mts.signalreader.</code><code class="descname">SignalReader</code><span class="sig-paren">(</span><em>filename</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalreader.html#SignalReader"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p><strong>MAIN Class for Signal File Read.</strong> (*.bsig (aka *.bin), *.csv)</p>
+<dl class="method">
+<dt id="hpc.mts.signalreader.SignalReader.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>filename</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalreader.html#SignalReader.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>open the binary file by its name, supported formats: bsig 2, 3, csv</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>filename</strong> (<em>str</em>) – path/to/file.name</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>type</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): type of file can set explicitly, set to ‘bsig’ will force it to be a bsig</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p><em>following parameter can be used when intending to open e.g. a bsig file.</em></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>use_numpy</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether using numpy arrays for signal values, default: True</li>
+<li><em>sensitive</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): whether to treat signal names case sensitive, default: True</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p><em>following parameter can be used when intending to open e.g. a csv file.</em></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>delim</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): delimiter char for columns</li>
+<li><em>scan_type</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): can be <code class="xref py py-obj docutils literal notranslate"><span class="pre">no_prefetch</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">prefetch</span></code> to read in data at init</li>
+<li><em>scan_opt</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): can be <code class="xref py py-obj docutils literal notranslate"><span class="pre">scan_auto</span></code>, ‘scan_raw’ or e.g. ‘float’, ‘int’ or ‘str’</li>
+<li><em>scip_lines</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): how many lines should be scripped / ignored reading in at start of file</li>
+<li><em>scip_data_lines</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): how many lines of data should be scripped reading in at start</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalreader.SignalReader.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalreader.html#SignalReader.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalreader.SignalReader.next">
+<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalreader.html#SignalReader.next"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>next signal item to catch and return</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalreader.SignalReader.signal_length">
+<code class="descname">signal_length</code><span class="sig-paren">(</span><em>signal=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalreader.html#SignalReader.signal_length"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>length of a signal</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>signal</strong> (<em>str</em>) – name of signal length should be returned</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">signal length</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalreader.SignalReader.signal_names">
+<em class="property">property </em><code class="descname">signal_names</code></dt>
+<dd><p>list of all signal names</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">all signal names in file</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts.signalwriter">
+<span id="hpc-mts-signalwriter-module"></span><h2>hpc.mts.signalwriter module</h2>
+<div class="section" id="signalwriter-py">
+<h3>signalwriter.py</h3>
+<p>signal writer class</p>
+<dl class="class">
+<dt id="hpc.mts.signalwriter.SignalWriter">
+<em class="property">class </em><code class="descclassname">hpc.mts.signalwriter.</code><code class="descname">SignalWriter</code><span class="sig-paren">(</span><em>filename</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalwriter.html#SignalWriter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>MAIN Class for Signal File Write. (\*.bsig)</p>
+<p>Example 1:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">hpc</span> <span class="kn">import</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">SignalException</span>
+
+<span class="c1"># EXAMPLE 1 (just write some)</span>
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;file_hla_xyz.bsig&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sw</span><span class="p">:</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Time stamp&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">]))</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Cycle counter&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>EXAMPLE 2:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># reorganize</span>
+<span class="n">bsig_in_file</span><span class="p">,</span> <span class="n">bsig_out_file</span> <span class="o">=</span> <span class="s1">&#39;Snapshot_201x.x.y_at_h.m.s_FCT.bsig&#39;</span><span class="p">,</span> <span class="s1">&#39;Snapshot_201x.x.y_at_h.m.s_all.bsig&#39;</span>
+<span class="n">sig_list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MTS.Timestamp&#39;</span><span class="p">,</span> <span class="s1">&#39;MTS.Cyclecounter&#39;</span><span class="p">,</span> <span class="s1">&#39;SIM VFB.FCTVehicle.HEAD.Header.uiStructSize&#39;</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="n">bsig_in_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">sin</span><span class="p">,</span> <span class="n">Signal</span><span class="p">(</span><span class="n">bsig_out_file</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sout</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">sig</span> <span class="ow">in</span> <span class="n">sig_list</span><span class="p">:</span>
+        <span class="n">sout</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="n">sin</span><span class="p">[</span><span class="n">sig</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>EXAMPLE 3:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># CSV</span>
+<span class="k">with</span> <span class="n">Signal</span><span class="p">(</span><span class="s1">&#39;Snapshot_xyz.csv&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">sw</span><span class="p">:</span>
+    <span class="n">sw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;signal 1&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="o">.....</span><span class="p">]))</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="hpc.mts.signalwriter.SignalWriter.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>filename</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalwriter.html#SignalWriter.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>open the binary file by its name, supported formats: bsig2, csv, txt</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>filename</strong> (<em>str</em>) – path/to/file.name</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>type</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): type of file can set explicitly, set to ‘bsig’ will force it to be a bsig</li>
+<li><em>v2format</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): used by bsig writer to force format to 2nd version</li>
+<li><em>sigdict</em> (<code class="docutils literal notranslate"><span class="pre">dict</span></code>): signal dictionary to immediatelly write</li>
+<li><em>block_size</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): set buffer block size of bsigs, default: 4096 (4kb)</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalwriter.SignalWriter.append">
+<code class="descname">append</code><span class="sig-paren">(</span><em>name</em>, <em>signal</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalwriter.html#SignalWriter.append"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a signal to file, numpy array required!</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>name</strong> (<em>str</em>) – name of signal to be added</li>
+<li><strong>signal</strong> (<em>numpy.array</em>) – signal to be added</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalwriter.SignalWriter.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/signalwriter.html#SignalWriter.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.mts.signalwriter.SignalWriter.signal_names">
+<em class="property">property </em><code class="descname">signal_names</code></dt>
+<dd><p>all signal names which are known in a list</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.mts">
+<span id="module-contents"></span><h2>Module contents</h2>
+<div class="section" id="init-py">
+<h3>__init__.py</h3>
+<p>sub-package to handle tooling around MTS.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.rdb.html" title="hpc.rdb package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="hpc.core.html" title="hpc.core package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" >hpc package</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,349 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sbmt.task_factory</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sbmt.task_factory</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">hpc/task_factory</span>
+<span class="sd">----------------</span>
+
+<span class="sd">TaskFactoryMTS Module for Hpc.</span>
+
+<span class="sd">**User-API Interfaces**</span>
+
+<span class="sd">    - `hpc` (complete package)</span>
+<span class="sd">    - `TaskFactory` (this module)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span><span class="p">,</span> <span class="n">PY2</span>
+<span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">StringTypes</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,)</span>
+
+<span class="c1"># - import HPC modules ------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..sched.sched_defs</span> <span class="kn">import</span> <span class="n">INPUT_PATH</span><span class="p">,</span> <span class="n">OUTPUT_PATH</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">PRODUCTION_HEADS</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">TASK_DEFAULTS</span><span class="p">,</span> <span class="n">USR_EXMAP</span>
+<span class="kn">from</span> <span class="nn">..bpl</span> <span class="kn">import</span> <span class="n">Bpl</span>
+<span class="kn">from</span> <span class="nn">.subtask_factory</span> <span class="kn">import</span> <span class="n">SubTaskFactory</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">RUNTM</span> <span class="o">=</span> <span class="s2">&quot;runtime&quot;</span>
+
+
+<span class="c1"># - classes -----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="TaskFactory"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory">[docs]</a><span class="k">class</span> <span class="nc">TaskFactory</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    **Create Tasks based on &quot;normal&quot; commandline call.**</span>
+
+<span class="sd">    - Typical usage is first to set all information, which is the same for</span>
+<span class="sd">      all Tasks. (environment-variables, working-dir, ....)</span>
+<span class="sd">    - After that, multiple calls of the &quot;create_task&quot; - for the real</span>
+<span class="sd">      Task creation.</span>
+
+<span class="sd">    *Example:*::</span>
+
+<span class="sd">        # Import hpc</span>
+<span class="sd">        import hpc</span>
+
+<span class="sd">        #connect to HPC cluster</span>
+<span class="sd">        job = hpc.Job(name=&quot;Training_Ping&quot;, project=&quot;Short_Test&quot;)</span>
+
+<span class="sd">        factory = hpc.TaskFactory(job)</span>
+<span class="sd">        factory.create_task(&#39;ping 127.0.0.1&#39;)</span>
+<span class="sd">        job.submit()</span>
+
+<span class="sd">    **Creates Tasks based on SubTasks.**</span>
+
+<span class="sd">    - Tasks can be the SubTaskIndex from a SubTaskFactory Created Task.</span>
+
+<span class="sd">    *Example:*::</span>
+
+<span class="sd">        # Import hpc</span>
+<span class="sd">        import hpc</span>
+
+<span class="sd">        # connect to local (pseudo) &quot;HPC&quot; cluster</span>
+<span class="sd">        job = hpc.JobSim(name=&quot;Training_SubTask&quot;, project=&quot;Short_Test&quot;)</span>
+
+<span class="sd">        # Create the main task factory</span>
+<span class="sd">        factory = hpc.TaskFactory(job)</span>
+
+<span class="sd">        # Create TaskFactory</span>
+<span class="sd">        ping1 = hpc.SubTaskFactory(job)</span>
+<span class="sd">        ping2 = hpc.SubTaskFactory(job)</span>
+
+<span class="sd">        sub1 = ping1.create_task(&quot;ping.exe 127.0.0.1&quot;)</span>
+
+<span class="sd">        counter = 0</span>
+<span class="sd">        for idx in range(0, 10):</span>
+<span class="sd">            sub2 = ping2.CreateTask(&quot;ping.exe 127.0.0.1 -n%d&quot; % counter)</span>
+<span class="sd">            counter += 1</span>
+<span class="sd">            factory.create_task(sub1 + sub2)</span>
+
+<span class="sd">        job.submit()</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="TaskFactory.__init__"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hpc</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init task factory</span>
+
+<span class="sd">        :param hpc.Job hpc: link to job</span>
+<span class="sd">        :param dict kwargs: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of task</span>
+<span class="sd">            * *io_watch* (``bool``): whether watchdog shall watch io traffic</span>
+<span class="sd">            * *cpu_watch* (``bool``): whether watchdog shall track cpu usage</span>
+<span class="sd">            * *time_watch* (``float``): whether watchdog shall monitor time [h]</span>
+<span class="sd">            * *prn_watch* (``bool``): whether watchdog shall watch the printout</span>
+<span class="sd">            * *time_factor* (``float``): default 16 x recording length</span>
+<span class="sd">            * *skipon* (``list``): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</span>
+<span class="sd">            * *wrapexe* (``dict``): executables wrapped around all sub task, e.g.</span>
+<span class="sd">                [{&quot;cmd&quot;: &quot;foobar.exe -o1 -o2&quot;, &quot;cwd&quot;: None, &quot;timeout&quot;: 0.5,</span>
+<span class="sd">                  &quot;waitfor&quot;: &quot;wait for this on stdout and continue&quot;, &quot;erroron&quot;: &quot;wait for this on stdout and fail&quot;,}]</span>
+<span class="sd">            * *cncl_cmd* (``str``): cancel command to be executed when task is canceled, max runtime: 60s</span>
+<span class="sd">            * *exit_map* (``dict``): map real exit code to user defined</span>
+<span class="sd">            * *folders* (``list[str]``): list of extra folder to create on WSN at start of (sub)task run</span>
+<span class="sd">            * *env* (``dict``): environment variables to set for the task</span>
+<span class="sd">            * *notify_on_start* (``bool``): receive an email when job starts</span>
+<span class="sd">            * *notify_on_completion* (``bool``): receive an email when job completes</span>
+<span class="sd">            * *out_dir* (``str``): output directory, if it should be different than the task folder or _data</span>
+<span class="sd">            * *log_dir* (``str``): log directory, if it should be different than the task folder \\ log</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">hpc</span><span class="o">.</span><span class="n">job_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;name of job is mandatory!&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span> <span class="o">=</span> <span class="n">hpc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">RUNTM</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tjenv</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">TASK_DEFAULTS</span><span class="p">)</span> <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span> <span class="o">!=</span> <span class="n">d</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;wrapexe&quot;</span><span class="p">,</span> <span class="n">USR_EXMAP</span><span class="p">,):</span>  <span class="c1"># take them out</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;stf&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stf</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;stf&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stf</span> <span class="o">=</span> <span class="n">SubTaskFactory</span><span class="p">(</span><span class="n">hpc</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TaskFactory.set_cur_work_dir"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.set_cur_work_dir">[docs]</a>    <span class="k">def</span> <span class="nf">set_cur_work_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">working_dir</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        SetCurWorkingDir set the current working dir for your process.</span>
+<span class="sd">        Per default the current working directory is set to</span>
+<span class="sd">        D:/data/%JobName%/1_Input.</span>
+
+<span class="sd">        :note:</span>
+<span class="sd">            - %JobName% will be replaced with the real JobName.</span>
+<span class="sd">            - %TaskName% will be replaced with the real TaskName.</span>
+
+<span class="sd">        :param working_dir:   Name of the Environment Variable.</span>
+<span class="sd">        :type working_dir:    string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stf</span><span class="o">.</span><span class="n">set_cur_work_dir</span><span class="p">(</span><span class="n">working_dir</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TaskFactory.add_environment_variable"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.add_environment_variable">[docs]</a>    <span class="k">def</span> <span class="nf">add_environment_variable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With this method, you are able to set multiple Environment variables</span>
+<span class="sd">        for your Task. You can call this method several times, with different</span>
+<span class="sd">        key/value - pairs. All of them will be set before your task</span>
+<span class="sd">        starts with execution.</span>
+
+<span class="sd">        :param key:   Name of the Environment Variable.</span>
+<span class="sd">        :type key:    string</span>
+<span class="sd">        :param value: Value which is used to set the Environment Variable.</span>
+<span class="sd">        :type value:  string</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stf</span><span class="o">.</span><span class="n">add_environment_variable</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TaskFactory.activate_app_watcher"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.activate_app_watcher">[docs]</a>    <span class="k">def</span> <span class="nf">activate_app_watcher</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">active</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        wether to (de)activate the watcher: deprecated</span>
+
+<span class="sd">        The ApplicationWatcher normal checks the real Task, if the task is</span>
+<span class="sd">        still running. He does this with looking on the cpu-load and the io</span>
+<span class="sd">        of the process. Is the task under the limit of the minimum cpu-load</span>
+<span class="sd">        and/or io, he will kill the process to free the node again.</span>
+
+<span class="sd">        Sometime it is necessay, to deactivate this, because the</span>
+<span class="sd">        ApplicationWatcher kills the process in a unwanted situation.</span>
+<span class="sd">        For this you can call this Method.</span>
+
+<span class="sd">        :param bool active: flag if Application Watcher shall be deactivated or not.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stf</span><span class="o">.</span><span class="n">activate_app_watcher</span><span class="p">(</span><span class="n">active</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_create_task_with_subtask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subtask</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        create a HPC task based on multiple subtasks.</span>
+
+<span class="sd">        :param int subtask: sub tasks id&#39;s or command</span>
+<span class="sd">        :param dict kwargs: misc more params</span>
+<span class="sd">        :return: task info being created</span>
+<span class="sd">        :rtype: dict</span>
+<span class="sd">        :raises HpcError: on any problems</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">nargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">taskno</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">taskno</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">maxtasks</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">head_node</span> <span class="ow">in</span> <span class="n">PRODUCTION_HEADS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;maximum number of tasks reached: </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">maxtasks</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">loglevel</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">subtask</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;adding subtask</span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> as task </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subtask</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span>
+                                      <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">subtask</span><span class="p">]),</span> <span class="n">taskno</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;adding task </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">taskno</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">starter</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot; --id&quot;</span><span class="p">):</span>
+            <span class="n">starter</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">starter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">head_node</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">jobid</span><span class="p">,</span> <span class="n">taskno</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">starter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">starter</span>
+
+        <span class="c1"># create HPC task</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">nargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;T</span><span class="si">{:0&gt;5d}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">taskno</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span> <span class="k">else</span> <span class="n">name</span><span class="p">[:</span><span class="mi">128</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">))</span>
+
+        <span class="n">tjenv</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tjenv</span><span class="p">)</span>
+        <span class="n">tjenv</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">nargs</span><span class="p">)</span>
+                      <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">TASK_DEFAULTS</span> <span class="ow">and</span> <span class="n">v</span> <span class="o">!=</span> <span class="n">tjenv</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">TASK_DEFAULTS</span><span class="p">[</span><span class="n">k</span><span class="p">])})</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">tjenv</span><span class="p">:</span>
+            <span class="n">nargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="c1"># add task information to sqlite db for app_starter</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">subtask</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">subtask</span> <span class="o">=</span> <span class="p">[</span><span class="n">subtask</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">taskno</span><span class="o">=</span><span class="n">taskno</span><span class="p">,</span> <span class="n">stk</span><span class="o">=</span><span class="n">subtask</span><span class="p">,</span> <span class="o">**</span><span class="n">tjenv</span><span class="p">)</span>
+
+        <span class="n">basepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">,</span> <span class="n">OUTPUT_PATH</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="n">env_data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_env_data</span><span class="p">)</span>
+        <span class="n">env_data</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;TaskName&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">&quot;TaskID&quot;</span><span class="p">:</span> <span class="n">taskno</span><span class="p">,</span> <span class="s2">&quot;HPCTaskTmpFolder&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span> <span class="s1">&#39;tmp&#39;</span><span class="p">),</span>
+                         <span class="s2">&quot;HPCTaskDataFolder&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basepath</span><span class="p">,</span> <span class="s2">&quot;data&quot;</span><span class="p">)})</span>
+        <span class="n">env_data</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">nargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="p">{}))</span>
+
+        <span class="n">cwd</span> <span class="o">=</span> <span class="n">nargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cwd&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">work_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">job_folder_name</span><span class="p">,</span> <span class="n">INPUT_PATH</span><span class="p">))</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="n">starter</span>
+        <span class="k">if</span> <span class="s2">&quot;adm&quot;</span> <span class="ow">in</span> <span class="n">nargs</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">template</span> <span class="o">==</span> <span class="s2">&quot;Admin&quot;</span><span class="p">:</span>
+            <span class="n">cmd</span> <span class="o">=</span> <span class="n">nargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;adm&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span> <span class="ow">and</span> <span class="n">RUNTM</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">nargs</span><span class="p">:</span>
+            <span class="n">nargs</span><span class="p">[</span><span class="n">RUNTM</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">([</span><span class="n">i</span> <span class="ow">in</span> <span class="n">nargs</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;min_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;max_nodes&quot;</span><span class="p">,</span> <span class="s2">&quot;min_cores&quot;</span><span class="p">,</span> <span class="s2">&quot;max_cores&quot;</span><span class="p">,</span>
+                                         <span class="s2">&quot;min_sockets&quot;</span><span class="p">,</span> <span class="s2">&quot;max_sockets&quot;</span><span class="p">,</span> <span class="s2">&quot;sockets&quot;</span><span class="p">]]):</span>
+            <span class="n">nargs</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">append_task</span><span class="p">(</span><span class="n">envs</span><span class="o">=</span><span class="n">env_data</span><span class="p">,</span> <span class="n">depends</span><span class="o">=</span><span class="n">nargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;depends&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+                                           <span class="n">taskno</span><span class="o">=</span><span class="n">taskno</span><span class="p">,</span> <span class="n">command_line</span><span class="o">=</span><span class="n">cmd</span><span class="p">,</span> <span class="n">work_directory</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">nargs</span><span class="p">)</span>
+        <span class="c1"># stderr=join(self._hpc.sched.net_out_path, &quot;T{:05d}&quot;.format(taskno), &quot;status.url&quot;))</span>
+
+<div class="viewcode-block" id="TaskFactory.create_task"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.create_task">[docs]</a>    <span class="k">def</span> <span class="nf">create_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a new task.</span>
+
+<span class="sd">        :param str cmd: Commandline for the executable to start.</span>
+<span class="sd">        :param dict kwargs: misc more args, see create_task method of subtask_factory for more info...</span>
+<span class="sd">        :return: info about the task</span>
+<span class="sd">        :rtype: dict</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">subtaskmode</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cmd</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">StringTypes</span><span class="p">):</span>
+                <span class="n">subtaskmode</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">subtaskmode</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">subtaskmode</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_task_with_subtask</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># create sub-task for cmd call</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_task_with_subtask</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stf</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TaskFactory.create_tasks"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.TaskFactory.create_tasks">[docs]</a>    <span class="k">def</span> <span class="nf">create_tasks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bpl_file_path</span><span class="p">,</span> <span class="n">cmd</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create multiple tasks based on a given \*.bpl file.</span>
+<span class="sd">        %recfile% inside &#39;cmd&#39; keyword will be replaced by iterated recording from bpl</span>
+<span class="sd">        Sections will not be taken into consideration as for create_tasks of task factory mts...</span>
+
+<span class="sd">        :param str bpl_file_path: bpl file name</span>
+<span class="sd">        :param str cmd: cmd to be used</span>
+<span class="sd">        :param dict kwargs: misc more args</span>
+<span class="sd">        :return: info of details being added</span>
+<span class="sd">        :rtype: list[dict]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rec</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;recording&quot;</span><span class="p">)</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%r</span><span class="s2">ecfile%&quot;</span><span class="p">)</span>
+        <span class="n">tasks</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">bpl_file_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">bpl</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">bpl</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">is_simple</span><span class="p">:</span>
+                    <span class="n">rfn</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">filepath</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">bpl_cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">rfn</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">sched</span><span class="o">.</span><span class="n">net_in_path</span><span class="p">,</span> <span class="s1">&#39;bpl&#39;</span><span class="p">,</span> <span class="s2">&quot;rec</span><span class="si">{:05d}</span><span class="s2">.bpl&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hpc</span><span class="o">.</span><span class="n">bpl_cnt</span><span class="p">))</span>
+                    <span class="n">item</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">rfn</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">rec</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;recording&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rfn</span>
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">cmd</span><span class="p">:</span>
+                    <span class="n">newcmd</span> <span class="o">=</span> <span class="n">cmd</span><span class="p">[:</span><span class="n">idx</span><span class="p">]</span> <span class="o">+</span> <span class="n">rfn</span> <span class="o">+</span> <span class="n">cmd</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">9</span><span class="p">:]</span>
+                <span class="k">elif</span> <span class="n">cmd</span><span class="p">:</span>
+                    <span class="n">newcmd</span> <span class="o">=</span> <span class="n">cmd</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">newcmd</span> <span class="o">=</span> <span class="n">rfn</span>
+
+            <span class="n">tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">newcmd</span><span class="p">,</span> <span class="o">**</span><span class="nb">dict</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="n">tasks</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

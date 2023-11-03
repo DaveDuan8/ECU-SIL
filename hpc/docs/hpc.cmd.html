@@ -1,0 +1,852 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.cmd package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="next" title="hpc" href="modules.html" />
+    <link rel="prev" title="Welcome to HPC’s documentation!" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="hpc"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to HPC’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-cmd-package">
+<h1>hpc.cmd package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.cmd.bpl_operator">
+<span id="hpc-cmd-bpl-operator-module"></span><h2>hpc.cmd.bpl_operator module</h2>
+<div class="section" id="bpl-operator">
+<h3>bpl_operator</h3>
+<p><strong>Bpl Operator</strong> supports easy command line calls to diff, merge etc. bpl files with bpl syntax (xml style).
+(*.ini files are not supported)</p>
+<p><strong>call syntax example</strong></p>
+<p>C:&gt; python bpl_operator &lt;op&gt; -i &lt;first.bpl&gt; &lt;second.bpl&gt; -o &lt;result.bpl&gt; [-s]</p>
+<p>This program does an operation on 2 BPL based files.
+Result of operation is saved into an output BPL based file.</p>
+<p>Attention: it does not handle sections! The output will not contain any sections.</p>
+<p>The result will not contain duplicates of a recordings.</p>
+<p>Option -s is intended to strictly use fileNames inside BPL’s as they are,
+otherwise, unc paths will be aligned and case insensitive comparison will take place.</p>
+<p>&lt;op&gt; := and | or | xor | sub</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>xor</em>: will contain files from either input (diff),</li>
+<li><em>or</em>:  will contain files from both inputs (merge),</li>
+<li><em>and</em>: will contain files common to both inputs,</li>
+<li><em>sub</em>: will contain files from first input which are not inside second input</li>
+</ul>
+</div></blockquote>
+<p>As the result does not contain duplicated recordings this can also be used to clean up
+all duplicate recordings in a bpl file by running</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">bpl_operator</span><span class="o">.</span><span class="n">py</span> <span class="ow">or</span> <span class="o">-</span><span class="n">i</span> <span class="n">main</span><span class="o">.</span><span class="n">bpl</span> <span class="n">empty</span><span class="o">.</span><span class="n">bpl</span> <span class="o">-</span><span class="n">o</span> <span class="n">singles</span><span class="o">.</span><span class="n">bpl</span>
+</pre></div>
+</div>
+<p>Use for the empty.bpl:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;yes&quot;?&gt;
+  &lt;BatchList xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xsi:noNamespaceSchemaLocation=&quot;batchlist.xsd&quot;&gt;
+&lt;/BatchList&gt;
+</pre></div>
+</div>
+<p>This script does not use any other HPC imports and just needs a Python installation.</p>
+<dl class="class">
+<dt id="hpc.cmd.bpl_operator.PlayList">
+<em class="property">class </em><code class="descclassname">hpc.cmd.bpl_operator.</code><code class="descname">PlayList</code><span class="sig-paren">(</span><em>path</em>, <em>sensitive=False</em>, <em>mode='r'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#PlayList"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+<p>class to provide list of bpl files and operator methods</p>
+<dl class="method">
+<dt id="hpc.cmd.bpl_operator.PlayList.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>path</em>, <em>sensitive=False</em>, <em>mode='r'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#PlayList.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path</strong> (<em>str</em>) – path to file</li>
+<li><strong>sensitive</strong> (<em>bool</em>) – when comparing to another PlayList, do it sensitive</li>
+<li><strong>mode</strong> (<em>str</em>) – read=r, write=w</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.cmd.bpl_operator.PlayList.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#PlayList.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close file</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.cmd.bpl_operator.PlayList.files">
+<code class="descname">files</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#PlayList.files"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>remove additional dotted unc parts</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.cmd.bpl_operator.PlayList.write">
+<code class="descname">write</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#PlayList.write"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>write file</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.bpl_operator.main">
+<code class="descclassname">hpc.cmd.bpl_operator.</code><code class="descname">main</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/bpl_operator.html#main"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>just calling the operation and saving the result</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.bsig_check">
+<span id="hpc-cmd-bsig-check-module"></span><h2>hpc.cmd.bsig_check module</h2>
+<div class="section" id="bsig-check-py">
+<h3>bsig_check.py</h3>
+<p><strong>Checks bisg files for their validity.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>Checks all bsig files from a given folder if they are readable / consistent.</li>
+</ul>
+</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;bsig_check.py</span> <span class="pre">J:\luss021\85585_DEV_ALL_LD_050561I02_Ori-Sim\2_Output\_data</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">param | -P use print, not logger output:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"></td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param | &lt;folder&gt; to scan through:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"></td>
+</tr>
+</tbody>
+</table>
+<dl class="function">
+<dt id="hpc.cmd.bsig_check.bsig_check">
+<code class="descclassname">hpc.cmd.bsig_check.</code><code class="descname">bsig_check</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/bsig_check.html#bsig_check"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check all bsigs for given folder or just one</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>bsigs</em> (<code class="docutils literal notranslate"><span class="pre">list</span> <span class="pre">|</span> <span class="pre">str</span></code>): input folder or file to check bsig file from or a bsig file directly</li>
+<li><em>logger</em> (<code class="docutils literal notranslate"><span class="pre">Logger</span></code>): use logger given, if done so</li>
+<li><em>rectms</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): expected recording begin and end timestamp</li>
+<li><em>recdiff</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): allowed recording difference, default: 10%</li>
+<li><em>exit_prio</em> (<code class="docutils literal notranslate"><span class="pre">ExitCode</span></code>): exit code priorizer, instance of ExitCode, default: None</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error found</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.compare_results">
+<span id="hpc-cmd-compare-results-module"></span><h2>hpc.cmd.compare_results module</h2>
+<div class="section" id="compare-results">
+<h3>compare_results</h3>
+<p>This file provides compare production vs test cluster jobs for projects</p>
+<dl class="function">
+<dt id="hpc.cmd.compare_results.compare_results">
+<code class="descclassname">hpc.cmd.compare_results.</code><code class="descname">compare_results</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/compare_results.html#compare_results"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>compare results production vs test cluster jobs
+:param kwargs: production head node, test head node and project
+:return: int
+:rtype: int</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.compare_results.parse_job_args">
+<code class="descclassname">hpc.cmd.compare_results.</code><code class="descname">parse_job_args</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/compare_results.html#parse_job_args"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>This parse job argument to compare results production vs test cluster
+:param list args: production head node, test head node and project
+:return: int
+:rtype: int</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.env_collector">
+<span id="hpc-cmd-env-collector-module"></span><h2>hpc.cmd.env_collector module</h2>
+<div class="section" id="env-collector-py">
+<h3>env_collector.py</h3>
+<p><strong>Extract information about a task from DB.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>get command line info</li>
+<li>get all details of a task and save to CSV</li>
+<li>print stdout of a task to console</li>
+<li>search with regex through stdout of a job</li>
+<li>export measurements with certain exitcode to a bpl</li>
+</ul>
+</dd>
+<dt><strong>UseCase:</strong></dt><dd>Used to save some information for IT, on job / task problems.</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">env_collector.py</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">env_collector.py</span> <span class="pre">search</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+…</p>
+<dl class="function">
+<dt id="hpc.cmd.env_collector.env_exporter">
+<code class="descclassname">hpc.cmd.env_collector.</code><code class="descname">env_exporter</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_exporter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>export collected data into a csv file</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>sortcol</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – field to sort results, default: TASK</li>
+<li><em>outfile</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – CSV output file name</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.env_collector.env_log_print">
+<code class="descclassname">hpc.cmd.env_collector.</code><code class="descname">env_log_print</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_log_print"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>print info from env_log</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>db</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – db to use</li>
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>taskid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC task id</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.env_collector.env_stdout_search">
+<code class="descclassname">hpc.cmd.env_collector.</code><code class="descname">env_stdout_search</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_stdout_search"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>search all stdout of a certain HPC job by some pattern</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>db</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – db to use</li>
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>pattern</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – regular expression pattern</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.env_collector.env_export_bpl">
+<code class="descclassname">hpc.cmd.env_collector.</code><code class="descname">env_export_bpl</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_export_bpl"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a bpl file from given job with only those recordings processed with a certain task state or exitcode.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>state</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – state of task to filter</li>
+<li><em>exitcode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – filter for exit codes</li>
+<li><em>bpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – output bpl file</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.error_reporter">
+<span id="hpc-cmd-error-reporter-module"></span><h2>hpc.cmd.error_reporter module</h2>
+<div class="section" id="error-reporter-py">
+<h3>error_reporter.py</h3>
+<p><strong>Extract information about a task / job from DB.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>export starttime, task and exitcode to CSV</li>
+<li>print amount of succeeded and failed tasks from last hour, day and week</li>
+<li>print the amount of errors and warnings of a node</li>
+<li>print amount of errors, error description and measurement used questing DB</li>
+</ul>
+</dd>
+<dt><strong>UseCase:</strong></dt><dd>Used to ahve some information for the IT available, when we have some Job /Task Problems.</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">error_reporter.py</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">error_reporter.py</span> <span class="pre">overview</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+…</p>
+<dl class="function">
+<dt id="hpc.cmd.error_reporter.overview">
+<code class="descclassname">hpc.cmd.error_reporter.</code><code class="descname">overview</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/error_reporter.html#overview"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>we export time, name and exitcode to a csv</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – head node name, job ident, output file and exitcodes</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.error_reporter.fail_succeeds">
+<code class="descclassname">hpc.cmd.error_reporter.</code><code class="descname">fail_succeeds</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/error_reporter.html#fail_succeeds"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>print amount of succeeded and failed tasks from last hour, day and week</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – head node name, job ident</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.error_reporter.win_events">
+<code class="descclassname">hpc.cmd.error_reporter.</code><code class="descname">win_events</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/error_reporter.html#win_events"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>we just print the amount of errors and warnings</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – nothing needed</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.error_reporter.rec_errors">
+<code class="descclassname">hpc.cmd.error_reporter.</code><code class="descname">rec_errors</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/error_reporter.html#rec_errors"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>print amount of errors, error description and measurement used questing DB</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – nothing needed</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.job_clone">
+<span id="hpc-cmd-job-clone-module"></span><h2>hpc.cmd.job_clone module</h2>
+<div class="section" id="job-clone-py">
+<h3>job_clone.py</h3>
+<p><strong>Extract information about a task / job from DB.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>export starttime, task and exitcode to CSV</li>
+<li>print amount of succeeded and failed tasks from last hour, day and week</li>
+<li>print the amount of errors and warnings of a node</li>
+<li>print amount of errors, error description and measurement used questing DB</li>
+</ul>
+</dd>
+<dt><strong>UseCase:</strong></dt><dd>Used to ahve some information for the IT available, when we have some Job /Task Problems.</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">job_clone.py</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">job_clone.py</span> <span class="pre">overview</span> <span class="pre">-h</span> <span class="pre">...</span></code>
+…</p>
+<dl class="function">
+<dt id="hpc.cmd.job_clone.job_clone">
+<code class="descclassname">hpc.cmd.job_clone.</code><code class="descname">job_clone</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/job_clone.html#job_clone"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>clone a job with only failed tasks</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name</li>
+<li><em>jobid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of HPC job</li>
+<li><em>exitcodes</em> (<code class="docutils literal notranslate"><span class="pre">list[int]</span></code>): list of exitcodes to limit tasks, default: []</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">new job id</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.job_clone.pack_job">
+<code class="descclassname">hpc.cmd.job_clone.</code><code class="descname">pack_job</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/job_clone.html#pack_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>pack whole input folder (1_Input) of a job into a tar.gz file for later requeue</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name</li>
+<li><em>jobid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of HPC job</li>
+<li><em>filename</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): destination name of file without extention</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">always 0</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.job_clone.requeue_job">
+<code class="descclassname">hpc.cmd.job_clone.</code><code class="descname">requeue_job</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/job_clone.html#requeue_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>unpack job’s zip and then call clone tool</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>filename</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of zip to unpack</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><strong>Exception</strong> – when job cannot be extracted</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">new job id (returned by requeue_job command)</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.job_sim_quality">
+<span id="hpc-cmd-job-sim-quality-module"></span><h2>hpc.cmd.job_sim_quality module</h2>
+<p>provide job simulation quality of projects</p>
+<ol class="arabic simple">
+<li>Connect to production head node</li>
+<li>Get finished jobs for each project from production</li>
+<li>Clone jobs and execute on test cluster</li>
+<li>map production and test cluster job ids</li>
+</ol>
+<dl class="function">
+<dt id="hpc.cmd.job_sim_quality.job_clone_sim_quality">
+<code class="descclassname">hpc.cmd.job_sim_quality.</code><code class="descname">job_clone_sim_quality</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/job_sim_quality.html#job_clone_sim_quality"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>clone job from production to test cluster and simulate in test cluster to check quality of job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>dict</em>) – production headnode, test headnode, top finished jobs and project</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">success state</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.job_sim_quality.parse_job_args">
+<code class="descclassname">hpc.cmd.job_sim_quality.</code><code class="descname">parse_job_args</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/job_sim_quality.html#parse_job_args"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>parse job argument to simulate on test cluster</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<em>list</em>) – production head node, test head node, no of finished jobs and project</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">success code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="module-hpc.cmd.mts_check">
+<span id="hpc-cmd-mts-check-module"></span><h2>hpc.cmd.mts_check module</h2>
+<div class="section" id="mts-check-py">
+<h3>mts_check.py</h3>
+<p><strong>Checks after MTS Crashdumps, Errors and Exception in *.xlog files.</strong></p>
+<dl class="docutils">
+<dt><strong>Features:</strong></dt><dd><ul class="simple">
+<li>Printing of Error Statistic Output from HPCErrorDB (Oracle)</li>
+<li>Scanning of a given Folder for Chrashdumps and xlog-Error File Entries.</li>
+<li>Scanning xlog-Error files for MTS Errors, Exceptions and …</li>
+<li>Writing all found errors into the Oracle Error DB.</li>
+</ul>
+</dd>
+<dt><strong>UseCase:</strong></dt><dd>Typically used as SubTask in the MTSTaskFactory for error checking.</dd>
+</dl>
+<p><strong>Usage:</strong></p>
+<blockquote>
+<div><ul>
+<li><p class="first"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">check</span> <span class="pre">\\LIFS010\hpc\liss006\3511_MFC3B0_JointSim\2_Output\T00008</span></code></p>
+</li>
+<li><p class="first"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">stat</span> <span class="pre">3511</span></code></p>
+</li>
+<li><div class="first line-block">
+<div class="line">scan for db file and add rec file mapping entries:</div>
+<div class="line"><code class="xref py py-obj docutils literal notranslate"><span class="pre">C:\&gt;python</span> <span class="pre">mts_check.py</span> <span class="pre">check</span> <span class="pre">\\LIFS010\hpc\liss006\3511_MFC3B0_JointSim</span> <span class="pre">-d</span></code></div>
+</div>
+</li>
+</ul>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">param check &lt;folder&gt;:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body">The given Input Folder URL which is used to scan after some errornous stuff.</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">param stat &lt;jobid&gt;:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">JobId which must be used for getting the Error info out from the Oracle DB.</td>
+</tr>
+</tbody>
+</table>
+<dl class="function">
+<dt id="hpc.cmd.mts_check.print_logs">
+<code class="descclassname">hpc.cmd.mts_check.</code><code class="descname">print_logs</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/mts/mts_check.html#print_logs"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Open a connection to Oracle DB and return details of job / task.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): HPC head node name, default: DEFAULT_HEAD_NODE</li>
+<li><em>jobid</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): id of HPC job</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error code</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.mts_xlog_crawler">
+<span id="hpc-cmd-mts-xlog-crawler-module"></span><h2>hpc.cmd.mts_xlog_crawler module</h2>
+<div class="section" id="mts-xlog-crawler-py">
+<h3>mts_xlog_crawler.py</h3>
+<p>MTS Xlog Crawler scans a hpc file system to extract data from xlog files and save to csv file</p>
+<ol class="arabic simple">
+<li>select a head node</li>
+<li>map head node with file system</li>
+<li>scan a file system to find a job folders</li>
+<li>find a xlog file in job folders</li>
+<li>parse xlog file to extract data for error and exception</li>
+<li>save extracted data to csv file</li>
+</ol>
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_crawler.mts_xlog_crawler">
+<code class="descclassname">hpc.cmd.mts_xlog_crawler.</code><code class="descname">mts_xlog_crawler</code><span class="sig-paren">(</span><em>headnode</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_crawler.html#mts_xlog_crawler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Its scans file system and find a mts xlog files in job folders</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_crawler.mts_xlog_parser">
+<code class="descclassname">hpc.cmd.mts_xlog_crawler.</code><code class="descname">mts_xlog_parser</code><span class="sig-paren">(</span><em>xlog_files</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_crawler.html#mts_xlog_parser"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>parse xlog file and error and exception extracted from xlog file</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>xlog_files</strong> (<em>list</em>) – list of files to parse through</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">error and exception data found</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">tuple</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_crawler.xlog_writer">
+<code class="descclassname">hpc.cmd.mts_xlog_crawler.</code><code class="descname">xlog_writer</code><span class="sig-paren">(</span><em>headnode</em>, <em>error_data</em>, <em>exception_data</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_crawler.html#xlog_writer"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>save extracted data into csv file</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>headnode</strong> (<em>str</em>) – name of head</li>
+<li><strong>error_data</strong> (<em>list</em>) – TODO</li>
+<li><strong>exception_data</strong> (<em>list</em>) – TODO</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.mts_xlog_merge">
+<span id="hpc-cmd-mts-xlog-merge-module"></span><h2>hpc.cmd.mts_xlog_merge module</h2>
+<div class="section" id="mts-xlog-merge-py">
+<h3>mts_xlog_merge.py</h3>
+<p>This script merge mts xlog file for error and exception data collected from HPC clusters</p>
+<p class="rubric">Example</p>
+<dl class="docutils">
+<dt>&gt; mts_xlog_merge -ler LU00156VMA_Error_28_05_2020_16_39_30.csv -ber OZAS012A_Error_22_05_2020_09_32_52.csv</dt><dd>-aer QHS6U5CA_Error_28_05_2020_05_20_36.csv -lex LU00156VMA_Exception_28_05_2020_16_39_30.csv
+-bex OZAS012A_Exception_22_05_2020_09_32_52.csv -aex QHS6U5CA_Exception_28_05_2020_05_20_36.csv</dd>
+</dl>
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_merge.mts_xlog_merge_error">
+<code class="descclassname">hpc.cmd.mts_xlog_merge.</code><code class="descname">mts_xlog_merge_error</code><span class="sig-paren">(</span><em>lnd</em>, <em>bng</em>, <em>abh</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_merge.html#mts_xlog_merge_error"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>merge xlog data for error</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>lnd</strong> (<em>str</em>) – csv file</li>
+<li><strong>bng</strong> (<em>str</em>) – csv file</li>
+<li><strong>abh</strong> (<em>str</em>) – csv file</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">0</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">int</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_merge.mts_xlog_merge_exception">
+<code class="descclassname">hpc.cmd.mts_xlog_merge.</code><code class="descname">mts_xlog_merge_exception</code><span class="sig-paren">(</span><em>lndx</em>, <em>bngx</em>, <em>abhx</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_merge.html#mts_xlog_merge_exception"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>merge xlog data for exception</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>lndx</strong> (<em>str</em>) – csv file</li>
+<li><strong>bngx</strong> (<em>str</em>) – csv file</li>
+<li><strong>abhx</strong> (<em>str</em>) – csv file</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">0</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">int</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.mts_xlog_patterns">
+<span id="hpc-cmd-mts-xlog-patterns-module"></span><h2>hpc.cmd.mts_xlog_patterns module</h2>
+<div class="section" id="mts-xlog-patterns-py">
+<h3>mts_xlog_patterns.py</h3>
+<p>This script scans a csv file and find a patterns for error and exceptions</p>
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_patterns.find_patterns_error">
+<code class="descclassname">hpc.cmd.mts_xlog_patterns.</code><code class="descname">find_patterns_error</code><span class="sig-paren">(</span><em>data</em>, <em>headnode</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_patterns.html#find_patterns_error"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>file</em>) – file</li>
+<li><strong>headnode</strong> (<em>str</em>) – str</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.cmd.mts_xlog_patterns.find_patterns_exception">
+<code class="descclassname">hpc.cmd.mts_xlog_patterns.</code><code class="descname">find_patterns_exception</code><span class="sig-paren">(</span><em>data</em>, <em>headnode</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/mts_xlog_patterns.html#find_patterns_exception"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> (<em>file</em>) – file</li>
+<li><strong>headnode</strong> (<em>str</em>) – str</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.set_hpc_creds">
+<span id="hpc-cmd-set-hpc-creds-module"></span><h2>hpc.cmd.set_hpc_creds module</h2>
+<div class="section" id="set-hpc-creds-py">
+<h3>set_hpc_creds.py</h3>
+<p>set password for all head nodes</p>
+<dl class="function">
+<dt id="hpc.cmd.set_hpc_creds.parse_args">
+<code class="descclassname">hpc.cmd.set_hpc_creds.</code><code class="descname">parse_args</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/cmd/set_hpc_creds.html#parse_args"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>parse the arguments</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.cmd.upgrade">
+<span id="hpc-cmd-upgrade-module"></span><h2>hpc.cmd.upgrade module</h2>
+<div class="section" id="upgrade-py">
+<h3>upgrade.py</h3>
+<p>provides auto upgrade functionality of HPC package</p>
+</div>
+</div>
+<div class="section" id="module-hpc.cmd">
+<span id="module-contents"></span><h2>Module contents</h2>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="hpc"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to HPC’s documentation!"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,1631 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="next" title="hpc.sbmt package" href="hpc.sbmt.html" />
+    <link rel="prev" title="hpc.mts package" href="hpc.mts.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sbmt.html" title="hpc.sbmt package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="hpc.mts.html" title="hpc.mts package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" accesskey="U">hpc package</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-rdb-package">
+<h1>hpc.rdb package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.rdb.app_srv">
+<span id="hpc-rdb-app-srv-module"></span><h2>hpc.rdb.app_srv module</h2>
+<div class="section" id="app-srv-py">
+<h3>app_srv.py</h3>
+<p>application server connection handler</p>
+<dl class="class">
+<dt id="hpc.rdb.app_srv.Connection">
+<em class="property">class </em><code class="descclassname">hpc.rdb.app_srv.</code><code class="descname">Connection</code><span class="sig-paren">(</span><em>host</em>, <em>schema</em>, <em>**_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/app_srv.html#Connection"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>application server connection</p>
+<dl class="method">
+<dt id="hpc.rdb.app_srv.Connection.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>host</em>, <em>schema</em>, <em>**_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/app_srv.html#Connection.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>take essential info here</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>host</strong> (<em>str</em>) – host to use / contact for remote connection</li>
+<li><strong>schema</strong> (<em>str</em>) – default schema name</li>
+<li><strong>_kwargs</strong> (<em>dict</em>) – <em>unused</em></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.app_srv.Connection.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/app_srv.html#Connection.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>pseudo closing the connection</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.app_srv.connect">
+<code class="descclassname">hpc.rdb.app_srv.</code><code class="descname">connect</code></dt>
+<dd><p>alias of <a class="reference internal" href="#hpc.rdb.app_srv.Connection" title="hpc.rdb.app_srv.Connection"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.app_srv.Connection</span></code></a></p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.base">
+<span id="hpc-rdb-base-module"></span><h2>hpc.rdb.base module</h2>
+<div class="section" id="base-db-py">
+<h3>base_db.py</h3>
+<p>base database interface</p>
+<dl class="class">
+<dt id="hpc.rdb.base.BaseDB">
+<em class="property">class </em><code class="descclassname">hpc.rdb.base.</code><code class="descname">BaseDB</code><span class="sig-paren">(</span><em>db_connection='HPC'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base implementation of the Database Interface</p>
+<dl class="attribute">
+<dt id="hpc.rdb.base.BaseDB.APPSRV">
+<code class="descname">APPSRV</code><em class="property"> = 2</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.base.BaseDB.ORACLE">
+<code class="descname">ORACLE</code><em class="property"> = 1</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.base.BaseDB.SQLITE">
+<code class="descname">SQLITE</code><em class="property"> = 0</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>db_connection='HPC'</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>initialize database</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>db_connection</strong> (<em>str</em>) – The database connection to be used</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>aggregates</em> (<code class="docutils literal notranslate"><span class="pre">list</span></code>): list of additional aggregates</li>
+<li><em>maxtry</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): try maximum times to get connection to Oracle DB, default: 60</li>
+<li><em>create</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): flag to create a non-existing sqlite DB, default: False (do not create)</li>
+<li><em>journal</em> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>): turn off journal mode with sqlite DB, default: True</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>*_</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close connection</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.columns">
+<code class="descname">columns</code><span class="sig-paren">(</span><em>table</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.columns"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Get a list of column names for a given table.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>table</strong> (<em>str</em>) – name of table</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">list of columns</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.commit">
+<code class="descname">commit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.commit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Commit the pending transactions</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.db_type">
+<em class="property">property </em><code class="descname">db_type</code></dt>
+<dd><p>return a string about what type of DB we have here.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.execute">
+<code class="descname">execute</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.execute"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>inner decoration (providing self)</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.executex">
+<code class="descname">executex</code><span class="sig-paren">(</span><em>statement</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.executex"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Execute SQL statement(s).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>statement</strong> (<em>str</em>) – SQL query, supported statements: select, insert, update, delete, execute</li>
+<li><strong>args</strong> (<em>list</em>) – additional arguments</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – additional arguments</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">returns all rows</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">tuple</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.mkvar">
+<code class="descname">mkvar</code><span class="sig-paren">(</span><em>vartype</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.mkvar"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a cx_Oracle / sqlite variable</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>vartype</strong> (<em>str</em>) – current supported ones are blob and number</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">oracle variable</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">object</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><strong>Exception</strong> – when connection is unknown</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.primary_key">
+<code class="descname">primary_key</code><span class="sig-paren">(</span><em>table</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.primary_key"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Get the primary key column(s).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>table</strong> (<em>str</em>) – name of table</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">list of columns</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.reconnect">
+<code class="descname">reconnect</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.reconnect"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close and re-open connection</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.rollback">
+<code class="descname">rollback</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.rollback"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Rollback the pending transactions</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.stream2blob">
+<code class="descname">stream2blob</code><span class="sig-paren">(</span><em>stream</em>, <em>compress=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDB.stream2blob"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>convert a stream object to oracle blob</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>stream</strong> (<em>stream</em>) – some stream from which data can be read</li>
+<li><strong>compress</strong> (<em>bool</em>) – do a zlib compress before converting</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">cx_Oracle BLOB</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">buffer</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.base.BaseDB.tables">
+<em class="property">property </em><code class="descname">tables</code></dt>
+<dd><p>tables of DB
+:rtype: list</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="hpc.rdb.base.BaseDbException">
+<em class="property">exception </em><code class="descclassname">hpc.rdb.base.</code><code class="descname">BaseDbException</code><a class="reference internal" href="_modules/hpc/rdb/base.html#BaseDbException"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>Base database exception</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.basepath">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">basepath</code><span class="sig-paren">(</span><em>filepath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#basepath"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>strip server share apart</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.bitand">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">bitand</code><span class="sig-paren">(</span><em>col</em>, <em>val</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#bitand"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>sqlite function to support for oracle’s bitand</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.crc">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">crc</code><span class="sig-paren">(</span><em>filepath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#crc"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>calc crc32 out of filepath</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.random">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">random</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; x in the interval [0, 1).</dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.serverpath">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">serverpath</code><span class="sig-paren">(</span><em>filepath</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#serverpath"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>only return server share part</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.base.tohex">
+<code class="descclassname">hpc.rdb.base.</code><code class="descname">tohex</code><span class="sig-paren">(</span><em>val</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/base.html#tohex"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>sqlite function to support hex output</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.catalog">
+<span id="hpc-rdb-catalog-module"></span><h2>hpc.rdb.catalog module</h2>
+<div class="section" id="catalog-py">
+<h3>catalog.py</h3>
+<blockquote>
+<div>catlogue API</div></blockquote>
+<p>interface to CAT_FILES and CAT_COLLECTIONS tables with classes</p>
+<ul class="simple">
+<li><a class="reference internal" href="#hpc.rdb.catalog.CollManager" title="hpc.rdb.catalog.CollManager"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CollManager</span></code></a> super class to start with</li>
+<li><a class="reference internal" href="#hpc.rdb.catalog.Collection" title="hpc.rdb.catalog.Collection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Collection</span></code></a>  use collection tree to read/write collections with recordings</li>
+<li><a class="reference internal" href="#hpc.rdb.catalog.Recording" title="hpc.rdb.catalog.Recording"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Recording</span></code></a>   get recording data from db</li>
+</ul>
+<p><strong>Usage Example:</strong></p>
+<blockquote>
+<div><p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">CollManager</span><span class="p">(</span><span class="s1">&#39;VGA&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">collmgr</span><span class="p">:</span>
+
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">collmgr</span><span class="p">:</span>  <span class="c1"># print only top collections:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+<span class="c1"># something recusive: print collection tree, just for fun</span>
+<span class="k">with</span> <span class="n">Collection</span><span class="p">(</span><span class="s2">&quot;VGA&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;svens_coll&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">coll</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">recur</span><span class="p">(</span><span class="n">coll</span><span class="p">,</span> <span class="n">space</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">((</span><span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="n">space</span><span class="p">)</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">coll</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coll</span><span class="p">:</span>
+            <span class="n">recur</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">space</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">recur</span><span class="p">(</span><span class="n">coll</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+<span class="c1"># read rec file entries</span>
+<span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="s1">&#39;VGA&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">db</span><span class="p">:</span>
+    <span class="k">with</span> <span class="n">Recording</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">lifs010.cw01.contiwan.com\prj\path\to\filename.rec&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">rec</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;measid:&#39;</span> <span class="o">+</span> <span class="n">rec</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;driven dist:&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">rec</span><span class="o">.</span><span class="n">vdy_dist</span><span class="p">()))</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;for project:&#39;</span> <span class="o">+</span> <span class="n">rec</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>see more parameter in class <a class="reference internal" href="#hpc.rdb.catalog.Recording" title="hpc.rdb.catalog.Recording"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Recording</span></code></a></p>
+</div></blockquote>
+<dl class="class">
+<dt id="hpc.rdb.catalog.CollManager">
+<em class="property">class </em><code class="descclassname">hpc.rdb.catalog.</code><code class="descname">CollManager</code><span class="sig-paren">(</span><em>connection='VGA'</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>common class for collections</p>
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.APPEND">
+<code class="descname">APPEND</code><em class="property"> = 1</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.CLSUB">
+<code class="descname">CLSUB</code><em class="property"> = {1: &lt;class 'hpc.rdb.catalog.Collection'&gt;, 2: &lt;class 'hpc.rdb.catalog.SharedColl'&gt;, 3: &lt;class 'hpc.rdb.catalog.Recording'&gt;, 4: &lt;class 'hpc.rdb.catalog.RecordingCopy'&gt;}</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.COLL">
+<code class="descname">COLL</code><em class="property"> = 1</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.NONE">
+<code class="descname">NONE</code><em class="property"> = 0</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.READ">
+<code class="descname">READ</code><em class="property"> = 0</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.REC">
+<code class="descname">REC</code><em class="property"> = 3</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.RECOPY">
+<code class="descname">RECOPY</code><em class="property"> = 4</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.SHARE">
+<code class="descname">SHARE</code><em class="property"> = 2</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.CollManager.WRITE">
+<code class="descname">WRITE</code><em class="property"> = 2</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>connection='VGA'</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>initialize a new collection or recording</p>
+<p>code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">CollManager</span><span class="p">(</span><span class="s1">&#39;VGA&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">collmgr</span><span class="p">:</span>
+
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">collmgr</span><span class="p">:</span>  <span class="c1"># print only top collections:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+<span class="c1"># something recusive, just for fun</span>
+<span class="k">with</span> <span class="n">Collection</span><span class="p">(</span><span class="s2">&quot;VGA&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;svens_coll&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">coll</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">recur</span><span class="p">(</span><span class="n">coll</span><span class="p">,</span> <span class="n">space</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">((</span><span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="n">space</span><span class="p">)</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">coll</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coll</span><span class="p">:</span>
+            <span class="n">recur</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">space</span> <span class="o">+</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">recur</span><span class="p">(</span><span class="n">coll</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Some more samples can be reviewed inside unittest…</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>connection</strong> (<em>BaseDB|str</em>) – connection name or <code class="xref py py-obj docutils literal notranslate"><span class="pre">BaseDB</span></code> object</li>
+<li><strong>**kw</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>**kw</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): if starting with a name, this instance will be the root collection</li>
+<li><em>desc</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): if name shouldn’t be unique, add a description to be it</li>
+<li><em>mode</em> (<code class="docutils literal notranslate"><span class="pre">CollManager.READ|CollManager.WRITE</span></code>): go into read or write mode, use class constants!</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="hpc.html#hpc.CollException" title="hpc.CollException"><strong>hpc.CollException</strong></a> – once some error is encountered</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.add">
+<code class="descname">add</code><span class="sig-paren">(</span><em>item</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.add"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a collection or recording</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>item</strong> (<em>Recording|Collection</em>) – recording or collection</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>commit=True</em>, <em>rollback=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>commit changes and close connection</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>commit</strong> (<em>bool</em>) – we should commit</li>
+<li><strong>rollback</strong> (<em>bool</em>) – we need to rollback</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.commit">
+<code class="descname">commit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.commit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>support for external commit to db</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.dbase">
+<em class="property">property </em><code class="descname">dbase</code></dt>
+<dd><p>return db connection</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.name">
+<em class="property">property </em><code class="descname">name</code></dt>
+<dd><p>return my name</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.next">
+<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.next"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>next child item to catch and return</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.regsub">
+<em class="property">classmethod </em><code class="descname">regsub</code><span class="sig-paren">(</span><em>theid</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.regsub"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>use it for subclass registration as we need to return proper child classes for iteration</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.rollback">
+<code class="descname">rollback</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.rollback"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>support for external rollback to db</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.sql">
+<code class="descname">sql</code><span class="sig-paren">(</span><em>sql</em>, <em>**parms</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollManager.sql"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>execute with background db</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.type">
+<em class="property">property </em><code class="descname">type</code></dt>
+<dd><p>REC or COLL</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return my type</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollManager.user">
+<em class="property">property </em><code class="descname">user</code></dt>
+<dd><p>return my name</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.rdb.catalog.Collection">
+<em class="property">class </em><code class="descclassname">hpc.rdb.catalog.</code><code class="descname">Collection</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Collection"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.rdb.catalog.CollManager" title="hpc.rdb.catalog.CollManager"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.catalog.CollManager</span></code></a></p>
+<p>A collection can contain other collections and for sure recordings.</p>
+<p>Collections have a name and optional description, that’s it!</p>
+<ul class="simple">
+<li>You can add another sub-collection via <strong>add_coll</strong> method,</li>
+<li>another recording can be added through <strong>add_rec</strong></li>
+<li>Removal of an subitem (Collection, Recording) is done via <strong>remove</strong> method.</li>
+<li>Export or Import to/from bpl files</li>
+</ul>
+<p>Several other infos are available through properties, e.g.:</p>
+<blockquote>
+<div><ul class="simple">
+<li>name:  complete url of collection  (str)</li>
+<li>id:  cb internal id  (int)</li>
+<li>desc:  description (can also be set here)  (str)</li>
+<li>parent:  parent collection (if defined) (<a class="reference internal" href="#hpc.rdb.catalog.Collection" title="hpc.rdb.catalog.Collection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Collection</span></code></a>)</li>
+<li>active:  flag if collection is used</li>
+<li>prio:  priority, e.g. to sort sub collections inside a collection</li>
+</ul>
+</div></blockquote>
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.Collection.GETATTR">
+<code class="descname">GETATTR</code><em class="property"> = {'desc': ('_desc',), 'id': ('_myId',), 'label': ('_label',), 'parent': ('_parent',), 'prio': ('_prio',)}</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.Collection.SETATTR">
+<code class="descname">SETATTR</code><em class="property"> = {'desc': ('_desc',)}</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Collection.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Collection.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>inti a collection which can contain other collections and for sure recordings.
+Collections have a name and optional description, that’s it!</p>
+<p>You can add another sub-collection via <strong>add_coll</strong> method,
+another recording can be added through <strong>add_rec</strong>
+Removal of an subitem is done via <strong>remove</strong> method.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kw</strong> (<em>dict</em>) – see below</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of collection to use (or create if not existing)</li>
+<li><em>desc</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): description of collection</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Collection.add_coll">
+<code class="descname">add_coll</code><span class="sig-paren">(</span><em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Collection.add_coll"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a collection</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kw</strong> (<em>dict</em>) – see below</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of collection</li>
+<li><em>desc</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): description of it</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">collection</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><code class="docutils literal notranslate"><span class="pre">Collection</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Collection.add_rec">
+<code class="descname">add_rec</code><span class="sig-paren">(</span><em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Collection.add_rec"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a recording</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kw</strong> (<em>dict</em>) – see below</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): recfile name or path or it’s id</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">recording</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><code class="docutils literal notranslate"><span class="pre">Recording</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Collection.remove">
+<code class="descname">remove</code><span class="sig-paren">(</span><em>sub</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Collection.remove"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>remove something</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>sub</strong> (<em>Recording|Collection</em>) – a subitem to be removed, similar to list.remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.rdb.catalog.Recording">
+<em class="property">class </em><code class="descclassname">hpc.rdb.catalog.</code><code class="descname">Recording</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Recording"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.rdb.catalog.CollManager" title="hpc.rdb.catalog.CollManager"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.catalog.CollManager</span></code></a></p>
+<p>A recording represents the data from cat_files (measid).</p>
+<p>Several other infos are available through properties, e.g.:</p>
+<blockquote>
+<div><ul class="simple">
+<li>name:  complete path and file name</li>
+<li>id:  measurement id</li>
+<li>timestamp:  tuple of [abs. start ts, abs. end ts] time stamps ([int, int])</li>
+<li>state:  status of file on server (transmitted: copied to server, archived: moved to archive)</li>
+<li>hash:  unique hash key of rec file (str)</li>
+<li>rectime:  recording time  (daytime object)</li>
+<li>import_date:  day/time of adding the rec file to the server / db  (daytime object)</li>
+<li>beginrelts:  first relative time stamp of section to be used in collection  (int)</li>
+<li>endrelts:  last relative time stamp of section used in collection  (int)</li>
+<li>distance:  driven distance based on VDY</li>
+<li>gpsdistance:  driven distance based on GPS positions</li>
+<li>filesize:  size in byte</li>
+<li>project:  name of project the rec file belongs to</li>
+<li>filestate:  acceptance state of the file (int: 1 := unchecked, 2 := rejected, 3 := accepted)</li>
+</ul>
+</div></blockquote>
+<p>Set properties for Recording inside a Collection:</p>
+<blockquote>
+<div><ul class="simple">
+<li>beginrelts: first relative time stamp of section to be used in collection</li>
+<li>endrelts:  last relative time stamp of section used in collection</li>
+</ul>
+</div></blockquote>
+<dl class="attribute">
+<dt id="hpc.rdb.catalog.Recording.GETATTR">
+<code class="descname">GETATTR</code><em class="property"> = {'distance': ('_dist',), 'filepath': ('_name',), 'filesize': ('_fsize',), 'filestate': ('_fstate',), 'gpsdistance': ('_gpsdist',), 'hash': ('_chash',), 'id': ('_myId',), 'import_date': ('_import',), 'location': ('_location',), 'map_id': ('_mapid',), 'parent': ('_parent',), 'project': ('_recprj',), 'rectime': ('_rectime',), 'region': ('_region',), 'relts': ('_relts',), 'timestamp': ('_timestamp',)}</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Recording.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kw</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Recording.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init recording which has a name being path/to/a/filename.</p>
+<p>Several other infos are available through properties, e.g.:
+timestamp, state of recording, recording time, etc.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>*args</strong> (<em>tuple</em>) – see <code class="docutils literal notranslate"><span class="pre">CollManager</span></code> for more details</li>
+<li><strong>**kwargs</strong> (<em>dict</em>) – see <code class="docutils literal notranslate"><span class="pre">CollManager</span></code> for more details</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>name</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): name of recording to use</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Recording.dist_file">
+<em class="property">property </em><code class="descname">dist_file</code></dt>
+<dd><p>sqlite DB distance file name
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Recording.gps_dist">
+<code class="descname">gps_dist</code><span class="sig-paren">(</span><em>start=None</em>, <em>stop=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Recording.gps_dist"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>calculate GPS distance between start and stop times, default: calc for the whole recording</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>start</strong> (<em>int</em>) – use specific start time</li>
+<li><strong>stop</strong> (<em>int</em>) – use specific stop time</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">distance</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Recording.gps_pos">
+<code class="descname">gps_pos</code><span class="sig-paren">(</span><em>timestamp=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Recording.gps_pos"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>GPS position at a certain timestamp,
+if None, first one is returned, otherwise closest to timestamp</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>timestamp</strong> (<em>int</em>) – MTS timestamp</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">tuple of (LAT, LON)</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">tuple</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.catalog.Recording.vdy_dist">
+<code class="descname">vdy_dist</code><span class="sig-paren">(</span><em>start=None</em>, <em>stop=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#Recording.vdy_dist"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>calculate VDY distance between start and stop times, default: calc for the whole recording</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>start</strong> (<em>int</em>) – use specific start time</li>
+<li><strong>stop</strong> (<em>int</em>) – use specific stop time</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">distance</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">float</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="hpc.rdb.catalog.CollException">
+<em class="property">exception </em><code class="descclassname">hpc.rdb.catalog.</code><code class="descname">CollException</code><span class="sig-paren">(</span><em>error</em>, <em>message</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollException"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>Collection manager exception class</p>
+<dl class="method">
+<dt id="hpc.rdb.catalog.CollException.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>error</em>, <em>message</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/catalog.html#CollException.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init this exception</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>error</strong> (<em>int</em>) – error code</li>
+<li><strong>message</strong> (<em>str</em>) – user readable message</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.env_data">
+<span id="hpc-rdb-env-data-module"></span><h2>hpc.rdb.env_data module</h2>
+<div class="section" id="env-data-py">
+<h3>env_data.py</h3>
+<p>management of environment data</p>
+<dl class="class">
+<dt id="hpc.rdb.env_data.EnvData">
+<em class="property">class </em><code class="descclassname">hpc.rdb.env_data.</code><code class="descname">EnvData</code><span class="sig-paren">(</span><em>db='HPC'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>supporting starter to save environment data into HPC schema</p>
+<dl class="attribute">
+<dt id="hpc.rdb.env_data.EnvData.DEFAULT_DB">
+<code class="descname">DEFAULT_DB</code><em class="property"> = 0</em></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="hpc.rdb.env_data.EnvData.NO_DB">
+<code class="descname">NO_DB</code><em class="property"> = 1</em></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>db='HPC'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>save some initial data from job into DB:
+add an hpc_job and hpc_task entry</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>db</strong> (<em>str</em>) – database connection to be used, default: HPC schema of Oracle DB</li>
+<li><strong>fallback_db</strong> (<em>str</em>) – sqlite filename to be used if connection fails</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.append">
+<code class="descname">append</code><span class="sig-paren">(</span><em>subdata</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.append"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append subtask infos</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.end_task">
+<code class="descname">end_task</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.end_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>end the task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.errors">
+<code class="descname">errors</code><span class="sig-paren">(</span><em>errors</em>, <em>cnt</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.errors"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append errors from bsig checker</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.get_slave_ident">
+<code class="descname">get_slave_ident</code><span class="sig-paren">(</span><em>dbase=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.get_slave_ident"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>retrieve ident of slave computer</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>dbase</strong> (<a class="reference internal" href="#hpc.rdb.base.BaseDB" title="hpc.rdb.base.BaseDB"><em>hpc.rdb.base.BaseDB</em></a>) – database connection</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">get slave ident of mine</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.insert_job">
+<code class="descname">insert_job</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.insert_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>iterate over connections</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.update_job">
+<code class="descname">update_job</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.update_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>iterate over connections</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.env_data.EnvData.update_task">
+<code class="descname">update_task</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#EnvData.update_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>iterate over connections</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_bpl_filter">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_bpl_filter</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_bpl_filter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>filter input bpl by location and output only valid ones</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>inbpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – input BPL file</li>
+<li><em>outbpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – output BPL file</li>
+<li><em>rest</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – left over BPL file</li>
+<li><em>location</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – location to use (e.g. LND for Lindau)</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">0</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_bpl_operation">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_bpl_operation</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_bpl_operation"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>do some operation on the bpl’s given and output the result accordingly</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>inbpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – input BPL file</li>
+<li><em>outbpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – output BPL file</li>
+<li><em>arith</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – math operation to do, e.g. (or, and, xor)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_export_bpl">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_export_bpl</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_export_bpl"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create a bpl file from given job with only those recordings processed with a certain task state or exitcode.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>state</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – state of task to filter</li>
+<li><em>exitcode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – filter for exit codes</li>
+<li><em>bpl</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – output bpl file</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_exporter">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_exporter</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_exporter"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>export collected data into a csv file</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>sortcol</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – field to sort results, default: TASK</li>
+<li><em>outfile</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – CSV output file name</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_log">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_log</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_log"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>return STDOUT from environment data</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>db</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – db to use</li>
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>taskid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC task id</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_log_print">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_log_print</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_log_print"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>print info from env_log</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>db</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – db to use</li>
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>taskid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC task id</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.env_stdout_search">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">env_stdout_search</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/env_data.html#env_stdout_search"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>search all stdout of a certain HPC job by some pattern</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>kwargs</strong> (<em>**dict</em>) – </td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> – <ul class="simple">
+<li><em>db</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – db to use</li>
+<li><em>headnode</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – head node name</li>
+<li><em>jobid</em> <code class="docutils literal notranslate"><span class="pre">int</span></code> – HPC job id</li>
+<li><em>pattern</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – regular expression pattern</li>
+</ul>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">exitcode</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.env_data.random">
+<code class="descclassname">hpc.rdb.env_data.</code><code class="descname">random</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; x in the interval [0, 1).</dt>
+<dd></dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.error_db">
+<span id="hpc-rdb-error-db-module"></span><h2>hpc.rdb.error_db module</h2>
+<div class="section" id="error-db-py">
+<h3>error_db.py</h3>
+<p>hpc error database interface</p>
+<dl class="class">
+<dt id="hpc.rdb.error_db.ErrorDB">
+<em class="property">class </em><code class="descclassname">hpc.rdb.error_db.</code><code class="descname">ErrorDB</code><span class="sig-paren">(</span><em>node</em>, <em>jobid</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.rdb.base.BaseDB" title="hpc.rdb.base.BaseDB"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.base.BaseDB</span></code></a></p>
+<p>Hpc Error DB Interface</p>
+<p>This Class provides a interface towards the Error-DB from HPC.
+All Errors which are found in the Subtask xxx_check will be stored here.</p>
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>node</em>, <em>jobid</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>error DB interface</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>node</strong> (<em>str</em>) – name of node to use</li>
+<li><strong>jobid</strong> (<em>int</em>) – id of job to use</li>
+<li><strong>kwargs</strong> (<em>dict</em>) – see below</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first last"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>logger</em> (<code class="docutils literal notranslate"><span class="pre">Logger</span></code>): logger instance</li>
+<li><em>mode</em> (<code class="docutils literal notranslate"><span class="pre">str</span></code>): mode can be ‘r’ for reading, ‘w’ for writing</li>
+</ul>
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.add_count">
+<code class="descname">add_count</code><span class="sig-paren">(</span><em>task_id</em>, <em>type_id</em>, <em>cnt=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.add_count"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a certain count to task errors</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>task_id</strong> (<em>int</em>) – id of hpc task</li>
+<li><strong>type_id</strong> (<em>int</em>) – id of type</li>
+<li><strong>cnt</strong> (<em>int</em>) – how many should be added</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.add_crash">
+<code class="descname">add_crash</code><span class="sig-paren">(</span><em>task_id</em>, <em>err_code</em>, <em>err_desc</em>, <em>err_src</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.add_crash"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Add a new crash entry into the Database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>task_id</strong> (<em>int</em>) – Hpc Task ID</li>
+<li><strong>err_code</strong> (<em>int</em>) – Error Code of the Error</li>
+<li><strong>err_desc</strong> (<em>str</em>) – Error Description of the Error</li>
+<li><strong>err_src</strong> (<em>str</em>) – Additional Error Source Inforamtion</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.add_error">
+<code class="descname">add_error</code><span class="sig-paren">(</span><em>task_id</em>, <em>err_code</em>, <em>err_desc</em>, <em>err_src</em>, <em>cnt=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.add_error"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Add a new Error entry into the Database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>task_id</strong> (<em>int</em>) – Hpc Task ID</li>
+<li><strong>err_code</strong> (<em>int</em>) – Error Code of the Error</li>
+<li><strong>err_desc</strong> (<em>str</em>) – Error Description of the Error</li>
+<li><strong>err_src</strong> (<em>str</em>) – Additional Error Source Information</li>
+<li><strong>cnt</strong> (<em>int</em>) – counter of occurence of this error</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.add_exception">
+<code class="descname">add_exception</code><span class="sig-paren">(</span><em>task_id</em>, <em>err_code</em>, <em>err_desc</em>, <em>err_src</em>, <em>cnt=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.add_exception"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>add a new Exception entry into the Database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>task_id</strong> (<em>int</em>) – Hpc Task ID</li>
+<li><strong>err_code</strong> (<em>int</em>) – Error Code of the Error</li>
+<li><strong>err_desc</strong> (<em>str</em>) – Error Description of the Error</li>
+<li><strong>err_src</strong> (<em>str</em>) – Additional Error Source Information</li>
+<li><strong>cnt</strong> (<em>int</em>) – counter of occurence of this error</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.add_item">
+<code class="descname">add_item</code><span class="sig-paren">(</span><em>task_id</em>, <em>type_id</em>, <em>err_code</em>, <em>err_desc</em>, <em>err_src</em>, <em>meas=0</em>, <em>time=datetime.datetime(2023</em>, <em>10</em>, <em>10</em>, <em>10</em>, <em>3</em>, <em>29</em>, <em>429072)</em>, <em>mts_ts=0</em>, <em>cnt=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.add_item"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Add a new item entry into hpc’s error database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>task_id</strong> (<em>int</em>) – Hpc Task ID</li>
+<li><strong>type_id</strong> (<em>int | str</em>) – Error Type ID</li>
+<li><strong>err_code</strong> (<em>int</em>) – Error Code of the Error</li>
+<li><strong>err_desc</strong> (<em>str</em>) – Error Description of the Error</li>
+<li><strong>err_src</strong> (<em>str</em>) – Additional Error Source Information</li>
+<li><strong>meas</strong> (<em>str | int</em>) – measurement which was used</li>
+<li><strong>time</strong> (<em>datetime</em>) – time of item</li>
+<li><strong>mts_ts</strong> (<em>int</em>) – time of MTS</li>
+<li><strong>cnt</strong> (<em>int</em>) – counter of occurence of this error</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.commit_items">
+<code class="descname">commit_items</code><span class="sig-paren">(</span><em>purge=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.commit_items"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>commit error items</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>purge</strong> (<em>bool</em>) – remove task results beforehand</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.delete_errors">
+<code class="descname">delete_errors</code><span class="sig-paren">(</span><em>task_id=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.delete_errors"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>delete all errors, exceptions and crashes, which belong to a dedicated task (if given)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>task_id</strong> (<em>int</em>) – task id to take care of, otherwise remove all from job</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">number of deletions</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.get_list_of_incidents">
+<code class="descname">get_list_of_incidents</code><span class="sig-paren">(</span><em>task_id=None</em>, <em>err_type=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.get_list_of_incidents"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>get a list of all incidents (errors, exceptions and crashes)
+for the given job_id and, optionally, task_id</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>task_id</strong> (<em>int</em>) – hpc task id to get the list from</li>
+<li><strong>err_type</strong> (<em>int</em>) – type of incidents to return: ‘Error’, ‘Exception’, ‘Crash’</li>
+<li><strong>kwargs</strong> – additional parameters to execute statement</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">list of incidents</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.items">
+<code class="descname">items</code><span class="sig-paren">(</span><em>task_id</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/error_db.html#ErrorDB.items"><span class="viewcode-link">[source]</span></a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">all error items for given task</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">int</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.error_db.ErrorDB.jobid">
+<em class="property">property </em><code class="descname">jobid</code></dt>
+<dd><p>db’s jobid
+:rtype: int</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.sqlite_defs">
+<span id="hpc-rdb-sqlite-defs-module"></span><h2>hpc.rdb.sqlite_defs module</h2>
+<div class="section" id="sqlite-defs-py">
+<h3>sqlite_defs.py</h3>
+<p>sqlite DB definitions</p>
+<dl class="function">
+<dt id="hpc.rdb.sqlite_defs.create_sqlite">
+<code class="descclassname">hpc.rdb.sqlite_defs.</code><code class="descname">create_sqlite</code><span class="sig-paren">(</span><em>filename, statements=&quot;\nCREATE TABLE [DMT_FILES] ([MEASID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FILEPATH] NVARCHAR2(300) NOT NULL, [RECFILEID] NVARCHAR2(255), [FILESIZE] INTEGER, [BEGINABSTS] INTEGER, [ENDABSTS] INTEGER, [PROJECT] NVARCHAR2(100), [STATUS] NVARCHAR2(11) NOT NULL DEFAULT 'transmitted', [BASEPATH] NVARCHAR2(250), [SERVERSHARE] NVARCHAR2(64), [CRC_NAME] INTEGER, [PARENT] INTEGER)\nCREATE UNIQUE INDEX [UQ_DMT_FILES_PATH] ON [DMT_FILES] ([FILEPATH])\nCREATE TABLE [HPC_ERRTYPE] ([TYPEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TYPENAME] NVARCHAR2(128) NOT NULL)\nCREATE UNIQUE INDEX [UQ_APPERR_TYPE_TYPENAME] ON [HPC_ERRTYPE] ([TYPENAME])\nCREATE TABLE [HPC_EXITCODES] ([EXITCODE] INTEGER NOT NULL PRIMARY KEY, [DESCR] VARCHAR2(128) NOT NULL, [PRIO] INTEGER NOT NULL)\nCREATE UNIQUE INDEX [HPC_EXITCODES_PRIO_UK] ON [HPC_EXITCODES] ([PRIO])\nCREATE TABLE [HPC_NODE] ([NODEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODENAME] NVARCHAR2(32) NOT NULL, [CONFIG] BLOB, [LOCATION] NVARCHAR2(20) NOT NULL DEFAULT 'LND')\nCREATE UNIQUE INDEX [NODENAME_IDX] ON [HPC_NODE] ([NODENAME])\nCREATE TABLE [HPC_SLAVE] ([SLAVEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_SLAVE_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [NAME] NVARCHAR2(32) NOT NULL, [DTOTAL] INTEGER NOT NULL DEFAULT 0, [RAMTOTAL] INTEGER NOT NULL DEFAULT 0, [CONFIG] BLOB, [PING] TIMESTAMP, [SOCKETS] INTEGER NOT NULL DEFAULT 1, [CORES] INTEGER NOT NULL DEFAULT 1)\nCREATE UNIQUE INDEX [HPC_SLAVE_NAME_UK] ON [HPC_SLAVE] ([NAME])\nCREATE TABLE [HPC_LOGITEM] ([IID] INTEGER NOT NULL PRIMARY KEY, [SLAVEID] INTEGER DEFAULT NULL CONSTRAINT [HPC_LOGITEM_NODE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE SET NULL, [NAME] NVARCHAR2(128) NOT NULL, [DESCR] NVARCHAR2(128), [CNT] INTEGER NOT NULL DEFAULT 0)\nCREATE UNIQUE INDEX [HPC_LOGITEM_NAME_UK] ON [HPC_LOGITEM] ([NAME], [DESCR])\nCREATE TABLE [HPC_NETLOG] ([SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_NETLOG_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [SEGRECV] INTEGER NOT NULL, [SEGSENT] INTEGER NOT NULL, [SEGRETR] INTEGER NOT NULL)\nCREATE TABLE [HPC_PRJTMPL] ([PTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(32) UNIQUE)\nCREATE TABLE [HPC_FUNCLASS] ([FCID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FCNAME] VARCHAR(4) UNIQUE)\nCREATE TABLE [HPC_STATE] ([STATEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(11) UNIQUE)\nCREATE TABLE [HPC_VER] ([VERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(96) UNIQUE)\nCREATE TABLE [HPC_PYVER] ([PYVERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(12) UNIQUE)\nCREATE TABLE [HPC_JOB] ([JOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [HPCJOBID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_JOB_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [IID] INTEGER DEFAULT NULL CONSTRAINT [HPC_JOB_USER_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SID] INTEGER DEFAULT 0 CONSTRAINT [HPC_JOB_SOURCE_PC_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SUBMITSTART] TIMESTAMP, [SUBMITSTOP] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] FLOAT, [SUBMIT_LOG] BLOB, [CHANGES] BLOB, [PRJID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PRJ_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [TMPLID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_TMPL_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [RESRS] NVARCHAR2(1), [VERID] INTEGER CONSTRAINT [HPC_JOB_VER_FK] REFERENCES [HPC_VER]([VERID]) ON DELETE SET NULL, [PYVERID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PYVER_FK] REFERENCES [HPC_PYVER]([PYVERID]), [JOBNAME] VARCHAR(128), [FNCID] INTEGER CONSTRAINT [HPC_JOB_FNC_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [CLSID] INTEGER CONSTRAINT [HPC_JOB_CLS_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_JOB_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE, [TASK_CNT] INTEGER DEFAULT 0, [SPID] INTEGER DEFAULT 0)\nCREATE UNIQUE INDEX [HPC_JOB_UK] ON [HPC_JOB] ([HPCJOBID], [NODEID])\nCREATE TABLE [HPC_MASTERJOB] ([MASTERJOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [MASTERID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_MASTERJOB_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [JOBID] INTEGER CONSTRAINT [HPC_MASTERJOB_JOB_FK] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [BUILDNO] INTEGER NOT NULL, [STATUS] NVARCHAR2(64), UNIQUE ([NODEID], [MASTERID]))\nCREATE TABLE [HPC_TASK] ([TASKID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [JOBID] INTEGER NOT NULL CONSTRAINT [FK_JOBID] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [HPCTASKID] INTEGER NOT NULL, [TASKNAME] VARCHAR2(128), [REQUEUE] INTEGER NOT NULL DEFAULT 0, [EXITCODE] INTEGER CONSTRAINT [HPC_TASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL, [STDOUT] BLOB, [SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_TASK_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE DEFAULT 0, [STARTTIME] TIMESTAMP, [STOPTIME] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] INTEGER, [CPU_TIME] FLOAT DEFAULT 0, [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_TASK_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE)\nCREATE UNIQUE INDEX [HPC_TASK_UK] ON [HPC_TASK] ([JOBID], [REQUEUE], [HPCTASKID])\nCREATE TABLE [HPC_TASKERRORS] ([TASKID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TYPE_FK] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CNT] NUMBER NOT NULL, CONSTRAINT [sqlite_autoindex_HPC_TASKERRORS_1] PRIMARY KEY ([TASKID], [TYPEID]))\nCREATE TABLE [HPC_SIMCFG] ([CFGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [CFG] VARCHAR2(4000), [CFGHASH] VARCHAR2(64), [CFGBIN] BLOB)\nCREATE TABLE [HPC_ERRORS] ([ERRORID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] INTEGER NOT NULL CONSTRAINT [FK_APPERROR_APPERR_TYPE] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CODE] INTEGER NOT NULL, [DESCR] NVARCHAR2(512), [SRC] NVARCHAR2(512), [ERRDATE] TIMESTAMP, [CNT] INTEGER NOT NULL DEFAULT 1, [MTSTIME] INTEGER NOT NULL DEFAULT 0)\nCREATE TABLE [HPC_SUBTASK] ([SUBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [SUBTASKID] INTEGER NOT NULL, [STARTTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [STOPTIME] TIMESTAMP, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL DEFAULT 0, [COMMAND] NVARCHAR2(32), [PID] INTEGER, [MEASID] INTEGER CONSTRAINT [HPC_SUBTASK_MEAS_FK] REFERENCES [DMT_FILES]([MEASID]) ON DELETE SET NULL, [APP] NVARCHAR2(64), [CFGID] INTEGER CONSTRAINT [HPC_SUBTASK_CFG_FK] REFERENCES [HPC_SIMCFG]([CFGID]) ON DELETE SET NULL, [DISK_IO] INTEGER, [CPU_TIME] FLOAT DEFAULT 0)\nCREATE TABLE [HPC_SUBTASK_WDOG] ([WDOGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [SUBID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_WDOG_FK] REFERENCES [HPC_SUBTASK]([SUBID]) ON DELETE CASCADE, [IOLOAD] INTEGER NOT NULL, [IOCONF] INTEGER NOT NULL, [CPULOAD] INTEGER NOT NULL, [CPUCONF] INTEGER NOT NULL, [MEMLOAD] INTEGER NOT NULL, [VIRTLOAD] INTEGER NOT NULL, [NETLOAD] INTEGER NOT NULL, [WDOGTIME] INTEGER NOT NULL)\nCREATE UNIQUE INDEX [HPC_SUBTASK_UK] ON [HPC_SUBTASK] ([TASKID], [SUBTASKID])\nCREATE TABLE [HPC_TASK_ECODE_HIST] ([HISTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_ECODE_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL)\n-- now insert some data into the tables\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OTHER', 'misc')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('UNIT000', 'misc')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00156VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00160VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00199VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00200VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LUAS003A', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LUAS004A', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS002A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS003A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS095A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('QHS6U5BA', 'ABH')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('QHS6U5CA', 'ABH')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OZAS012A', 'BLR')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OZAS013A', 'BLR')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('ITAS004A', 'SHB')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('ITAS005A', 'SHB')\ninsert into HPC_SLAVE (SLAVEID, NODEID, NAME) values(0, (SELECT NODEID FROM HPC_NODE WHERE NODENAME = 'OTHER'), '(missing)')\ninsert into HPC_LOGITEM (IID, NAME) values(0, 'unknown/missing')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (0, 'Crash')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (1, 'Exception')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (2, 'Error')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (3, 'Alert')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (4, 'Warning')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (5, 'Information')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (6, 'Debug')\ninsert into HPC_PRJTMPL (PTID, NAME) values (0, null)\ninsert into HPC_VER (VERID, VERSTR) values(1, 'unknown')\ninsert into HPC_PYVER (PYVERID, VERSTR) values(0, 'unknown')\ninsert into HPC_FUNCLASS (FCID, FCNAME) values(0, 'n/a')\ninsert into HPC_STATE values(0, 'None')\ninsert into HPC_STATE values(1, 'Configuring')\ninsert into HPC_STATE values(2, 'Submitted')\ninsert into HPC_STATE values(4, 'Validating')\ninsert into HPC_STATE values(8, 'Dispatching')\ninsert into HPC_STATE values(16, 'Queued')\ninsert into HPC_STATE values(32, 'Running')\ninsert into HPC_STATE values(64, 'Finishing')\ninsert into HPC_STATE values(128, 'Finished')\ninsert into HPC_STATE values(256, 'Failed')\ninsert into HPC_STATE values(512, 'Canceled')\ninsert into HPC_STATE values(1024, 'Canceling')\n-- generate new inserts, copy / paste this:\n-- select 'insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(' || to_char(exitcode) || ', ''' || descr || ''', ' || to_char(prio) || ')' from hpc_exitcodes where exitcode &gt;= 0 order by prio;\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(2, 'application: wrong argument (python)', 119)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(150, 'infrastructure: unspecified error found', 510)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(152, 'infrastructure: (robo)copy caused an error', 512)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(153, 'infrastructure: network name is not longer available', 513)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(154, 'infrastructure: failed to connect to DB', 514)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(155, 'infrastructure: recording is not available', 516)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(156, 'infrastructure: (robo)copy overwrote output data files', 517)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(157, 'infrastructure: recording is archived', 518)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(159, 'infrastructure: GPU driver or kernel module error', 519)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(146, 'MTS error: failed to add merge candidate', 520)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(31, 'infrastructure: low temp space (D:)', 521)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(41, 'application CPU idle', 522)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(42, 'application IO idle', 523)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(43, 'application print out idle', 524)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(46, 'application timeout', 525)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(49, 'application hang / was terminated', 526)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(50, 'wrapper application failure', 527)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(219, 'user generated error 219', 528)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(218, 'user generated error 218', 529)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(217, 'user generated error 217', 530)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(216, 'user generated error 216', 531)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(215, 'user generated error 215', 532)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(214, 'user generated error 214', 533)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(213, 'user generated error 213', 534)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(212, 'user generated error 212', 535)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(211, 'user generated error 211', 536)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(210, 'user generated error 210', 537)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(209, 'user generated error 209', 538)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(208, 'user generated error 208', 539)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(207, 'user generated error 207', 540)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(206, 'user generated error 206', 541)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(205, 'user generated error 205', 542)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(204, 'user generated error 204', 543)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(203, 'user generated error 203', 544)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(202, 'user generated error 202', 545)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(201, 'user generated error 201', 546)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(200, 'user generic error', 547)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(145, 'MTS: no error log available', 548)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(141, 'MTS info: output generated successfully', 549)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(112, 'simulation BSIG corrupt', 550)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(113, 'duration of recording and BSIG differ', 551)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(114, 'BSIG has too many time jumps', 552)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(115, 'no BSIGs at all produced', 553)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(47, 'application IPv4 retransmit rate too high', 554)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(48, 'application IPv6 retransmit rate too high', 555)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(51, 'application low virtual memory', 557)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(52, 'application low CPU power', 558)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(53, 'application high memory usage', 559)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(54, 'application fatal message', 560)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(60, 'floating point exception: invalid operation', 561)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(61, 'floating point exception: division by zero', 562)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(62, 'floating point exception: overflow', 563)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(63, 'floating point exception: underflow', 564)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(64, 'floating point exception: inexact operation', 565)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(65, 'floating point exception: denormal operation', 566)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(66, 'floating point exception: stack check', 567)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(70, 'MTS crash: access violation', 568)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(71, 'MTS crash: invalid parameter', 569)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(72, 'MTS crash: array bounds exceeded', 570)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(73, 'MTS crash: breakpoint', 571)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(74, 'MTS crash: float divide by zero', 572)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(75, 'MTS crash: invalid operation', 573)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(76, 'MTS crash: guard page', 574)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(77, 'MTS crash: illegal instruction', 575)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(78, 'MTS crash: integer division by zero', 576)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(79, 'MTS crash: integer overflow', 577)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(80, 'MTS crash: invalid handle', 578)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(81, 'MTS crash: privileged instruction', 579)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(82, 'MTS crash: single step', 580)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(83, 'MTS crash: stack buffer overrun', 581)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(84, 'MTS crash: fatal app exit', 582)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(85, 'MTS crash: thread activation context', 583)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(90, 'MTS exception: near scan peak error', 584)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(91, 'MTS exception: far scan peak error', 585)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(92, 'MTS exception: peak error at position x', 586)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(93, 'MTS exception: access violation', 587)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(94, 'MTS exception: inconsistent data structure', 588)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(95, 'MTS exception: config of MO missing', 589)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(96, 'MTS exception: MO code error', 590)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(97, 'MTS exception: BMW radome correction', 591)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(98, 'MTS exception: unknown exception', 592)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(99, 'MTS exception: unhandled exception', 593)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(110, 'MTS error: network unavailable', 594)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(111, 'MTS error: recording corrupt', 595)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(100, 'MTS unknown exception', 596)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(120, 'MTS error: unspecified', 597)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(121, 'MTS error: crash dump', 598)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(122, 'MTS error: xlog is corrupt', 599)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(123, 'MTS error: block terminated caching thread found', 600)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(124, 'MTS error: application error', 601)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(142, 'MTS error: GPU server execution', 602)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(143, 'MTS error: invalid MDF block', 603)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(125, 'MTS error: unknown error', 605)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(126, 'MTS log: exception found', 606)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(128, 'MTS log: alert found', 607)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(127, 'MTS log: error found', 608)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(129, 'MTS log: warning found', 609)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(130, 'MTS log: info found', 610)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(131, 'MTS log: debug found', 611)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(132, 'MTS log: corrupt crash log found', 612)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(133, 'MTS error: too old DLL detected / used', 613)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(144, 'MTS error: low on memory', 614)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(134, 'MTS error: too much memory in use', 615)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(135, 'MTS xlog not available', 616)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(136, 'MTS error: side-by-side configuration is incorrect', 617)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(138, 'MTS error: cannot open or read configuration', 618)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(137, 'MTS error: reading recording failed', 619)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(139, 'MTS error: recovering data', 620)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(140, 'MTS error: error reported', 621)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(40, 'application unspecified error', 622)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(20, 'unspecified HPC error', 623)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(21, 'application is not local', 624)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(22, 'wrong argument', 625)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(23, 'user canceled task', 626)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(24, 'general database error', 627)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(25, 'reading from DB failed', 628)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(26, 'invalid PID', 629)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(27, 'internal error', 630)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(28, 'cyclic admin job failed', 631)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(29, 'application not found', 632)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(30, 'script malfunction', 633)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(158, 'infrastructure: failed to create task output folders', 635)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(1, 'unspecified', 636)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(0, 'OK', 999)\n&quot;, clear=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/sqlite_defs.html#create_sqlite"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create an sqlite file by using given statements</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>filename</strong> (<em>str</em>) – path and name of sqlite file to create</li>
+<li><strong>statements</strong> (<em>str</em>) – optional sql commands to create tables and fill first values,
+default: definitions compatible with Oracle HPC DB</li>
+<li><strong>clear</strong> (<em>bool</em>) – delete existing sqlite file in any case, default: use existing if available</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">path and name of created file</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">str</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.rdb.sqlite_defs.update_stmts">
+<code class="descclassname">hpc.rdb.sqlite_defs.</code><code class="descname">update_stmts</code><span class="sig-paren">(</span><em>dbase, statements=&quot;\nCREATE TABLE [DMT_FILES] ([MEASID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FILEPATH] NVARCHAR2(300) NOT NULL, [RECFILEID] NVARCHAR2(255), [FILESIZE] INTEGER, [BEGINABSTS] INTEGER, [ENDABSTS] INTEGER, [PROJECT] NVARCHAR2(100), [STATUS] NVARCHAR2(11) NOT NULL DEFAULT 'transmitted', [BASEPATH] NVARCHAR2(250), [SERVERSHARE] NVARCHAR2(64), [CRC_NAME] INTEGER, [PARENT] INTEGER)\nCREATE UNIQUE INDEX [UQ_DMT_FILES_PATH] ON [DMT_FILES] ([FILEPATH])\nCREATE TABLE [HPC_ERRTYPE] ([TYPEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TYPENAME] NVARCHAR2(128) NOT NULL)\nCREATE UNIQUE INDEX [UQ_APPERR_TYPE_TYPENAME] ON [HPC_ERRTYPE] ([TYPENAME])\nCREATE TABLE [HPC_EXITCODES] ([EXITCODE] INTEGER NOT NULL PRIMARY KEY, [DESCR] VARCHAR2(128) NOT NULL, [PRIO] INTEGER NOT NULL)\nCREATE UNIQUE INDEX [HPC_EXITCODES_PRIO_UK] ON [HPC_EXITCODES] ([PRIO])\nCREATE TABLE [HPC_NODE] ([NODEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODENAME] NVARCHAR2(32) NOT NULL, [CONFIG] BLOB, [LOCATION] NVARCHAR2(20) NOT NULL DEFAULT 'LND')\nCREATE UNIQUE INDEX [NODENAME_IDX] ON [HPC_NODE] ([NODENAME])\nCREATE TABLE [HPC_SLAVE] ([SLAVEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_SLAVE_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [NAME] NVARCHAR2(32) NOT NULL, [DTOTAL] INTEGER NOT NULL DEFAULT 0, [RAMTOTAL] INTEGER NOT NULL DEFAULT 0, [CONFIG] BLOB, [PING] TIMESTAMP, [SOCKETS] INTEGER NOT NULL DEFAULT 1, [CORES] INTEGER NOT NULL DEFAULT 1)\nCREATE UNIQUE INDEX [HPC_SLAVE_NAME_UK] ON [HPC_SLAVE] ([NAME])\nCREATE TABLE [HPC_LOGITEM] ([IID] INTEGER NOT NULL PRIMARY KEY, [SLAVEID] INTEGER DEFAULT NULL CONSTRAINT [HPC_LOGITEM_NODE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE SET NULL, [NAME] NVARCHAR2(128) NOT NULL, [DESCR] NVARCHAR2(128), [CNT] INTEGER NOT NULL DEFAULT 0)\nCREATE UNIQUE INDEX [HPC_LOGITEM_NAME_UK] ON [HPC_LOGITEM] ([NAME], [DESCR])\nCREATE TABLE [HPC_NETLOG] ([SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_NETLOG_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [SEGRECV] INTEGER NOT NULL, [SEGSENT] INTEGER NOT NULL, [SEGRETR] INTEGER NOT NULL)\nCREATE TABLE [HPC_PRJTMPL] ([PTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(32) UNIQUE)\nCREATE TABLE [HPC_FUNCLASS] ([FCID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FCNAME] VARCHAR(4) UNIQUE)\nCREATE TABLE [HPC_STATE] ([STATEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(11) UNIQUE)\nCREATE TABLE [HPC_VER] ([VERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(96) UNIQUE)\nCREATE TABLE [HPC_PYVER] ([PYVERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(12) UNIQUE)\nCREATE TABLE [HPC_JOB] ([JOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [HPCJOBID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_JOB_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [IID] INTEGER DEFAULT NULL CONSTRAINT [HPC_JOB_USER_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SID] INTEGER DEFAULT 0 CONSTRAINT [HPC_JOB_SOURCE_PC_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SUBMITSTART] TIMESTAMP, [SUBMITSTOP] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] FLOAT, [SUBMIT_LOG] BLOB, [CHANGES] BLOB, [PRJID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PRJ_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [TMPLID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_TMPL_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [RESRS] NVARCHAR2(1), [VERID] INTEGER CONSTRAINT [HPC_JOB_VER_FK] REFERENCES [HPC_VER]([VERID]) ON DELETE SET NULL, [PYVERID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PYVER_FK] REFERENCES [HPC_PYVER]([PYVERID]), [JOBNAME] VARCHAR(128), [FNCID] INTEGER CONSTRAINT [HPC_JOB_FNC_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [CLSID] INTEGER CONSTRAINT [HPC_JOB_CLS_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_JOB_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE, [TASK_CNT] INTEGER DEFAULT 0, [SPID] INTEGER DEFAULT 0)\nCREATE UNIQUE INDEX [HPC_JOB_UK] ON [HPC_JOB] ([HPCJOBID], [NODEID])\nCREATE TABLE [HPC_MASTERJOB] ([MASTERJOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [MASTERID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_MASTERJOB_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [JOBID] INTEGER CONSTRAINT [HPC_MASTERJOB_JOB_FK] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [BUILDNO] INTEGER NOT NULL, [STATUS] NVARCHAR2(64), UNIQUE ([NODEID], [MASTERID]))\nCREATE TABLE [HPC_TASK] ([TASKID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [JOBID] INTEGER NOT NULL CONSTRAINT [FK_JOBID] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [HPCTASKID] INTEGER NOT NULL, [TASKNAME] VARCHAR2(128), [REQUEUE] INTEGER NOT NULL DEFAULT 0, [EXITCODE] INTEGER CONSTRAINT [HPC_TASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL, [STDOUT] BLOB, [SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_TASK_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE DEFAULT 0, [STARTTIME] TIMESTAMP, [STOPTIME] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] INTEGER, [CPU_TIME] FLOAT DEFAULT 0, [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_TASK_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE)\nCREATE UNIQUE INDEX [HPC_TASK_UK] ON [HPC_TASK] ([JOBID], [REQUEUE], [HPCTASKID])\nCREATE TABLE [HPC_TASKERRORS] ([TASKID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TYPE_FK] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CNT] NUMBER NOT NULL, CONSTRAINT [sqlite_autoindex_HPC_TASKERRORS_1] PRIMARY KEY ([TASKID], [TYPEID]))\nCREATE TABLE [HPC_SIMCFG] ([CFGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [CFG] VARCHAR2(4000), [CFGHASH] VARCHAR2(64), [CFGBIN] BLOB)\nCREATE TABLE [HPC_ERRORS] ([ERRORID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] INTEGER NOT NULL CONSTRAINT [FK_APPERROR_APPERR_TYPE] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CODE] INTEGER NOT NULL, [DESCR] NVARCHAR2(512), [SRC] NVARCHAR2(512), [ERRDATE] TIMESTAMP, [CNT] INTEGER NOT NULL DEFAULT 1, [MTSTIME] INTEGER NOT NULL DEFAULT 0)\nCREATE TABLE [HPC_SUBTASK] ([SUBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [SUBTASKID] INTEGER NOT NULL, [STARTTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [STOPTIME] TIMESTAMP, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL DEFAULT 0, [COMMAND] NVARCHAR2(32), [PID] INTEGER, [MEASID] INTEGER CONSTRAINT [HPC_SUBTASK_MEAS_FK] REFERENCES [DMT_FILES]([MEASID]) ON DELETE SET NULL, [APP] NVARCHAR2(64), [CFGID] INTEGER CONSTRAINT [HPC_SUBTASK_CFG_FK] REFERENCES [HPC_SIMCFG]([CFGID]) ON DELETE SET NULL, [DISK_IO] INTEGER, [CPU_TIME] FLOAT DEFAULT 0)\nCREATE TABLE [HPC_SUBTASK_WDOG] ([WDOGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [SUBID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_WDOG_FK] REFERENCES [HPC_SUBTASK]([SUBID]) ON DELETE CASCADE, [IOLOAD] INTEGER NOT NULL, [IOCONF] INTEGER NOT NULL, [CPULOAD] INTEGER NOT NULL, [CPUCONF] INTEGER NOT NULL, [MEMLOAD] INTEGER NOT NULL, [VIRTLOAD] INTEGER NOT NULL, [NETLOAD] INTEGER NOT NULL, [WDOGTIME] INTEGER NOT NULL)\nCREATE UNIQUE INDEX [HPC_SUBTASK_UK] ON [HPC_SUBTASK] ([TASKID], [SUBTASKID])\nCREATE TABLE [HPC_TASK_ECODE_HIST] ([HISTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_ECODE_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL)\n-- now insert some data into the tables\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OTHER', 'misc')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('UNIT000', 'misc')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00156VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00160VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00199VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LU00200VMA', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LUAS003A', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LUAS004A', 'LND')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS002A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS003A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('LSAS095A', 'FFM')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('QHS6U5BA', 'ABH')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('QHS6U5CA', 'ABH')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OZAS012A', 'BLR')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('OZAS013A', 'BLR')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('ITAS004A', 'SHB')\ninsert into HPC_NODE (NODENAME, LOCATION) values ('ITAS005A', 'SHB')\ninsert into HPC_SLAVE (SLAVEID, NODEID, NAME) values(0, (SELECT NODEID FROM HPC_NODE WHERE NODENAME = 'OTHER'), '(missing)')\ninsert into HPC_LOGITEM (IID, NAME) values(0, 'unknown/missing')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (0, 'Crash')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (1, 'Exception')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (2, 'Error')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (3, 'Alert')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (4, 'Warning')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (5, 'Information')\ninsert into HPC_ERRTYPE (TYPEID, TYPENAME) values (6, 'Debug')\ninsert into HPC_PRJTMPL (PTID, NAME) values (0, null)\ninsert into HPC_VER (VERID, VERSTR) values(1, 'unknown')\ninsert into HPC_PYVER (PYVERID, VERSTR) values(0, 'unknown')\ninsert into HPC_FUNCLASS (FCID, FCNAME) values(0, 'n/a')\ninsert into HPC_STATE values(0, 'None')\ninsert into HPC_STATE values(1, 'Configuring')\ninsert into HPC_STATE values(2, 'Submitted')\ninsert into HPC_STATE values(4, 'Validating')\ninsert into HPC_STATE values(8, 'Dispatching')\ninsert into HPC_STATE values(16, 'Queued')\ninsert into HPC_STATE values(32, 'Running')\ninsert into HPC_STATE values(64, 'Finishing')\ninsert into HPC_STATE values(128, 'Finished')\ninsert into HPC_STATE values(256, 'Failed')\ninsert into HPC_STATE values(512, 'Canceled')\ninsert into HPC_STATE values(1024, 'Canceling')\n-- generate new inserts, copy / paste this:\n-- select 'insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(' || to_char(exitcode) || ', ''' || descr || ''', ' || to_char(prio) || ')' from hpc_exitcodes where exitcode &gt;= 0 order by prio;\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(2, 'application: wrong argument (python)', 119)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(150, 'infrastructure: unspecified error found', 510)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(152, 'infrastructure: (robo)copy caused an error', 512)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(153, 'infrastructure: network name is not longer available', 513)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(154, 'infrastructure: failed to connect to DB', 514)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(155, 'infrastructure: recording is not available', 516)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(156, 'infrastructure: (robo)copy overwrote output data files', 517)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(157, 'infrastructure: recording is archived', 518)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(159, 'infrastructure: GPU driver or kernel module error', 519)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(146, 'MTS error: failed to add merge candidate', 520)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(31, 'infrastructure: low temp space (D:)', 521)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(41, 'application CPU idle', 522)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(42, 'application IO idle', 523)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(43, 'application print out idle', 524)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(46, 'application timeout', 525)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(49, 'application hang / was terminated', 526)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(50, 'wrapper application failure', 527)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(219, 'user generated error 219', 528)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(218, 'user generated error 218', 529)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(217, 'user generated error 217', 530)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(216, 'user generated error 216', 531)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(215, 'user generated error 215', 532)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(214, 'user generated error 214', 533)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(213, 'user generated error 213', 534)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(212, 'user generated error 212', 535)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(211, 'user generated error 211', 536)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(210, 'user generated error 210', 537)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(209, 'user generated error 209', 538)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(208, 'user generated error 208', 539)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(207, 'user generated error 207', 540)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(206, 'user generated error 206', 541)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(205, 'user generated error 205', 542)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(204, 'user generated error 204', 543)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(203, 'user generated error 203', 544)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(202, 'user generated error 202', 545)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(201, 'user generated error 201', 546)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(200, 'user generic error', 547)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(145, 'MTS: no error log available', 548)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(141, 'MTS info: output generated successfully', 549)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(112, 'simulation BSIG corrupt', 550)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(113, 'duration of recording and BSIG differ', 551)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(114, 'BSIG has too many time jumps', 552)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(115, 'no BSIGs at all produced', 553)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(47, 'application IPv4 retransmit rate too high', 554)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(48, 'application IPv6 retransmit rate too high', 555)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(51, 'application low virtual memory', 557)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(52, 'application low CPU power', 558)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(53, 'application high memory usage', 559)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(54, 'application fatal message', 560)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(60, 'floating point exception: invalid operation', 561)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(61, 'floating point exception: division by zero', 562)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(62, 'floating point exception: overflow', 563)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(63, 'floating point exception: underflow', 564)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(64, 'floating point exception: inexact operation', 565)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(65, 'floating point exception: denormal operation', 566)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(66, 'floating point exception: stack check', 567)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(70, 'MTS crash: access violation', 568)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(71, 'MTS crash: invalid parameter', 569)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(72, 'MTS crash: array bounds exceeded', 570)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(73, 'MTS crash: breakpoint', 571)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(74, 'MTS crash: float divide by zero', 572)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(75, 'MTS crash: invalid operation', 573)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(76, 'MTS crash: guard page', 574)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(77, 'MTS crash: illegal instruction', 575)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(78, 'MTS crash: integer division by zero', 576)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(79, 'MTS crash: integer overflow', 577)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(80, 'MTS crash: invalid handle', 578)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(81, 'MTS crash: privileged instruction', 579)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(82, 'MTS crash: single step', 580)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(83, 'MTS crash: stack buffer overrun', 581)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(84, 'MTS crash: fatal app exit', 582)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(85, 'MTS crash: thread activation context', 583)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(90, 'MTS exception: near scan peak error', 584)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(91, 'MTS exception: far scan peak error', 585)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(92, 'MTS exception: peak error at position x', 586)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(93, 'MTS exception: access violation', 587)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(94, 'MTS exception: inconsistent data structure', 588)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(95, 'MTS exception: config of MO missing', 589)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(96, 'MTS exception: MO code error', 590)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(97, 'MTS exception: BMW radome correction', 591)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(98, 'MTS exception: unknown exception', 592)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(99, 'MTS exception: unhandled exception', 593)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(110, 'MTS error: network unavailable', 594)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(111, 'MTS error: recording corrupt', 595)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(100, 'MTS unknown exception', 596)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(120, 'MTS error: unspecified', 597)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(121, 'MTS error: crash dump', 598)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(122, 'MTS error: xlog is corrupt', 599)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(123, 'MTS error: block terminated caching thread found', 600)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(124, 'MTS error: application error', 601)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(142, 'MTS error: GPU server execution', 602)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(143, 'MTS error: invalid MDF block', 603)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(125, 'MTS error: unknown error', 605)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(126, 'MTS log: exception found', 606)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(128, 'MTS log: alert found', 607)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(127, 'MTS log: error found', 608)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(129, 'MTS log: warning found', 609)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(130, 'MTS log: info found', 610)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(131, 'MTS log: debug found', 611)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(132, 'MTS log: corrupt crash log found', 612)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(133, 'MTS error: too old DLL detected / used', 613)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(144, 'MTS error: low on memory', 614)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(134, 'MTS error: too much memory in use', 615)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(135, 'MTS xlog not available', 616)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(136, 'MTS error: side-by-side configuration is incorrect', 617)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(138, 'MTS error: cannot open or read configuration', 618)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(137, 'MTS error: reading recording failed', 619)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(139, 'MTS error: recovering data', 620)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(140, 'MTS error: error reported', 621)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(40, 'application unspecified error', 622)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(20, 'unspecified HPC error', 623)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(21, 'application is not local', 624)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(22, 'wrong argument', 625)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(23, 'user canceled task', 626)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(24, 'general database error', 627)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(25, 'reading from DB failed', 628)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(26, 'invalid PID', 629)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(27, 'internal error', 630)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(28, 'cyclic admin job failed', 631)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(29, 'application not found', 632)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(30, 'script malfunction', 633)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(158, 'infrastructure: failed to create task output folders', 635)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(1, 'unspecified', 636)\ninsert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(0, 'OK', 999)\n&quot;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/sqlite_defs.html#update_stmts"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>update / insert statements</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>dbase</strong> (<em>BaseDb</em>) – database connection</li>
+<li><strong>statements</strong> (<em>str</em>) – sql statements (n separated)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb.table_db">
+<span id="hpc-rdb-table-db-module"></span><h2>hpc.rdb.table_db module</h2>
+<div class="section" id="table-db-py">
+<h3>table_db.py</h3>
+<blockquote>
+<div>providing table dictionary for being able to copy / sync a whole table keeping auto-increment keys intact</div></blockquote>
+<dl class="class">
+<dt id="hpc.rdb.table_db.CfgDict">
+<em class="property">class </em><code class="descclassname">hpc.rdb.table_db.</code><code class="descname">CfgDict</code><span class="sig-paren">(</span><em>src_db</em>, <em>dst_db</em>, <em>table</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#CfgDict"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.rdb.table_db.TableDict" title="hpc.rdb.table_db.TableDict"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.table_db.TableDict</span></code></a></p>
+<p>interim solution to be able to merge back old sqlites without bin</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.rdb.table_db.FixDict">
+<em class="property">class </em><code class="descclassname">hpc.rdb.table_db.</code><code class="descname">FixDict</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#FixDict"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.rdb.table_db.TableDict" title="hpc.rdb.table_db.TableDict"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.rdb.table_db.TableDict</span></code></a></p>
+<p>specific TableDict for DMT_FILES / CAT_DMT_FILES which is taking care of both</p>
+<dl class="method">
+<dt id="hpc.rdb.table_db.FixDict.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#FixDict.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create new table dict</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>args</strong> (<em>*tuple</em>) – arguments forwarded to hpc.rdb.table_db.TableDict</li>
+<li><strong>kwargs</strong> (<em>**dict</em>) – additonal arguments forwarded to hpc.rdb.table_db.TableDict</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.rdb.table_db.TableDict">
+<em class="property">class </em><code class="descclassname">hpc.rdb.table_db.</code><code class="descname">TableDict</code><span class="sig-paren">(</span><em>src_db</em>, <em>dst_db</em>, <em>table</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#TableDict"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></p>
+<p>I’m a dict, holding primary keys from source table and on missing keys, new entries are copied
+to destination and it’s primary key is saved and returned</p>
+<dl class="method">
+<dt id="hpc.rdb.table_db.TableDict.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>src_db</em>, <em>dst_db</em>, <em>table</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#TableDict.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>create new instance</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>src_db</strong> (<a class="reference internal" href="#hpc.rdb.base.BaseDB" title="hpc.rdb.base.BaseDB"><em>BaseDB</em></a>) – source database connection</li>
+<li><strong>dst_db</strong> (<a class="reference internal" href="#hpc.rdb.base.BaseDB" title="hpc.rdb.base.BaseDB"><em>BaseDB</em></a>) – destination database connection</li>
+<li><strong>table</strong> (<em>str</em>) – table which this dict refers to</li>
+<li><strong>kwargs</strong> (<em>**dict</em>) – lookup dictionaries from other DbDict’s which are used to replace values from source.
+keys are column names and it’s values are lookup dictionaries</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><p class="first"><strong>kwargs</strong> – <ul class="simple">
+<li><dl class="first docutils">
+<dt><em>dontcare</em> <code class="docutils literal notranslate"><span class="pre">list</span></code> – do not take care about given column details, if they do not match exactly,</dt><dd>this is needed as some Oracle tables are not designed well</dd>
+</dl>
+</li>
+<li><em>recurse</em>  – TODO: fill out what’s this</li>
+<li><em>defaults</em> <code class="docutils literal notranslate"><span class="pre">dict</span></code> – explicit default values for different columns</li>
+<li><em>pkey</em> <code class="docutils literal notranslate"><span class="pre">str</span></code> – primary key of table if not defined in db</li>
+<li><em>lob</em> <code class="docutils literal notranslate"><span class="pre">memoryfile</span></code> – list of bytes as stored in db fields</li>
+</ul>
+</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#hpc.rdb.base.BaseDbException" title="hpc.rdb.base.BaseDbException"><strong>BaseDbException</strong></a> – no primary key defined and no found</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.table_db.TableDict.keys">
+<code class="descname">keys</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#TableDict.keys"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>keys we have</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.table_db.TableDict.sync">
+<code class="descname">sync</code><span class="sig-paren">(</span><em>casesens=False</em>, <em>where=''</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#TableDict.sync"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>copy data from a non-indexed table such as a mapping table to destination.
+I was too lazy to get into deepcopy, which might be interesting here…</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>casesens</strong> (<em>boolean</em>) – take care of case sensitivity of column names</li>
+<li><strong>where</strong> (<em>str</em>) – additional where clause</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">number of copied rows</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">int</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.rdb.table_db.TableDict.value">
+<code class="descname">value</code><span class="sig-paren">(</span><em>key</em>, <em>col</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/rdb/table_db.html#TableDict.value"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>get a specific item from column by key</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>key</strong> (<em>str</em>) – filter value for selection</li>
+<li><strong>col</strong> (<em>str</em>) – column to filter on</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">items found in table</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">list of lists</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.rdb">
+<span id="module-contents"></span><h2>Module contents</h2>
+<div class="section" id="init-py">
+<h3>__init__.py</h3>
+<p>relational database package</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sbmt.html" title="hpc.sbmt package"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="hpc.mts.html" title="hpc.mts package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" >hpc package</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

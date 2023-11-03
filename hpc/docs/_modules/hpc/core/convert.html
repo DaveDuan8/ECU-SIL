@@ -1,0 +1,205 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.core.convert</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.core.convert</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">convert.py</span>
+<span class="sd">----------</span>
+
+<span class="sd">conversation functions</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">ast</span> <span class="kn">import</span> <span class="n">parse</span><span class="p">,</span> <span class="n">Expression</span><span class="p">,</span> <span class="n">Add</span><span class="p">,</span> <span class="n">Sub</span><span class="p">,</span> <span class="n">Mult</span><span class="p">,</span> <span class="n">Div</span><span class="p">,</span> <span class="n">Mod</span><span class="p">,</span> <span class="n">Pow</span><span class="p">,</span> <span class="n">BinOp</span><span class="p">,</span> <span class="n">USub</span><span class="p">,</span> <span class="n">UAdd</span><span class="p">,</span> <span class="n">UnaryOp</span><span class="p">,</span> <span class="n">Str</span><span class="p">,</span> <span class="n">Num</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">add</span><span class="p">,</span> <span class="n">sub</span><span class="p">,</span> <span class="n">mul</span><span class="p">,</span> <span class="n">truediv</span><span class="p">,</span> <span class="n">mod</span><span class="p">,</span> <span class="nb">pow</span> <span class="k">as</span> <span class="n">opow</span><span class="p">,</span> <span class="n">neg</span><span class="p">,</span> <span class="n">pos</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">inf</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="human_size"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.convert.human_size">[docs]</a><span class="k">def</span> <span class="nf">human_size</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;B&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    format a size in bytes to human readable format, e.g. bytes, KB, MB, GB, TB, PB</span>
+<span class="sd">    Note that bytes/KB will be reported in whole numbers but MB and</span>
+<span class="sd">    above will have greater precision e.g. 1 byte, 43 bytes, 443 KB, 4.3 MB, 4.43 GB, etc</span>
+
+<span class="sd">    :param int num: raw size in bytes</span>
+<span class="sd">    :param str unit: whished unit to get size_bytes converted</span>
+<span class="sd">    :return: human readable size aligned</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># --&gt; http://en.wikipedia.org/wiki/Metric_prefix#List_of_SI_prefixes</span>
+    <span class="n">unit_list</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;M&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;G&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;P&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;E&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Z&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)]</span>
+
+    <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">num</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">num</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;-&quot;</span>
+    <span class="k">if</span> <span class="n">num</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+    <span class="k">elif</span> <span class="n">num</span> <span class="o">==</span> <span class="n">inf</span><span class="p">:</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;(inf) </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">num</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">log</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)),</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit_list</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">quot</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">num</span><span class="p">)</span> <span class="o">/</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="n">idx</span> <span class="o">*</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">mult</span><span class="p">,</span> <span class="n">num_decimals</span> <span class="o">=</span> <span class="n">unit_list</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">ret</span> <span class="o">+=</span> <span class="p">(</span><span class="s1">&#39;{:.</span><span class="si">%s</span><span class="s1">f} </span><span class="si">{}{}</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">num_decimals</span><span class="p">)</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">quot</span><span class="p">,</span> <span class="n">mult</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ret</span></div>
+
+
+<div class="viewcode-block" id="toint"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.convert.toint">[docs]</a><span class="k">def</span> <span class="nf">toint</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    convert a text to an integer</span>
+
+<span class="sd">    :param str text: text to convert</span>
+<span class="sd">    :return: integer</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">number</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="o">==</span> <span class="s2">&quot;min&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span>
+    <span class="k">if</span> <span class="n">text</span> <span class="o">==</span> <span class="s2">&quot;max&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="n">mult</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">]:</span>
+                <span class="n">mult</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;-&#39;</span> <span class="k">else</span> <span class="mi">1</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="n">number</span> <span class="o">=</span> <span class="n">v</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="n">number</span> <span class="o">+</span> <span class="n">v</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">number</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="n">mult</span> <span class="o">*</span> <span class="n">number</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="arg_trans"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.convert.arg_trans">[docs]</a><span class="k">def</span> <span class="nf">arg_trans</span><span class="p">(</span><span class="n">mapping</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    argument transformation into dict with defaults</span>
+
+<span class="sd">    :param list mapping: list of argument names including their defaults</span>
+<span class="sd">    :param list args: argument list</span>
+<span class="sd">    :param dict kwargs: named arguments with defaults</span>
+<span class="sd">    :return: transferred arguments</span>
+<span class="sd">    :rtype: dict</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dflt</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">newmap</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="n">dflt</span><span class="p">)</span>
+    <span class="n">k</span><span class="p">,</span> <span class="n">l</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="c1"># update from mapping</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,))</span> <span class="k">else</span> <span class="n">i</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">if</span> <span class="n">l</span> <span class="o">&gt;</span> <span class="n">k</span> <span class="k">else</span> <span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">,))</span> <span class="k">else</span> <span class="n">dflt</span><span class="p">)</span>
+        <span class="n">newmap</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="n">k</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="c1"># update rest from args</span>
+    <span class="k">while</span> <span class="n">k</span> <span class="o">&lt;</span> <span class="n">l</span><span class="p">:</span>
+        <span class="n">newmap</span><span class="p">[</span><span class="s2">&quot;arg</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        <span class="n">k</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="c1"># update left over from kwargs</span>
+    <span class="n">newmap</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">newmap</span></div>
+
+
+<div class="viewcode-block" id="safe_eval"><a class="viewcode-back" href="../../../hpc.core.html#hpc.core.convert.safe_eval">[docs]</a><span class="k">def</span> <span class="nf">safe_eval</span><span class="p">(</span><span class="n">txt</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    take over proposal from https://stackoverflow.com/questions/15197673/using-pythons-eval-vs-ast-literal-eval</span>
+<span class="sd">    as eval() shouldn&#39;t be used</span>
+
+<span class="sd">    :param str txt: string to evaluate</span>
+<span class="sd">    :return: result</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">bin_ops</span> <span class="o">=</span> <span class="p">{</span><span class="n">Add</span><span class="p">:</span> <span class="n">add</span><span class="p">,</span> <span class="n">Sub</span><span class="p">:</span> <span class="n">sub</span><span class="p">,</span> <span class="n">Mult</span><span class="p">:</span> <span class="n">mul</span><span class="p">,</span> <span class="n">Div</span><span class="p">:</span> <span class="n">truediv</span><span class="p">,</span> <span class="n">Mod</span><span class="p">:</span> <span class="n">mod</span><span class="p">,</span> <span class="n">Pow</span><span class="p">:</span> <span class="n">opow</span><span class="p">,</span> <span class="n">BinOp</span><span class="p">:</span> <span class="n">BinOp</span><span class="p">}</span>
+    <span class="n">un_ops</span> <span class="o">=</span> <span class="p">{</span><span class="n">USub</span><span class="p">:</span> <span class="n">neg</span><span class="p">,</span> <span class="n">UAdd</span><span class="p">:</span> <span class="n">pos</span><span class="p">,</span> <span class="n">UnaryOp</span><span class="p">:</span> <span class="n">UnaryOp</span><span class="p">}</span>
+    <span class="n">ops</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">bin_ops</span><span class="p">)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">un_ops</span><span class="p">)</span>
+
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">parse</span><span class="p">(</span><span class="n">txt</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;eval&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_eval</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Expression</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">_eval</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">s</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Num</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">n</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">BinOp</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">ops</span><span class="p">):</span>
+                <span class="n">left</span> <span class="o">=</span> <span class="n">_eval</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">left</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">left</span><span class="o">.</span><span class="n">n</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="n">ops</span><span class="p">):</span>
+                <span class="n">right</span> <span class="o">=</span> <span class="n">_eval</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">right</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">right</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">right</span><span class="o">.</span><span class="n">n</span>
+            <span class="k">return</span> <span class="n">bin_ops</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="p">)](</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">UnaryOp</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">operand</span><span class="p">,</span> <span class="n">ops</span><span class="p">):</span>
+                <span class="n">operand</span> <span class="o">=</span> <span class="n">_eval</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">operand</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">operand</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">operand</span><span class="o">.</span><span class="n">value</span>
+            <span class="k">return</span> <span class="n">un_ops</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="p">)](</span><span class="n">operand</span><span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="s2">&quot;Bad syntax, </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)))</span>
+
+    <span class="k">return</span> <span class="n">_eval</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

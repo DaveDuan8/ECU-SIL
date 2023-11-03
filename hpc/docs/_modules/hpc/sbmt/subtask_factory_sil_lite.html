@@ -1,0 +1,135 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sbmt.subtask_factory_sil_lite</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.sbmt.subtask_factory_sil_lite</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">subtask_factory_sil_lite.py</span>
+<span class="sd">---------------------------</span>
+
+<span class="sd">SubTaskFactorySILLite Module for HPC.</span>
+
+<span class="sd">**User-API Interfaces**</span>
+
+<span class="sd">    - `hpc` (complete package)</span>
+<span class="sd">    - `SubTaskFactorySILLite` (this module)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.subtask_factory_mts</span> <span class="kn">import</span> <span class="n">SubTaskFactoryMTS</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SubTaskFactorySILLite"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.SubTaskFactorySILLite">[docs]</a><span class="k">class</span> <span class="nc">SubTaskFactorySILLite</span><span class="p">(</span><span class="n">SubTaskFactoryMTS</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specialized class for creating Hpc SubTasks which run out SIL Lite.</span>
+
+<span class="sd">    - Typical usage is first to set all information,</span>
+<span class="sd">      which is the same for all Tasks. (SetConfigFolder,SetConfigFile,...)</span>
+<span class="sd">    - After that, multiple calls of the &quot;create_task&quot;</span>
+<span class="sd">      -&gt; for the real SIL Lite-Task creation.</span>
+<span class="sd">    - This class is derived from the `SubTaskFactory`,</span>
+<span class="sd">      this means all methods from there can also be used.</span>
+<span class="sd">    - a private check method is registered to be executed in Job.submit() checking</span>
+<span class="sd">      the availability of the SIL Lite config file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SubTaskFactorySILLite.__init__"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.SubTaskFactorySILLite.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hpc</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param hpc.Job hpc: hpc job class</span>
+<span class="sd">        :param dict kwargs: see below</span>
+
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *io_watch* (``bool``): whether watchdog shall watch io traffic</span>
+<span class="sd">            * *cpu_watch* (``bool``): whether watchdog shall track cpu usage</span>
+<span class="sd">            * *time_watch* (``float``): whether watchdog shall monitor time [h]</span>
+<span class="sd">            * *prn_watch* (``bool``): whether watchdog shall watch the printout</span>
+<span class="sd">            * *time_factor* (``float``): default 16 x recording length</span>
+<span class="sd">            * *loglevel* (``int``): use a certain logging level (mts_check)</span>
+<span class="sd">            * *exist* (``bool``): check existence of recording, default: False</span>
+<span class="sd">            * *mtscheck* (``bool``): check MTS log files for problems, default: False</span>
+<span class="sd">            * *skipon* (``list``): continue on certain exitcodes of previous subtask, e.g. [-302, -402]</span>
+<span class="sd">            * *cfg_blacklist* (``list[str]``): blacklisted MTS / SilLite config sections</span>
+<span class="sd">            * *wrapexe* (``str``): executable wrapped around each sub task</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;exist&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># overwrite as we cannot check DB</span>
+        <span class="n">SubTaskFactoryMTS</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hpc</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;SIL&quot;</span><span class="p">,</span> <span class="n">map_rec</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SubTaskFactorySILLite.set_app_path"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.SubTaskFactorySILLite.set_app_path">[docs]</a>    <span class="k">def</span> <span class="nf">set_app_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_path</span><span class="o">=</span><span class="s2">&quot;d:</span><span class="se">\\</span><span class="s2">data</span><span class="se">\\</span><span class="s2">%JobName%</span><span class="se">\\</span><span class="s2">1_Input</span><span class="se">\\</span><span class="s2">sil_lite</span><span class="se">\\</span><span class="s2">sil_lite.exe&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Provide the possibility to set the path to sil_lite</span>
+<span class="sd">        to the correct one, if the default path can&#39;t be used.</span>
+
+<span class="sd">        :note: %JobName% will be replaced with the real JobName.</span>
+
+<span class="sd">        :param str app_path:   Absolute path to the sil_lite.exe,</span>
+<span class="sd">                           which is used to start the Task.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">SubTaskFactoryMTS</span><span class="o">.</span><span class="n">set_app_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app_path</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SubTaskFactorySILLite.copy_sil_lite_folders"><a class="viewcode-back" href="../../../hpc.sbmt.html#hpc.SubTaskFactorySILLite.copy_sil_lite_folders">[docs]</a>    <span class="k">def</span> <span class="nf">copy_sil_lite_folders</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sil_sys_folder_name</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;.\sil_lite&#39;</span><span class="p">,</span> <span class="n">sil_measure_folder_name</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;.\mts_measurement&#39;</span><span class="p">,</span>
+                              <span class="n">use_filter</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sil_sys_dest</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;sil_lite&#39;</span><span class="p">,</span> <span class="n">sil_measure_dest</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;mts_measurement&#39;</span><span class="p">,):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Copy SIL lite folders from default (or given) directories and</span>
+<span class="sd">        omit unneeded mts files and folders that are not needed in offline simulation</span>
+
+<span class="sd">        :param str sil_sys_folder_name:     optional path to sil_lite folder</span>
+<span class="sd">        :param str sil_measure_folder_name: optional path to mts_measurement folder</span>
+<span class="sd">        :param bool use_filter:             optional to deactivate ignore filter</span>
+<span class="sd">        :param str sil_sys_dest:            destination path for sil_lite</span>
+<span class="sd">        :param str sil_measure_dest:        destination path for mts_measurement</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">SubTaskFactoryMTS</span><span class="o">.</span><span class="n">copy_mts_folders</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sil_sys_folder_name</span><span class="p">,</span> <span class="n">sil_measure_folder_name</span><span class="p">,</span> <span class="n">use_filter</span><span class="p">,</span>
+                                           <span class="n">sil_sys_dest</span><span class="p">,</span> <span class="n">sil_measure_dest</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

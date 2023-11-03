@@ -1,0 +1,1089 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb.catalog</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.rdb.catalog</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">catalog.py</span>
+<span class="sd">----------</span>
+
+<span class="sd">    catlogue API</span>
+
+<span class="sd">interface to CAT_FILES and CAT_COLLECTIONS tables with classes</span>
+
+<span class="sd">- `CollManager` super class to start with</span>
+<span class="sd">- `Collection`  use collection tree to read/write collections with recordings</span>
+<span class="sd">- `Recording`   get recording data from db</span>
+
+<span class="sd">**Usage Example:**</span>
+
+<span class="sd">    code::</span>
+
+<span class="sd">        with CollManager(&#39;VGA&#39;) as collmgr:</span>
+
+<span class="sd">            for item in collmgr:  # print only top collections:</span>
+<span class="sd">                print(item.name)</span>
+
+<span class="sd">        # something recusive: print collection tree, just for fun</span>
+<span class="sd">        with Collection(&quot;VGA&quot;, name=&quot;svens_coll&quot;) as coll:</span>
+
+<span class="sd">            def recur(coll, space):</span>
+<span class="sd">                print((&quot; &quot; * space) + str(coll))</span>
+<span class="sd">                for c in coll:</span>
+<span class="sd">                    recur(c, space + 3)</span>
+<span class="sd">            recur(coll, 0)</span>
+
+<span class="sd">        # read rec file entries</span>
+<span class="sd">        with BaseDB(&#39;VGA&#39;) as db:</span>
+<span class="sd">            with Recording(db, name=r&#39;\\lifs010.cw01.contiwan.com\prj\path\to\filename.rec&#39;) as rec:</span>
+<span class="sd">                print(&#39;measid:&#39; + rec.id)</span>
+<span class="sd">                print(&#39;driven dist:&#39; + str(rec.vdy_dist()))</span>
+<span class="sd">                print(&#39;for project:&#39; + rec.project)</span>
+
+<span class="sd">    see more parameter in class `Recording`</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=E1101,C0103,C0302,R0201,W0125,W0201</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">version_info</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">sep</span><span class="p">,</span> <span class="n">getsize</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">radians</span><span class="p">,</span> <span class="n">sin</span><span class="p">,</span> <span class="n">cos</span><span class="p">,</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">asin</span>
+<span class="kn">from</span> <span class="nn">getpass</span> <span class="kn">import</span> <span class="n">getuser</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">types</span> <span class="kn">import</span> <span class="n">StringTypes</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">StringTypes</span> <span class="o">=</span> <span class="p">(</span><span class="nb">str</span><span class="p">,)</span>
+
+<span class="c1"># - import HPC modules ------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">BaseDB</span><span class="p">,</span> <span class="n">crc</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">replace_server_path</span>
+<span class="kn">from</span> <span class="nn">..core.path</span> <span class="kn">import</span> <span class="n">splitdrive</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+
+<span class="c1"># - defines -----------------------------------------------------------------------------------------------------------</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;CollManager&quot;</span><span class="p">,</span> <span class="s2">&quot;Collection&quot;</span><span class="p">,</span> <span class="s2">&quot;Recording&quot;</span><span class="p">,</span> <span class="s2">&quot;CollException&quot;</span><span class="p">]</span>
+<span class="n">ERR_NO_REC</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">ERR_NO_COL</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">ERR_NO_PAR</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">ERR_NO_CON</span> <span class="o">=</span> <span class="mi">5</span>
+
+<span class="n">META_BASE</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">lufs003x.li.de.conti.de&quot;</span><span class="p">,</span> <span class="n">SHB</span><span class="o">=</span><span class="sa">r</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">itfs002x.it.cn.conti.de&quot;</span><span class="p">)</span>
+
+
+<span class="c1"># - classes / functions -----------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="CollException"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollException">[docs]</a><span class="k">class</span> <span class="nc">CollException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Collection manager exception class&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="CollException.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollException.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init this exception</span>
+
+<span class="sd">        :param int error: error code</span>
+<span class="sd">        :param str message: user readable message</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="ne">Exception</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span> <span class="o">=</span> <span class="n">error</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="n">message</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return my own string representation&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;ErrorCode </span><span class="si">%d</span><span class="s2"> </span><span class="se">\n</span><span class="s2"> </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CollManager"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager">[docs]</a><span class="k">class</span> <span class="nc">CollManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0902</span>
+    <span class="sd">&quot;&quot;&quot;common class for collections&quot;&quot;&quot;</span>
+
+    <span class="c1"># type of entry we are</span>
+    <span class="n">NONE</span><span class="p">,</span> <span class="n">COLL</span><span class="p">,</span> <span class="n">SHARE</span><span class="p">,</span> <span class="n">REC</span><span class="p">,</span> <span class="n">RECOPY</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">))</span>
+
+    <span class="c1"># type of mode we do:</span>
+    <span class="n">READ</span><span class="p">,</span> <span class="n">APPEND</span><span class="p">,</span> <span class="n">WRITE</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+    <span class="c1"># type of class we are, don&#39;t use it privately!</span>
+    <span class="n">CLSUB</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="CollManager.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="s2">&quot;VGA&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0915,R1260</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        initialize a new collection or recording</span>
+
+<span class="sd">        code::</span>
+
+<span class="sd">            with CollManager(&#39;VGA&#39;) as collmgr:</span>
+
+<span class="sd">                for item in collmgr:  # print only top collections:</span>
+<span class="sd">                    print(item.name)</span>
+
+<span class="sd">            # something recusive, just for fun</span>
+<span class="sd">            with Collection(&quot;VGA&quot;, name=&quot;svens_coll&quot;) as coll:</span>
+
+<span class="sd">                def recur(coll, space):</span>
+<span class="sd">                    print((&quot; &quot; * space) + str(coll))</span>
+<span class="sd">                    for c in coll:</span>
+<span class="sd">                        recur(c, space + 3)</span>
+<span class="sd">                recur(coll, 0)</span>
+
+<span class="sd">        Some more samples can be reviewed inside unittest...</span>
+
+<span class="sd">        :param BaseDB|str connection: connection name or `BaseDB` object</span>
+<span class="sd">        :param dict \**kw: see below</span>
+<span class="sd">        :keyword \**kw:</span>
+<span class="sd">            * *name* (``str``): if starting with a name, this instance will be the root collection</span>
+<span class="sd">            * *desc* (``str``): if name shouldn&#39;t be unique, add a description to be it</span>
+<span class="sd">            * *mode* (``CollManager.READ|CollManager.WRITE``): go into read or write mode, use class constants!</span>
+<span class="sd">        :raises hpc.CollException: once some error is encountered</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;mode&#39;</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">READ</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">NONE</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iteridx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;uname&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_childsfetched</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">connection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;parent&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>  <span class="c1"># to get access first</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">BaseDB</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">connection</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">connection</span><span class="p">,</span> <span class="n">autocommit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="c1"># do we need that one?, as inserts don&#39;t seem to follow this...</span>
+                <span class="c1"># if self._db.db_type[0] == -1:</span>
+                <span class="c1">#     self._db(&quot;ALTER SESSION SET NLS_DATE_FORMAT = &#39;YYYY-MM-DD HH24:MI:SS&#39;&quot;, commit=True)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_CON</span><span class="p">,</span> <span class="s2">&quot;DB connection failed!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT USERID, NAME FROM VAL_GLOBAL_ADMIN.GBL_USERS &quot;</span>
+                                        <span class="s2">&quot;WHERE LOGINNAME = :lnm OR USERID = 0 ORDER BY USERID DESC&quot;</span><span class="p">,</span>
+                                        <span class="n">lnm</span><span class="o">=</span><span class="n">getuser</span><span class="p">())[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">NONE</span><span class="p">:</span>  <span class="c1"># we&#39;re the first / initial one</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_label</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;desc&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;prio&#39;</span><span class="p">,</span> <span class="s1">&#39;normal&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># we&#39;re all, the root of collections, the manager</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;&lt;CollManager&gt;&quot;</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># so, we&#39;re the collection, let&#39;s see if we are in DB</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">=</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+                    <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT COLLID FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS WHERE NAME = :name&quot;</span>
+                    <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">}</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; AND COLLCOMMENT = :dscr&quot;</span>
+                        <span class="n">sqa</span><span class="p">[</span><span class="s1">&#39;dscr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; AND (CP_LABEL IS NULL OR CP_LABEL = &#39;&#39;)&quot;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; AND CP_LABEL = :label&quot;</span>
+                        <span class="n">sqa</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span>
+                    <span class="n">cids</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">cids</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># good, we&#39;re already in and can use ourself!</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="n">cids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_label</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT CP_LABEL, COLLCOMMENT, PARENTID, p.NAME, USERID, u.NAME &quot;</span>
+                                 <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS &quot;</span>
+                                 <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PRIORITIES p USING(PRID) &quot;</span>
+                                 <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_USERS u USING(USERID) &quot;</span>
+                                 <span class="s2">&quot;WHERE COLLID = :cid&quot;</span><span class="p">,</span> <span class="n">cid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="c1"># update last usage by HPC</span>
+                    <span class="c1"># self._db(&quot;UPDATE VAL_GLOBAL_ADMIN.CAT_COLLECTIONS SET LAST_USAGE = SYSTIMESTAMP &quot;</span>
+                    <span class="c1">#          &quot;WHERE COLLID = :cid&quot;, cid=self._myId)</span>
+
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">READ</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_COL</span><span class="p">,</span> <span class="s2">&quot;no collection by name &#39;</span><span class="si">%s</span><span class="s2">&#39; existing!&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_PAR</span><span class="p">,</span> <span class="s2">&quot;no parent for new collection of &#39;</span><span class="si">%s</span><span class="s2">&#39; given!&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>  <span class="c1"># otherwise add a new entry  # pragma: no cover</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT COLLID FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS &quot;</span>
+                                                <span class="s2">&quot;WHERE NAME = :coll&quot;</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_PAR</span><span class="p">,</span> <span class="s2">&quot;parent &#39;</span><span class="si">%s</span><span class="s2">&#39; for new collection not found!&quot;</span>
+                                                <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;INSERT INTO VAL_GLOBAL_ADMIN.CAT_COLLECTIONS (NAME, COLLCOMMENT, PARENTID, CP_LABEL, &quot;</span>
+                           <span class="s2">&quot;PRID, USERID) &quot;</span>
+                           <span class="s2">&quot;VALUES (:name, :dscr, :par, :label, (SELECT PRID FROM VAL_GLOBAL_ADMIN.GBL_PRIORITIES &quot;</span>
+                           <span class="s2">&quot;WHERE NAME = :prio), :uid) RETURNING COLLID&quot;</span><span class="p">)</span>
+                    <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s1">&#39;dscr&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">,</span> <span class="s1">&#39;par&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span>
+                           <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sqnullconv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_label</span><span class="p">),</span> <span class="s1">&#39;prio&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">,</span> <span class="s1">&#39;uid&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">0</span><span class="p">]}</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">:</span>  <span class="c1"># mode set to write!  # pragma: no cover</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_label</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;prio&#39;</span><span class="p">,</span> <span class="s1">&#39;normal&#39;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="ow">in</span> <span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">):</span>  <span class="c1"># what to add?</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;desc&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="c1"># check if we need to update existing collection</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+                    <span class="n">sql</span><span class="p">,</span> <span class="n">sqa</span> <span class="o">=</span> <span class="s2">&quot;SELECT COLLID FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS WHERE NAME LIKE :name&quot;</span><span class="p">,</span> \
+                               <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">}</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; AND CP_LABEL LIKE :label&quot;</span>
+                        <span class="n">sqa</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; AND COLLCOMMENT LIKE :dscr&quot;</span>
+                        <span class="n">sqa</span><span class="p">[</span><span class="s1">&#39;dscr&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span>
+                    <span class="n">cids</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">cids</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">:</span>
+                    <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT SAHREDMAPID, p.NAME FROM VAL_GLOBAL_ADMIN.CAT_SHAREDCOLLECTIONMAP &quot;</span>
+                                   <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PRIORITIES p USING(PRID) &quot;</span>
+                                   <span class="s2">&quot;WHERE PARENT_COLLID = :par AND CHILD_COLLID = :cld&quot;</span><span class="p">,</span>
+                                   <span class="n">par</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="n">cld</span><span class="o">=</span><span class="n">cids</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">res</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span> <span class="o">=</span> <span class="n">res</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;INSERT INTO VAL_GLOBAL_ADMIN.CAT_SHAREDCOLLECTIONMAP &quot;</span>
+                                              <span class="s2">&quot;(PARENT_COLLID, CHILD_COLLID, PRID) VALUES (:par, :cld, &quot;</span>
+                                              <span class="s2">&quot;(SELECT PRID FROM VAL_GLOBAL_ADMIN.GBL_PRIORITIES &quot;</span>
+                                              <span class="s2">&quot;WHERE NAME = :prio)) RETURNING SAHREDMAPID&quot;</span><span class="p">,</span>
+                                              <span class="n">par</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="n">cld</span><span class="o">=</span><span class="n">cids</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">prio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># update parent then</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="n">cids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;UPDATE VAL_GLOBAL_ADMIN.CAT_COLLECTIONS SET PARENTID = :par WHERE COLLID = :coll&quot;</span><span class="p">,</span>
+                             <span class="n">par</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>  <span class="c1"># insert new one</span>
+                    <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;INSERT INTO VAL_GLOBAL_ADMIN.CAT_COLLECTIONS (PARENTID, PRID, NAME, USERID, CP_LABEL$M) &quot;</span>
+                           <span class="s2">&quot;VALUES (:par, (SELECT PRID FROM VAL_GLOBAL_ADMIN.GBL_PRIORITIES WHERE NAME = :prio), &quot;</span>
+                           <span class="s2">&quot;:name, :uid, :label$V) RETURNING COLLID&quot;</span><span class="p">)</span>
+                    <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;par&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sqnullconv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_label</span><span class="p">),</span>
+                           <span class="s1">&#39;prio&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">,</span> <span class="s1">&#39;uid&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">0</span><span class="p">]}</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$M&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$V&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">sql</span> <span class="o">=</span> <span class="n">sql</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$M&quot;</span><span class="p">,</span> <span class="s2">&quot;, COLLCOMMENT&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$V&quot;</span><span class="p">,</span> <span class="s2">&quot;, :comm&quot;</span><span class="p">)</span>
+                        <span class="n">sqa</span><span class="p">[</span><span class="s1">&#39;comm&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># add a recording</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_get_rec_details</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;relts&quot;</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_relts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>  <span class="c1"># be a list of relative timestamp&#39;s lists</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_relts</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">kw</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;section&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">rel</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;section&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="p">[[</span><span class="n">i</span><span class="o">.</span><span class="n">start_ts</span> <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">rel</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">start_ts</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                                    <span class="n">i</span><span class="o">.</span><span class="n">end_ts</span> <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">rel</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">end_ts</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rel</span><span class="p">]</span>
+
+                <span class="c1"># for rel in self._relts:</span>
+                <span class="c1">#     try:</span>
+                <span class="c1">#         self._relts[0] = int(self._relts[0][:-1]) \</span>
+                <span class="c1">#             if type(self._relts[0]) in StringTypes and self._relts[0].endswith(&#39;R&#39;) \</span>
+                <span class="c1">#             else int(self._relts[0]) - self._timestamp[0]</span>
+                <span class="c1">#         self._relts[1] = int(self._relts[1][:-1]) \</span>
+                <span class="c1">#             if type(self._relts[1]) in StringTypes and self._relts[1].endswith(&#39;R&#39;) \</span>
+                <span class="c1">#             else int(self._relts[1]) - self._timestamp[0]</span>
+                <span class="c1">#     except Exception as _:</span>
+                <span class="c1">#         pass</span>
+
+                <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT COUNT(COLLMAPID) FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP WHERE COLLID = :cid &quot;</span> \
+                      <span class="s2">&quot;AND MEASID = :mid&quot;</span>
+                <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="s2">&quot;mid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="s2">&quot;uid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">0</span><span class="p">]}</span>
+                <span class="k">for</span> <span class="n">b</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span><span class="p">:</span>
+                    <span class="n">sqla</span> <span class="o">=</span> <span class="s2">&quot;  AND BEGINRELTS $B AND ENDRELTS $E&quot;</span>
+                    <span class="k">if</span> <span class="n">b</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">e</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sqla</span> <span class="o">=</span> <span class="n">sqla</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$B&quot;</span><span class="p">,</span> <span class="s2">&quot;IS NULL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$E&quot;</span><span class="p">,</span> <span class="s2">&quot;IS NULL&quot;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">sqla</span> <span class="o">=</span> <span class="n">sqla</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$B&quot;</span><span class="p">,</span> <span class="s2">&quot;= :beg&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$E&quot;</span><span class="p">,</span> <span class="s2">&quot;= :end&quot;</span><span class="p">)</span>
+                        <span class="n">sqa</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;beg&quot;</span><span class="p">:</span> <span class="n">b</span><span class="p">,</span> <span class="s2">&quot;end&quot;</span><span class="p">:</span> <span class="n">e</span><span class="p">})</span>
+
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span> <span class="o">+</span> <span class="n">sqla</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="s2">&quot;beg&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sqa</span><span class="p">:</span>
+                            <span class="n">sqa</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;beg&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;end&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+                        <span class="n">mid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;INSERT INTO VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP (COLLID, MEASID, &quot;</span>
+                                       <span class="s2">&quot;BEGINRELTS, ENDRELTS, USERID) VALUES (:cid, :mid, :beg, :end, :uid) &quot;</span>
+                                       <span class="s2">&quot;RETURNING COLLMAPID&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_mapid</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># retrieve the details of me</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="ow">in</span> <span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">):</span>  <span class="c1"># details from collection</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">kw</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_mapid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_label</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prio</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT c.NAME, c.CP_LABEL, c.COLLCOMMENT, p.NAME, USERID, u.NAME &quot;</span>
+                                 <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS c &quot;</span>
+                                 <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PRIORITIES p USING(PRID) &quot;</span>
+                                 <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_USERS u USING(USERID) &quot;</span>
+                                 <span class="s2">&quot;WHERE COLLID = :coll&quot;</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">:</span>  <span class="c1"># details from recording</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">kw</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_childsfetched</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;map&quot;</span><span class="p">],</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;rel&quot;</span><span class="p">],</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;childs&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_chash</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dist</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpsdist</span><span class="p">,</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_fsize</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rectime</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recprj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">,</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_region</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_import</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapt_ts</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_get_rec_details</span><span class="p">(</span><span class="n">kw</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span>
+
+            <span class="k">else</span><span class="p">:</span>  <span class="c1"># only one thing left over: recording copy (RECOPY)</span>
+                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">kw</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_childsfetched</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_location</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;rel&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_chash</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dist</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gpsdist</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_rectime</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recprj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_region</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;par&quot;</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_import</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapt_ts</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_relts</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_get_rec_details</span><span class="p">(</span><span class="n">kw</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="CollManager.add"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.add">[docs]</a>    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>  <span class="c1"># pragma: no cover</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a collection or recording</span>
+
+<span class="sd">        :param Recording|Collection item: recording or collection</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">Recording</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">Recording</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                          <span class="n">relts</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">relts</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">Collection</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">Collection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">,</span>
+                           <span class="n">name</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">desc</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;not allowed to add </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">i</span></div>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;disconnect&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return string text summary of me&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">NONE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&lt;collection summary from </span><span class="si">{!s}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&lt;collection </span><span class="si">{}</span><span class="s2">: &#39;</span><span class="si">{}</span><span class="s2">&#39; (</span><span class="si">{}</span><span class="s2">)&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&lt;shared collection </span><span class="si">{}</span><span class="s2">: &#39;</span><span class="si">{}</span><span class="s2">&#39; (</span><span class="si">{}</span><span class="s2">)&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+                                                              <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_desc</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;&lt;recording </span><span class="si">{}</span><span class="s2">: &#39;</span><span class="si">{}</span><span class="s2">&#39; (</span><span class="si">{}</span><span class="s2">-</span><span class="si">{}</span><span class="s2">)&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="s2">&quot;&lt;recording copy </span><span class="si">{}</span><span class="s2">: &#39;</span><span class="si">{}</span><span class="s2">&#39; (</span><span class="si">{}</span><span class="s2">)&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;start iterating through test cases&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iteridx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+<div class="viewcode-block" id="CollManager.next"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.next">[docs]</a>    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;next child item to catch and return&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iteridx</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_childs</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">StopIteration</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iteridx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_iteridx</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span></div>
+
+    <span class="k">if</span> <span class="n">version_info</span> <span class="o">&gt;</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="fm">__next__</span> <span class="o">=</span> <span class="nb">next</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;provide a slice index to be able to iterate through the childs&quot;&quot;&quot;</span>
+        <span class="n">nchilds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_childs</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="n">nchilds</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="c1"># if cls is None:</span>
+            <span class="c1">#     cls = CollManager.CLSUB[self._childs[idx].kind](self._db, type=self._childs[idx].kind,</span>
+            <span class="c1">#                                                     parent=self._myId, name=self._childs[idx])</span>
+            <span class="c1">#     self._childs[idx].clsid = id(cls)</span>
+            <span class="c1">#     self._childs[idx].cls = cls</span>
+            <span class="c1"># return cls</span>
+
+        <span class="c1"># untested:</span>
+        <span class="c1"># elif type(idx) == slice and min(0, idx.start, idx.stop) == 0 and max(nchilds, idx.start, idx.stop):</span>
+        <span class="c1">#     return [CollManager.CLSUB[self._childs[idx][1]](self._db, parent=self._myId, name=self._childs[idx][0],</span>
+        <span class="c1">#                                                     type=self._childs[idx][1])</span>
+        <span class="c1">#             for i in range(idx.start, idx.stop, idx.step)]</span>
+
+        <span class="k">raise</span> <span class="ne">IndexError</span>
+
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;provide length of sub items / childs&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_childs</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;being able to use with statement&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;close connection&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CollManager.close"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">commit</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">rollback</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        commit changes and close connection</span>
+
+<span class="sd">        :param bool commit: we should commit</span>
+<span class="sd">        :param bool rollback: we need to rollback</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_selfopen</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">rollback</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">commit</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_rec_details</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;retrieve my own details from name or id&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mapid</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">[]</span>
+
+        <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;meas&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>
+            <span class="n">recname</span> <span class="o">=</span> <span class="n">replace_server_path</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="n">srv</span> <span class="o">=</span> <span class="n">splitdrive</span><span class="p">(</span><span class="n">recname</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">srv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s1">&#39;CRC_NAME = :crc AND SERVERSHARE = :lnm AND BASEPATH = :bpth&#39;</span>
+                <span class="n">sqa</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;crc&quot;</span><span class="p">:</span> <span class="n">crc</span><span class="p">(</span><span class="n">recname</span><span class="p">),</span> <span class="s2">&quot;lnm&quot;</span><span class="p">:</span> <span class="n">srv</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;bpth&quot;</span><span class="p">:</span> <span class="n">srv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">sep</span><span class="p">)}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s1">&#39;LOWER(RECFILEID) = :meas&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s1">&#39;MEASID = :meas&#39;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_chash</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_timestamp</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dist</span><span class="p">,</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">_gpsdist</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fsize</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rectime</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recprj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fstate</span><span class="p">,</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_region</span> <span class="o">=</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT distinct MEASID, FILEPATH, CONTENTHASH, BEGINABSTS, ENDABSTS, &quot;</span>
+                         <span class="s2">&quot;RECDRIVENDIST, GPSDRIVENDIST, FILESIZE, RECTIME, IMPORTDATE, p.NAME, STATUS, &quot;</span>
+                         <span class="s2">&quot;LOC, REGION FROM VAL_GLOBAL_ADMIN.CAT_FILES &quot;</span>
+                         <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PROJECT p USING(PID) &quot;</span>
+                         <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_LOCATION USING(LOCATION) &quot;</span>
+                         <span class="s2">&quot;WHERE &quot;</span> <span class="o">+</span> <span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">sqa</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_import</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapt_ts</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_import</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_REC</span><span class="p">,</span> <span class="s2">&quot;recording &#39;</span><span class="si">%s</span><span class="s2">&#39; does not exist!&quot;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_adapt_ts</span><span class="p">(</span><span class="n">ts</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;adapt timestamp&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ts</span><span class="p">,</span> <span class="n">StringTypes</span><span class="p">):</span>  <span class="c1"># for sqlite</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">ts</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span> <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">ts</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ts</span><span class="p">[:</span><span class="n">idx</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">ts</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_get_childs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;retrieve sub items / childs of us&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_childsfetched</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="p">)</span>
+
+        <span class="c1"># if self._type != CollManager.RECOPY and self._myId is None:  # as I said: we&#39;re all</span>
+        <span class="c1">#     self._childs = [Child(i[0], CollManager.COLL, name=i[1], label=i[2], desc=i[3], par=i[4], prio=i[5])</span>
+        <span class="c1">#                    for i in self._db(&quot;SELECT COLLID, c.NAME, CP_LABEL, COLLCOMMENT, PARENTID, p.NAME &quot;</span>
+        <span class="c1">#                                               &quot;FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS c &quot;</span>
+        <span class="c1">#                                               &quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PRIORITIES p USING(PRID) &quot;</span>
+        <span class="c1">#                                               &quot;WHERE PARENTID IS NULL ORDER BY COLLID&quot;)]</span>
+        <span class="c1"># elif len(self._childs) == 0:  # otherwise we&#39;re a definite collection</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="ow">in</span> <span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">):</span>
+            <span class="c1"># check if we have child (shared)collections</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span> <span class="o">=</span> <span class="p">[(</span><span class="n">Collection</span> <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span> <span class="k">else</span> <span class="n">SharedColl</span><span class="p">)</span>
+                            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">uname</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                             <span class="n">data</span><span class="o">=</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">6</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">7</span><span class="p">],))</span>
+                            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;WITH SHCOL(COLLID, KIND, MID) AS (SELECT COLLID, </span><span class="si">%d</span><span class="s2">, 0 &quot;</span>
+                                              <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS WHERE PARENTID = :par &quot;</span>
+                                              <span class="s2">&quot;UNION SELECT CHILD_COLLID, </span><span class="si">%d</span><span class="s2">, SAHREDMAPID &quot;</span>
+                                              <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_SHAREDCOLLECTIONMAP &quot;</span>
+                                              <span class="s2">&quot;WHERE PARENT_COLLID = :par) &quot;</span>
+                                              <span class="s2">&quot;SELECT COLLID, KIND, MID, c.NAME, CP_LABEL, COLLCOMMENT, &quot;</span>
+                                              <span class="s2">&quot;p.NAME, PARENTID FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS c &quot;</span>
+                                              <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.GBL_PRIORITIES p USING(PRID) &quot;</span>
+                                              <span class="s2">&quot;INNER JOIN SHCOL USING(COLLID) ORDER BY COLLID&quot;</span>
+                                              <span class="o">%</span> <span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">),</span> <span class="n">par</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">)]</span>
+            <span class="c1"># check for child recordings</span>
+            <span class="n">meass</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT MEASID, COLLMAPID, BEGINRELTS, ENDRELTS, FILEPATH, &quot;</span>
+                              <span class="s2">&quot;CONTENTHASH, BEGINABSTS, ENDABSTS, RECDRIVENDIST, GPSDRIVENDIST, &quot;</span>
+                              <span class="s2">&quot;FILESIZE, RECTIME, IMPORTDATE, PROJECT, STATUS, LOC, REGION &quot;</span>
+                              <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP &quot;</span>
+                              <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.CAT_DMT_FILES USING(MEASID) &quot;</span>
+                              <span class="s2">&quot;WHERE COLLID = :coll ORDER BY FILEPATH, BEGINRELTS&quot;</span><span class="p">,</span>
+                              <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">meass</span><span class="p">:</span>
+                    <span class="n">meass</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;map&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> <span class="s2">&quot;rel&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">]]],</span> <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">[</span><span class="mi">4</span><span class="p">:],</span> <span class="s2">&quot;childs&quot;</span><span class="p">:</span> <span class="p">[]}</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">m</span> <span class="o">=</span> <span class="n">meass</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                    <span class="n">m</span><span class="p">[</span><span class="s2">&quot;map&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">m</span><span class="p">[</span><span class="s2">&quot;rel&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">]])</span>
+
+            <span class="c1"># Child(i[0], CollManager.REC, mapid=[i[1]], rel=[(i[2], i[3],)], path=i[4], hash=i[5],</span>
+            <span class="c1">#       begts=i[6], endts=i[7], dist=i[8], gps=i[9], fsz=i[10], rtm=i[11], impdt=i[12],</span>
+            <span class="c1">#       prj=i[13], stat=i[14], loc=i[15], reg=i[16])</span>
+            <span class="k">if</span> <span class="n">meass</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;SELECT PARENT, MEASID, FILEPATH, IMPORTDATE, STATUS, LOC &quot;</span>
+                                  <span class="s2">&quot;FROM VAL_GLOBAL_ADMIN.CAT_DMT_FILES WHERE PARENT IN (&quot;</span>
+                                  <span class="s2">&quot;SELECT MEASID FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP &quot;</span>
+                                  <span class="s2">&quot;INNER JOIN VAL_GLOBAL_ADMIN.CAT_DMT_FILES USING(MEASID) &quot;</span>
+                                  <span class="s2">&quot;WHERE COLLID = :coll)&quot;</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">):</span>
+                    <span class="n">par</span> <span class="o">=</span> <span class="n">meass</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                    <span class="n">par</span><span class="p">[</span><span class="s2">&quot;childs&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">RecordingCopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">uname</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span>
+                                                       <span class="n">par</span><span class="o">=</span><span class="n">par</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">:],</span> <span class="n">rel</span><span class="o">=</span><span class="n">par</span><span class="p">[</span><span class="s2">&quot;rel&quot;</span><span class="p">]))</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">Recording</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">k</span><span class="p">,</span> <span class="n">uname</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_uname</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">],</span> <span class="nb">map</span><span class="o">=</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;map&quot;</span><span class="p">],</span>
+                                           <span class="n">rel</span><span class="o">=</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;rel&quot;</span><span class="p">],</span> <span class="n">childs</span><span class="o">=</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;childs&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">meass</span><span class="p">)])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_childsfetched</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        use it for code reduction of property handling, see above attribute GETATTR for valid attributnames (keys)</span>
+<span class="sd">        additional attributes are inherited from CollManager: id, type, name</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">bak</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">GETATTR</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bak</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bak</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bak</span><span class="p">[</span><span class="mi">0</span><span class="p">])[</span><span class="n">bak</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span>
+
+    <span class="k">def</span> <span class="nf">_sqnullconv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;convert null values to empty strings on sqlite&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">item</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span> <span class="k">else</span> <span class="n">item</span>
+
+<div class="viewcode-block" id="CollManager.regsub"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.regsub">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">regsub</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">theid</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;use it for subclass registration as we need to return proper child classes for iteration&quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="n">subcls</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;update class dict&quot;&quot;&quot;</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">CLSUB</span><span class="p">[</span><span class="n">theid</span><span class="p">]</span> <span class="o">=</span> <span class="n">subcls</span>
+            <span class="k">return</span> <span class="n">subcls</span>
+        <span class="k">return</span> <span class="n">inner</span></div>
+
+<div class="viewcode-block" id="CollManager.commit"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.commit">[docs]</a>    <span class="k">def</span> <span class="nf">commit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;support for external commit to db&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="CollManager.rollback"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.rollback">[docs]</a>    <span class="k">def</span> <span class="nf">rollback</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;support for external rollback to db&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dbase</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return db connection&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span>
+
+<div class="viewcode-block" id="CollManager.sql"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.CollManager.sql">[docs]</a>    <span class="k">def</span> <span class="nf">sql</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">parms</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;execute with background db&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="o">**</span><span class="n">parms</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return my type: REC or COLL&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return my name&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;return my name&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_uname</span>
+
+    <span class="nd">@name</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;set new name for collection&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;UPDATE VAL_GLOBAL_ADMIN.CAT_COLLECTIONS SET NAME = :name WHERE COLLID = :coll&quot;</span><span class="p">,</span>
+                     <span class="n">name</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;cannot change name of me!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Collection"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Collection">[docs]</a><span class="nd">@CollManager</span><span class="o">.</span><span class="n">regsub</span><span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Collection</span><span class="p">(</span><span class="n">CollManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A collection can contain other collections and for sure recordings.</span>
+
+<span class="sd">    Collections have a name and optional description, that&#39;s it!</span>
+
+<span class="sd">    - You can add another sub-collection via **add_coll** method,</span>
+<span class="sd">    - another recording can be added through **add_rec**</span>
+<span class="sd">    - Removal of an subitem (Collection, Recording) is done via **remove** method.</span>
+<span class="sd">    - Export or Import to/from bpl files</span>
+
+<span class="sd">    Several other infos are available through properties, e.g.:</span>
+
+<span class="sd">        - name:  complete url of collection  (str)</span>
+<span class="sd">        - id:  cb internal id  (int)</span>
+<span class="sd">        - desc:  description (can also be set here)  (str)</span>
+<span class="sd">        - parent:  parent collection (if defined) (`Collection`)</span>
+<span class="sd">        - active:  flag if collection is used</span>
+<span class="sd">        - prio:  priority, e.g. to sort sub collections inside a collection</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_myId&quot;</span><span class="p">,),</span> <span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_desc&quot;</span><span class="p">,),</span> <span class="s2">&quot;prio&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_prio&quot;</span><span class="p">,),</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_parent&quot;</span><span class="p">,),</span> <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_label&quot;</span><span class="p">,)}</span>
+    <span class="n">SETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_desc&quot;</span><span class="p">,)}</span>
+
+    <span class="k">if</span> <span class="kc">False</span><span class="p">:</span>  <span class="c1"># helping intellisense</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">desc</span> <span class="o">=</span> <span class="n">prio</span> <span class="o">=</span> <span class="n">parent</span> <span class="o">=</span> <span class="n">desc</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Collection.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Collection.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        inti a collection which can contain other collections and for sure recordings.</span>
+<span class="sd">        Collections have a name and optional description, that&#39;s it!</span>
+
+<span class="sd">        You can add another sub-collection via **add_coll** method,</span>
+<span class="sd">        another recording can be added through **add_rec**</span>
+<span class="sd">        Removal of an subitem is done via **remove** method.</span>
+
+<span class="sd">        :param dict \**kw: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of collection to use (or create if not existing)</span>
+<span class="sd">            * *desc* (``str``): description of collection</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">CollManager</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Collection.add_coll"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Collection.add_coll">[docs]</a>    <span class="k">def</span> <span class="nf">add_coll</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a collection</span>
+
+<span class="sd">        :param dict \**kw: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of collection</span>
+<span class="sd">            * *desc* (``str``): description of it</span>
+<span class="sd">        :return: collection</span>
+<span class="sd">        :rtype: ``Collection``</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s1">&#39;type&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kw</span> <span class="ow">or</span> <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">):</span>
+            <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">Collection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">c</span></div>
+
+<div class="viewcode-block" id="Collection.add_rec"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Collection.add_rec">[docs]</a>    <span class="k">def</span> <span class="nf">add_rec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        add a recording</span>
+
+<span class="sd">        :param dict \**kw: see below</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): recfile name or path or it&#39;s id</span>
+<span class="sd">        :return: recording</span>
+<span class="sd">        :rtype: ``Recording``</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">Recording</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_myId</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">WRITE</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">r</span></div>
+
+<div class="viewcode-block" id="Collection.remove"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Collection.remove">[docs]</a>    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sub</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        remove something</span>
+
+<span class="sd">        :param Recording|Collection sub: a subitem to be removed, similar to list.remove</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">sub</span><span class="o">.</span><span class="n">type</span> <span class="ow">in</span> <span class="p">[</span><span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">RECOPY</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sub</span><span class="o">.</span><span class="n">map_id</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;DELETE FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONMAP WHERE COLLMAPID = :map&quot;</span><span class="p">,</span> <span class="nb">map</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="n">sub</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sub</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sub</span><span class="o">.</span><span class="n">_childs</span><span class="p">:</span>  <span class="c1"># pylint: disable=W0212</span>
+                    <span class="k">if</span> <span class="nb">id</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">==</span> <span class="n">i</span><span class="p">:</span>
+                        <span class="n">sub</span><span class="o">.</span><span class="n">_childs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>  <span class="c1"># pylint: disable=W0212</span>
+                        <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">sub</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">COLL</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;DELETE FROM VAL_GLOBAL_ADMIN.CAT_COLLECTIONS WHERE COLLID = :coll&quot;</span><span class="p">,</span> <span class="n">coll</span><span class="o">=</span><span class="n">sub</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="p">(</span><span class="s2">&quot;DELETE FROM VAL_GLOBAL_ADMIN.CAT_SHAREDCOLLECTIONMAP WHERE SAHREDMAPID = :mid&quot;</span><span class="p">,</span>
+                         <span class="n">coll</span><span class="o">=</span><span class="n">sub</span><span class="o">.</span><span class="n">map_id</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">id</span><span class="p">(</span><span class="n">sub</span><span class="p">)</span></div></div>
+
+
+<span class="nd">@CollManager</span><span class="o">.</span><span class="n">regsub</span><span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">SHARE</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">SharedColl</span><span class="p">(</span><span class="n">CollManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    a shared collection is a special kind of collection which can be used in several parent collections</span>
+
+<span class="sd">    removing a shared collection means deleting the link to it,</span>
+<span class="sd">    the sub collection itself is only removed if the last link is deleted</span>
+
+<span class="sd">    a shared collection can contain other (shared) collections and for sure recordings</span>
+
+<span class="sd">    otherwise a shared collection is similar to the `Collection`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_myId&quot;</span><span class="p">,),</span> <span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_desc&quot;</span><span class="p">,),</span> <span class="s2">&quot;prio&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_prio&quot;</span><span class="p">,),</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_parent&quot;</span><span class="p">,),</span> <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_label&quot;</span><span class="p">,)}</span>
+    <span class="n">SETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;desc&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_desc&quot;</span><span class="p">,)}</span>
+
+    <span class="k">if</span> <span class="kc">False</span><span class="p">:</span>  <span class="c1"># helping intellisense</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">desc</span> <span class="o">=</span> <span class="n">prio</span> <span class="o">=</span> <span class="n">parent</span> <span class="o">=</span> <span class="n">description</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init a collection which can contain other collections and for sure recordings</span>
+<span class="sd">        collections have a name and optional description, that&#39;s it!</span>
+
+<span class="sd">        you can add another sub-collection via **add_coll** method,</span>
+<span class="sd">        another recording can be added through **add_rec**</span>
+<span class="sd">        removal of an subitem is done via **remove** method</span>
+
+<span class="sd">        :param tuple \*args: see ``CollManager`` for more details</span>
+<span class="sd">        :param dict \**kwargs: see ``CollManager`` for more details</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of collection to use (or create if not existing)</span>
+<span class="sd">            * *desc* (``str``): description of collection</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">CollManager</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+    <span class="c1"># 2B taken over from Collection:</span>
+    <span class="c1"># __contains__ = Collection.__dict__[&#39;__contains__&#39;]</span>
+
+
+<div class="viewcode-block" id="Recording"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Recording">[docs]</a><span class="nd">@CollManager</span><span class="o">.</span><span class="n">regsub</span><span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Recording</span><span class="p">(</span><span class="n">CollManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A recording represents the data from cat_files (measid).</span>
+
+<span class="sd">    Several other infos are available through properties, e.g.:</span>
+
+<span class="sd">        - name:  complete path and file name</span>
+<span class="sd">        - id:  measurement id</span>
+<span class="sd">        - timestamp:  tuple of [abs. start ts, abs. end ts] time stamps ([int, int])</span>
+<span class="sd">        - state:  status of file on server (transmitted: copied to server, archived: moved to archive)</span>
+<span class="sd">        - hash:  unique hash key of rec file (str)</span>
+<span class="sd">        - rectime:  recording time  (daytime object)</span>
+<span class="sd">        - import_date:  day/time of adding the rec file to the server / db  (daytime object)</span>
+<span class="sd">        - beginrelts:  first relative time stamp of section to be used in collection  (int)</span>
+<span class="sd">        - endrelts:  last relative time stamp of section used in collection  (int)</span>
+<span class="sd">        - distance:  driven distance based on VDY</span>
+<span class="sd">        - gpsdistance:  driven distance based on GPS positions</span>
+<span class="sd">        - filesize:  size in byte</span>
+<span class="sd">        - project:  name of project the rec file belongs to</span>
+<span class="sd">        - filestate:  acceptance state of the file (int: 1 := unchecked, 2 := rejected, 3 := accepted)</span>
+
+<span class="sd">    Set properties for Recording inside a Collection:</span>
+
+<span class="sd">        - beginrelts: first relative time stamp of section to be used in collection</span>
+<span class="sd">        - endrelts:  last relative time stamp of section used in collection</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_myId&quot;</span><span class="p">,),</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_parent&quot;</span><span class="p">,),</span> <span class="s2">&quot;filepath&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_name&quot;</span><span class="p">,),</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_timestamp&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_chash&quot;</span><span class="p">,),</span> <span class="s2">&quot;rectime&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_rectime&quot;</span><span class="p">,),</span> <span class="s2">&quot;import_date&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_import&quot;</span><span class="p">,),</span> <span class="s2">&quot;project&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_recprj&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;relts&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_relts&quot;</span><span class="p">,),</span> <span class="s2">&quot;distance&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_dist&quot;</span><span class="p">,),</span> <span class="s2">&quot;gpsdistance&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_gpsdist&quot;</span><span class="p">,),</span> <span class="s2">&quot;filesize&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_fsize&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;map_id&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_mapid&quot;</span><span class="p">,),</span> <span class="s2">&quot;filestate&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_fstate&quot;</span><span class="p">,),</span> <span class="s2">&quot;location&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_location&quot;</span><span class="p">,),</span> <span class="s2">&quot;region&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_region&quot;</span><span class="p">,)}</span>
+
+    <span class="k">if</span> <span class="kc">False</span><span class="p">:</span>  <span class="c1"># helping intellisense</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">state</span> <span class="o">=</span> <span class="nb">hash</span> <span class="o">=</span> <span class="n">rectime</span> <span class="o">=</span> <span class="n">import_date</span> <span class="o">=</span> \
+            <span class="n">beginrelts</span> <span class="o">=</span> <span class="n">endrelts</span> <span class="o">=</span> <span class="n">distance</span> <span class="o">=</span> <span class="n">gpsdistance</span> <span class="o">=</span> <span class="n">filesize</span> <span class="o">=</span> <span class="n">map_id</span> <span class="o">=</span> <span class="n">project</span> <span class="o">=</span> <span class="n">loation</span> <span class="o">=</span> <span class="n">region</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Recording.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Recording.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init recording which has a name being path/to/a/filename.</span>
+
+<span class="sd">        Several other infos are available through properties, e.g.:</span>
+<span class="sd">        timestamp, state of recording, recording time, etc.</span>
+
+<span class="sd">        :param tuple \*args: see ``CollManager`` for more details</span>
+<span class="sd">        :param dict \**kwargs: see ``CollManager`` for more details</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of recording to use</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">REC</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span> <span class="ow">and</span> <span class="s2">&quot;connection&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kw</span><span class="p">:</span>
+            <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;connection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;VGA&quot;</span>
+
+        <span class="n">CollManager</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addColl</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dist_file</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: sqlite DB distance file name</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">join</span><span class="p">(</span><span class="n">META_BASE</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_location</span><span class="p">],</span> <span class="s1">&#39;meta&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recprj</span><span class="p">,</span> <span class="s1">&#39;_DISTANCE&#39;</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_chash</span><span class="p">[:</span><span class="mi">4</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_chash</span> <span class="o">+</span> <span class="s2">&quot;.sqlite&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_calc_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">which</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        retrieve and calc the distance</span>
+
+<span class="sd">        :param str which: currently supports &#39;vdy&#39; and &#39;gps&#39;</span>
+<span class="sd">        :param int start: start time</span>
+<span class="sd">        :param int stop: stop time</span>
+<span class="sd">        :return: distance from start to stop</span>
+<span class="sd">        :rtype: float</span>
+<span class="sd">        :raises hpc.CollException: if no distance data is available</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">which</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;VDY&#39;</span><span class="p">,</span> <span class="s1">&#39;GPS&#39;</span><span class="p">),</span> <span class="s2">&quot;only &#39;VDY&#39; or &#39;GPS&#39; is supported!&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">getsize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dist_file</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">CollException</span><span class="p">(</span><span class="n">ERR_NO_CON</span><span class="p">,</span> <span class="s2">&quot;no VDY or GPS data available from data mining!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># build sql query</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2"> FROM </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;MTSTS, VELOCITY&quot;</span> <span class="k">if</span> <span class="n">which</span> <span class="o">==</span> <span class="s1">&#39;VDY&#39;</span> <span class="k">else</span> <span class="s2">&quot;LATITUDE, LONGITUDE&quot;</span><span class="p">,</span> <span class="n">which</span><span class="p">)</span>
+        <span class="n">fltr</span><span class="p">,</span> <span class="n">fidx</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;WHERE&quot;</span><span class="p">,</span> <span class="s2">&quot;AND&quot;</span><span class="p">],</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="si">{}</span><span class="s2"> MTSTS &gt;= </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fltr</span><span class="p">[</span><span class="n">fidx</span><span class="p">],</span> <span class="n">start</span><span class="p">)</span>
+            <span class="n">fidx</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stop</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">sql</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="si">{}</span><span class="s2"> MTSTS &lt;= </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fltr</span><span class="p">[</span><span class="n">fidx</span><span class="p">],</span> <span class="n">stop</span><span class="p">)</span>
+
+        <span class="c1"># connect and load data from sqlite file</span>
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dist_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">ddb</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">ddb</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">which</span> <span class="o">==</span> <span class="s1">&#39;VDY&#39;</span><span class="p">:</span>  <span class="c1"># calculate VDY distance</span>
+            <span class="n">mts</span><span class="p">,</span> <span class="n">vdy</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">data</span><span class="p">))</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="mf">0.</span>
+            <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">mts</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">mts</span><span class="p">[</span><span class="mi">1</span><span class="p">:])),</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">vdy</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">vdy</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))):</span>
+                <span class="n">dt</span><span class="p">,</span> <span class="n">dv</span> <span class="o">=</span> <span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mf">0.000001</span><span class="p">,</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="c1"># dist += v[0] * dt + 0.5 * (dv / dt) * dt**2</span>
+                <span class="n">dist</span> <span class="o">+=</span> <span class="n">dt</span> <span class="o">*</span> <span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dv</span><span class="p">)</span>
+            <span class="n">dist</span> <span class="o">/=</span> <span class="mf">1000.</span>  <span class="c1"># [km]</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># calculate GPS distance</span>
+            <span class="k">def</span> <span class="nf">haversine</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+                <span class="sd">&quot;&quot;&quot;calculate the haversine distance&quot;&quot;&quot;</span>
+                <span class="n">lat1</span><span class="p">,</span> <span class="n">lon1</span> <span class="o">=</span> <span class="n">start</span>
+                <span class="n">lat2</span><span class="p">,</span> <span class="n">lon2</span> <span class="o">=</span> <span class="n">end</span>
+
+                <span class="n">d_lat</span> <span class="o">=</span> <span class="n">radians</span><span class="p">(</span><span class="n">lat2</span> <span class="o">-</span> <span class="n">lat1</span><span class="p">)</span>
+                <span class="n">d_lon</span> <span class="o">=</span> <span class="n">radians</span><span class="p">(</span><span class="n">lon2</span> <span class="o">-</span> <span class="n">lon1</span><span class="p">)</span>
+                <span class="n">lat1</span> <span class="o">=</span> <span class="n">radians</span><span class="p">(</span><span class="n">lat1</span><span class="p">)</span>
+                <span class="n">lat2</span> <span class="o">=</span> <span class="n">radians</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span>
+
+                <span class="n">a</span> <span class="o">=</span> <span class="n">sin</span><span class="p">(</span><span class="n">d_lat</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">cos</span><span class="p">(</span><span class="n">lat1</span><span class="p">)</span> <span class="o">*</span> <span class="n">cos</span><span class="p">(</span><span class="n">lat2</span><span class="p">)</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">d_lon</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">asin</span><span class="p">(</span><span class="n">sqrt</span><span class="p">(</span><span class="n">a</span><span class="p">))</span>
+
+                <span class="k">return</span> <span class="mf">6372.8</span> <span class="o">*</span> <span class="n">c</span>  <span class="c1"># Earth radius in kilometers</span>
+
+            <span class="n">dist</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="n">haversine</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))])</span>
+
+        <span class="k">return</span> <span class="n">dist</span>
+
+<div class="viewcode-block" id="Recording.vdy_dist"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Recording.vdy_dist">[docs]</a>    <span class="k">def</span> <span class="nf">vdy_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        calculate VDY distance between start and stop times, default: calc for the whole recording</span>
+
+<span class="sd">        :param int start: use specific start time</span>
+<span class="sd">        :param int stop: use specific stop time</span>
+<span class="sd">        :return: distance</span>
+<span class="sd">        :rtype: float</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calc_dist</span><span class="p">(</span><span class="s1">&#39;VDY&#39;</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Recording.gps_dist"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Recording.gps_dist">[docs]</a>    <span class="k">def</span> <span class="nf">gps_dist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        calculate GPS distance between start and stop times, default: calc for the whole recording</span>
+
+<span class="sd">        :param int start: use specific start time</span>
+<span class="sd">        :param int stop: use specific stop time</span>
+<span class="sd">        :return: distance</span>
+<span class="sd">        :rtype: float</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_calc_dist</span><span class="p">(</span><span class="s1">&#39;GPS&#39;</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Recording.gps_pos"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.Recording.gps_pos">[docs]</a>    <span class="k">def</span> <span class="nf">gps_pos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        GPS position at a certain timestamp,</span>
+<span class="sd">        if None, first one is returned, otherwise closest to timestamp</span>
+
+<span class="sd">        :param int timestamp: MTS timestamp</span>
+<span class="sd">        :return: tuple of (LAT, LON)</span>
+<span class="sd">        :rtype: tuple</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dist_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">ddb</span><span class="p">:</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT LATITUDE, LONGITUDE FROM GPS </span><span class="si">%s</span><span class="s2">LIMIT 1&quot;</span>
+            <span class="k">if</span> <span class="n">timestamp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">%=</span> <span class="s2">&quot;&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">%=</span> <span class="s2">&quot;ORDER BY ABS(MTSTS - </span><span class="si">%d</span><span class="s2">) &quot;</span> <span class="o">%</span> <span class="n">timestamp</span>
+
+            <span class="n">pos</span> <span class="o">=</span> <span class="n">ddb</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pos</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="kc">None</span></div></div>
+
+
+<span class="nd">@CollManager</span><span class="o">.</span><span class="n">regsub</span><span class="p">(</span><span class="n">CollManager</span><span class="o">.</span><span class="n">RECOPY</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">RecordingCopy</span><span class="p">(</span><span class="n">CollManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A recording represents the data from cat_files (measid).</span>
+
+<span class="sd">    Several other infos are available through properties, e.g.:</span>
+
+<span class="sd">        - name:  complete path and file name</span>
+<span class="sd">        - id:  parent id</span>
+<span class="sd">        - timestamp:  tuple of [abs. start ts, abs. end ts] time stamps ([int, int])</span>
+<span class="sd">        - state:  status of file on server (transmitted: copied to server, archived: moved to archive)</span>
+<span class="sd">        - hash:  unique hash key of rec file (str)</span>
+<span class="sd">        - rectime:  recording time  (daytime object)</span>
+<span class="sd">        - import_date:  day/time of adding the rec file to the server / db  (daytime object)</span>
+<span class="sd">        - distance:  driven distance based on VDY</span>
+<span class="sd">        - gpsdistance:  driven distance based on GPS positions</span>
+<span class="sd">        - filesize:  size in byte</span>
+<span class="sd">        - project:  name of project the rec file belongs to</span>
+<span class="sd">        - filestate:  acceptance state of the file (int: 1 := unchecked, 2 := rejected, 3 := accepted)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">GETATTR</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_myId&quot;</span><span class="p">,),</span> <span class="s2">&quot;parent&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_parent&quot;</span><span class="p">,),</span> <span class="s2">&quot;filepath&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_name&quot;</span><span class="p">,),</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_timestamp&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_state&quot;</span><span class="p">,),</span> <span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_chash&quot;</span><span class="p">,),</span> <span class="s2">&quot;rectime&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_rectime&quot;</span><span class="p">,),</span> <span class="s2">&quot;import_date&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_import&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;project&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_recprj&quot;</span><span class="p">,),</span> <span class="s2">&quot;relts&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_relts&quot;</span><span class="p">,),</span> <span class="s2">&quot;distance&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_dist&quot;</span><span class="p">,),</span> <span class="s2">&quot;gpsdistance&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_gpsdist&quot;</span><span class="p">,),</span>
+               <span class="s2">&quot;filesize&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_fsize&quot;</span><span class="p">,),</span> <span class="s2">&quot;filestate&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_fstate&quot;</span><span class="p">,),</span> <span class="s2">&quot;location&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_location&quot;</span><span class="p">,),</span> <span class="s2">&quot;region&quot;</span><span class="p">:</span> <span class="p">(</span><span class="s2">&quot;_region&quot;</span><span class="p">,)}</span>
+    <span class="n">SETATTR</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="kc">False</span><span class="p">:</span>  <span class="c1"># helping intellisense</span>
+        <span class="nb">id</span> <span class="o">=</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">state</span> <span class="o">=</span> <span class="nb">hash</span> <span class="o">=</span> <span class="n">rectime</span> <span class="o">=</span> <span class="n">import_date</span> <span class="o">=</span> \
+            <span class="n">beginrelts</span> <span class="o">=</span> <span class="n">endrelts</span> <span class="o">=</span> <span class="n">distance</span> <span class="o">=</span> <span class="n">gpsdistance</span> <span class="o">=</span> <span class="n">filesize</span> <span class="o">=</span> <span class="n">project</span> <span class="o">=</span> <span class="n">loation</span> <span class="o">=</span> <span class="n">region</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        init recording copy, it has a name being path/to/a/filename.</span>
+
+<span class="sd">        Several other infos are available through properties, e.g.:</span>
+<span class="sd">        timestamp, state of recording, recording time, etc.</span>
+
+<span class="sd">        :param tuple \*args: see ``CollManager`` for more details</span>
+<span class="sd">        :param dict \**kwargs: see ``CollManager`` for more details</span>
+<span class="sd">        :keyword \**kwargs:</span>
+<span class="sd">            * *name* (``str``): name of recording to use</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">kw</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">,</span> <span class="n">CollManager</span><span class="o">.</span><span class="n">RECOPY</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span> <span class="ow">and</span> <span class="s2">&quot;connection&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kw</span><span class="p">:</span>
+            <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;connection&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;VGA&quot;</span>
+
+        <span class="n">CollManager</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">addColl</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        catch all available types (using global var?)</span>
+<span class="sd">        catch name / value and save into generated class -&gt; type(&#39;MET&#39;, .., ..) and return it</span>
+
+<span class="sd">        :param object item: todo</span>
+<span class="sd">        :return: value</span>
+<span class="sd">        :rtype: object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+
+<span class="c1"># class Child(dict):</span>
+<span class="c1">#     &quot;&quot;&quot;child object</span>
+<span class="c1">#     &quot;&quot;&quot;</span>
+<span class="c1">#</span>
+<span class="c1">#     def __init__(self, ident, kind, **kwargs):</span>
+<span class="c1">#         dict.__init__(self, ident=ident, kind=kind)</span>
+<span class="c1">#         self.update(kwargs)</span>
+<span class="c1">#</span>
+<span class="c1">#     def __setattr__(self, key, value):</span>
+<span class="c1">#         if key in [&quot;ident&quot;, &quot;kind&quot;]:</span>
+<span class="c1">#             raise AttributeError(key)</span>
+<span class="c1">#         self[key] = value</span>
+<span class="c1">#</span>
+<span class="c1">#     def __getattr__(self, item):</span>
+<span class="c1">#         if item in self:</span>
+<span class="c1">#             return self[item]</span>
+<span class="c1">#         elif type(item) == tuple:</span>
+<span class="c1">#             return tuple([self[k] for k in self.keys() if not k.startswith(&#39;_&#39;)])</span>
+<span class="c1">#         else:</span>
+<span class="c1">#             return None</span>
+<span class="c1">#</span>
+<span class="c1">#     def __hash__(self):</span>
+<span class="c1">#         return hash((self.ident, self.kind,))</span>
+<span class="c1">#</span>
+<span class="c1">#     def __eq__(self, other):</span>
+<span class="c1">#         return self.ident == other.ident and self.kind == other.ident</span>
+<span class="c1">#</span>
+<span class="c1">#     def get(self, key):</span>
+<span class="c1">#         if type(key) in (tuple, list):</span>
+<span class="c1">#             return [self[k] for k in key]</span>
+<span class="c1">#         elif key in self:</span>
+<span class="c1">#             return self[key]</span>
+<span class="c1">#         else:</span>
+<span class="c1">#             return None</span>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

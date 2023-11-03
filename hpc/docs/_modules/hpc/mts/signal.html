@@ -1,0 +1,260 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.mts.signal</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.mts.signal</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">signal.py</span>
+<span class="sd">---------</span>
+
+<span class="sd">signal processor to read and write bsig&#39;s and csv&#39;s</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">csv</span> <span class="kn">import</span> <span class="n">Dialect</span><span class="p">,</span> <span class="n">QUOTE_NONNUMERIC</span><span class="p">,</span> <span class="n">register_dialect</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.signalreader</span> <span class="kn">import</span> <span class="n">SignalReader</span>
+<span class="kn">from</span> <span class="nn">.signalwriter</span> <span class="kn">import</span> <span class="n">SignalWriter</span>
+
+
+<span class="c1"># - classes / functions ------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="SignalException"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.SignalException">[docs]</a><span class="k">class</span> <span class="nc">SignalException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;general exception for SignalReader class&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SignalException.__init__"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.SignalException.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;derive from std error&quot;&quot;&quot;</span>
+        <span class="ne">Exception</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;ERROR: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">msg</span><span class="p">))</span></div></div>
+
+
+<div class="viewcode-block" id="MetaData"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.MetaData">[docs]</a><span class="k">class</span> <span class="nc">MetaData</span><span class="p">(</span><span class="n">Dialect</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0903</span>
+    <span class="sd">&quot;&quot;&quot;Describe the usual properties of Excel-generated CSV files.&quot;&quot;&quot;</span>
+
+    <span class="n">delimiter</span> <span class="o">=</span> <span class="s1">&#39;;&#39;</span>
+    <span class="n">quotechar</span> <span class="o">=</span> <span class="s1">&#39;&quot;&#39;</span>
+    <span class="n">doublequote</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">skipinitialspace</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">lineterminator</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+    <span class="n">quoting</span> <span class="o">=</span> <span class="n">QUOTE_NONNUMERIC</span></div>
+
+
+<span class="n">register_dialect</span><span class="p">(</span><span class="s2">&quot;conti-excel&quot;</span><span class="p">,</span> <span class="n">MetaData</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Signal"><a class="viewcode-back" href="../../../hpc.mts.html#hpc.Signal">[docs]</a><span class="k">class</span> <span class="nc">Signal</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0903</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    **Signal File Read and Write** (\*.bsig (aka \*.bin), \*.csv)</span>
+
+<span class="sd">    open, step through, read or write signals and close a signal file, provide list of signal names</span>
+
+<span class="sd">    by default the **values read are returned as numpy array**, see `__init__` how to configure for python lists</span>
+
+<span class="sd">    for csv files several options (like delimiter) are supported, see `__init__` for more details</span>
+
+<span class="sd">    even if the usage looks like calling a dict *a Signal instance is no dict:*</span>
+
+<span class="sd">    - when getting a signal using ``sr[&#39;my_signal_name&#39;]`` just that signal is read from the file;</span>
+<span class="sd">    - adding or deleting signals is not possible, it&#39;s just a reader;</span>
+<span class="sd">    - there are no dict functions like d.keys(), d.values(), d.get() etc.</span>
+
+<span class="sd">    supported functions (see also Examples below):</span>
+
+<span class="sd">        - with              open and integrated close for a signal file</span>
+<span class="sd">        - get               values of signal with name or index: ``sr[&#39;my_name&#39;], sr[2]``</span>
+<span class="sd">        - len               number of signals: ``len(sr)``</span>
+<span class="sd">        - in                check if signal with name is available: ``if &#39;my_sig&#39; in sr:``</span>
+<span class="sd">        - for               loop over all signals with name and values: ``for n, v in sr:``</span>
+<span class="sd">        - signal_names      list of all signal names (like dict.keys()): ``sr.signal_names``</span>
+
+<span class="sd">    for the writing use mode=&#39;w&#39; and use type=&#39;csv&#39; or type=&#39;bsig&#39;</span>
+<span class="sd">    if later is used you might want to step back using V2 format: v2format=True</span>
+
+<span class="sd">    Example 1::</span>
+
+<span class="sd">        # read csv files:</span>
+<span class="sd">        reader = Signal(&lt;file.csv&gt;,</span>
+<span class="sd">                        &#39;delim&#39;=&lt;delimiter&gt;,</span>
+<span class="sd">                        &#39;scan_type&#39;=&lt;&#39;prefetch&#39;,&#39;no_prefetch&#39;&gt;,</span>
+<span class="sd">                        &#39;scan_opt&#39;=&lt;&#39;scan_auto&#39;,&#39;scan_raw&#39;,&#39;float&#39;,...&gt;,</span>
+<span class="sd">                        &#39;skip_lines&#39;=&lt;number_of_header_lines_to_skip&gt;,</span>
+<span class="sd">                        &#39;skip_data_lines&#39;=&lt;number_of_data_lines_to_skip&gt;)</span>
+
+<span class="sd">        # read bsig files (version 2 or 3)</span>
+<span class="sd">        reader = Signal(&lt;file.bsig&gt;)</span>
+
+<span class="sd">        # check if signal with name is stored in file:</span>
+<span class="sd">        if &quot;MTS.Package.TimeStamp&quot; not in reader:</span>
+<span class="sd">            print(&quot;TimeStamp missing in signal file&quot;)</span>
+
+<span class="sd">    Example 2::</span>
+
+<span class="sd">        import numpy as np</span>
+<span class="sd">        from hpc import Signal, SignalException</span>
+
+<span class="sd">        sr = Signal(&#39;file_hla_xyz.txt&#39;, delim =&#39;\t&#39;, scan_type=&#39;NO_PREFETCH&#39;)</span>
+<span class="sd">        # get values</span>
+<span class="sd">        read_values = sr[&#39;lux_R2G&#39;]</span>
+<span class="sd">        sr.close()</span>
+
+<span class="sd">    Example 3::</span>
+
+<span class="sd">        sr = Signal(&#39;file_sla_xyz.csv&#39;,delim =&#39;,&#39;,skip_lines=8)</span>
+<span class="sd">        # read only signal &#39;timestamp&#39;</span>
+<span class="sd">        values = sr[&#39;timestamp&#39;] # gets the timestamp signal</span>
+<span class="sd">        values = sr[0] # gets the signal by index 0</span>
+<span class="sd">        sr.close()</span>
+
+<span class="sd">    Example 4::</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;) as sr:</span>
+<span class="sd">            signals = sr[[&#39;Time stamp&#39;,&#39;Cycle counter&#39;]] # retrieves a list of both signals --&gt; [[&lt;sig1&gt;], [&lt;sig2&gt;]]</span>
+
+<span class="sd">    Example 5::</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;) as sr:</span>
+<span class="sd">            signals = sr[&#39;Time stamp&#39;:50:250] # retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+
+<span class="sd">    Example 6::</span>
+
+<span class="sd">        with Signal(&#39;file_fct.bsig&#39;) as sr:</span>
+<span class="sd">            for n, v in sr:  # iterate over names and signals</span>
+<span class="sd">                print(&quot;{}: {}&quot;.format(n, v.size))</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;) as sr:</span>
+<span class="sd">            signals = sr[&#39;Time stamp&#39;:50:250] # retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+
+<span class="sd">    Example 7::</span>
+
+<span class="sd">        instance_ARS = Signal(&#39;file_ars_xyz.csv&#39;, delim =&#39;;&#39;,scan_opt = &#39;float&#39;)</span>
+<span class="sd">        ...</span>
+<span class="sd">        instance_ARS.close()</span>
+
+
+<span class="sd">        import numpy as np</span>
+<span class="sd">        from hpc import Signal, SignalException</span>
+
+<span class="sd">    Example 8::</span>
+
+<span class="sd">        sr = Signal(&#39;file_hla_xyz.txt&#39;, delim =&#39;\t&#39;, scan_type=&#39;NO_PREFETCH&#39;)</span>
+<span class="sd">        # get values</span>
+<span class="sd">        read_values = sr[&#39;lux_R2G&#39;]</span>
+<span class="sd">        sr.close()</span>
+
+<span class="sd">    Example 9::</span>
+
+<span class="sd">        sr = Signal(&#39;file_sla_xyz.csv&#39;,delim =&#39;,&#39;,skip_lines=8)</span>
+<span class="sd">        # read only signal &#39;timestamp&#39;</span>
+<span class="sd">        values = sr[&#39;timestamp&#39;] # gets the timestamp signal</span>
+<span class="sd">        values = sr[0] # gets the signal by index 0</span>
+<span class="sd">        sr.close()</span>
+
+<span class="sd">    Example 10::</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;) as sr:</span>
+<span class="sd">            signals = sr[[&#39;Time stamp&#39;,&#39;Cycle counter&#39;]] # retrieves a list of both signals --&gt; [[&lt;sig1&gt;], [&lt;sig2&gt;]]</span>
+
+<span class="sd">    Example 11::</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;) as sr:</span>
+<span class="sd">            signals = sr[&#39;Time stamp&#39;:50:250] # retrieves 200 samples of time stamp signal from offset 50 onwards</span>
+
+<span class="sd">    Example 12::</span>
+
+<span class="sd">        instance_ARS = Signal(&#39;file_ars_xyz.csv&#39;, delim =&#39;;&#39;,scan_opt = &#39;float&#39;)</span>
+<span class="sd">        ...</span>
+<span class="sd">        instance_ARS.close()</span>
+
+<span class="sd">    Example 13::</span>
+
+<span class="sd">        # just write some</span>
+
+<span class="sd">        with Signal(&#39;file_hla_xyz.bsig&#39;, mode=&#39;w&#39;) as sw:</span>
+<span class="sd">            sw.append(&#39;Time stamp&#39;, np.array([0, 1, 2, 3, 4, 5, 6, 7]))</span>
+<span class="sd">            sw.append(&#39;Cycle counter&#39;, np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32))</span>
+
+<span class="sd">    Example 14::</span>
+
+<span class="sd">        # reorganize</span>
+
+<span class="sd">        bsig_in_file, bsig_out_file = &#39;Snapshot_201x.x.y_at_h.m.s_FCT.bsig&#39;, &#39;Snapshot_201x.x.y_at_h.m.s_all.bsig&#39;</span>
+<span class="sd">        sig_list = [&#39;MTS.Timestamp&#39;, &#39;MTS.Cyclecounter&#39;, &#39;SIM VFB.FCTVehicle.HEAD.Header.uiStructSize&#39;, ...]</span>
+
+<span class="sd">        with Signal(bsig_in_file) as sin, Signal(bsig_out_file, mode=&#39;w&#39;) as sout:</span>
+<span class="sd">            for sig in sig_list:</span>
+<span class="sd">                sout.append(sig, sin[sig])</span>
+
+<span class="sd">    Example 15::</span>
+
+<span class="sd">        # CSV</span>
+
+<span class="sd">        with Signal(&#39;Snapshot_xyz.csv&#39;, mode=&#39;w&#39;) as sw:</span>
+<span class="sd">            sw.append(&#39;signal 1&#39;, np.array([0, 1, 2, 3, 4, 5, 6, .....]))</span>
+<span class="sd">            ...</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;overload to encapsulate either reader or writer&quot;&quot;&quot;</span>
+        <span class="n">kw</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="n">kw</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;mode&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;exc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SignalException</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;r&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">SignalReader</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;w&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">SignalWriter</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+        <span class="k">raise</span> <span class="n">SignalException</span><span class="p">(</span><span class="s2">&quot;mode &#39;</span><span class="si">{}</span><span class="s2">&#39; is not supported, use &#39;r&#39; or &#39;w&#39;!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">))</span>
+
+    <span class="fm">__enter__</span> <span class="o">=</span> <span class="fm">__exit__</span> <span class="o">=</span> <span class="kc">None</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

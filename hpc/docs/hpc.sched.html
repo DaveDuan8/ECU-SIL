@@ -1,0 +1,698 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.sched package</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="prev" title="hpc.sbmt package" href="hpc.sbmt.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sbmt.html" title="hpc.sbmt package"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" accesskey="U">hpc package</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="hpc-sched-package">
+<h1>hpc.sched package</h1>
+<div class="section" id="submodules">
+<h2>Submodules</h2>
+</div>
+<div class="section" id="module-hpc.sched.base">
+<span id="hpc-sched-base-module"></span><h2>hpc.sched.base module</h2>
+<div class="section" id="base-py">
+<h3>base.py</h3>
+<p>base class for local and MS HPC scheduler</p>
+<dl class="class">
+<dt id="hpc.sched.base.SchedulerBase">
+<em class="property">class </em><code class="descclassname">hpc.sched.base.</code><code class="descname">SchedulerBase</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>meant to be base of all schedulers</p>
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init scheduler base</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>headnode</strong> (<em>str</em>) – name of …</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body"><strong>kwargs</strong> (<em>dict</em>) – misc args</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.append_task">
+<code class="descname">append_task</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.append_task"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>append a task with given arguments</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.cancel_job">
+<code class="descname">cancel_job</code><span class="sig-paren">(</span><em>message</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.cancel_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>virtual</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.check_template">
+<code class="descname">check_template</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.check_template"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check if template is available</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – if Default template is being used</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.client_in_path">
+<em class="property">property </em><code class="descname">client_in_path</code></dt>
+<dd><p>Local Client (WorkstationNode) Path to Job Input Folder
+e.g. “d:/data/3522_MTS_Training/1_Input”
+:type: string</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.client_out_path">
+<em class="property">property </em><code class="descname">client_out_path</code></dt>
+<dd><p>Local Client (WorkstationNode) Path to Job Out Folder
+e.g. “d:/data/3522_MTS_Training/2_Output”
+:type: string</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>do nothing as we don’t have anything</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.job_folder_name">
+<em class="property">property </em><code class="descname">job_folder_name</code></dt>
+<dd><p>Name of the Job Folder (e.g. 1025_MTS_Training)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.jobstate">
+<em class="property">property </em><code class="descname">jobstate</code></dt>
+<dd><p>virtual</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.net_in_path">
+<em class="property">property </em><code class="descname">net_in_path</code></dt>
+<dd><p>Complete URL to the Network Job Input Folder
+e.g. “\LIFS010S/hpc/LUSS013/3522_MTS_Training/1_Input”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.net_out_data_path">
+<em class="property">property </em><code class="descname">net_out_data_path</code></dt>
+<dd><p>Complete URL to the Network Job Out Data Folder
+e.g. “\LIFS010S/hpc/LUSS013/3522_MTS_Training/2_Output/_data”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.net_out_path">
+<em class="property">property </em><code class="descname">net_out_path</code></dt>
+<dd><p>Complete URL to the Network Job Out Folder
+e.g. “\LIFS010S/hpc/LUSS013/3522_MTS_Training/2_Output”</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.submit">
+<code class="descname">submit</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.submit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>virtual</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#SchedulerBase.update"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>update several keys</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.base.SchedulerBase.work_path">
+<em class="property">property </em><code class="descname">work_path</code></dt>
+<dd><p>WSN node working path</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">usually, D:data</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">str</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="hpc.sched.base.to_string">
+<code class="descclassname">hpc.sched.base.</code><code class="descname">to_string</code><span class="sig-paren">(</span><em>value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/base.html#to_string"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>convert a boolean, list or time value to a string</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>value</strong> (<em>Boolean</em><em>, </em><em>List</em><em> or </em><em>DateTime</em>) – True/False, list with values, date and time</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">True, False or csv as string, or time in “dd.mm.yy HH:MM:SS” format</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">string</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sched.sched_defs">
+<span id="hpc-sched-sched-defs-module"></span><h2>hpc.sched.sched_defs module</h2>
+<div class="section" id="sched-defs-py">
+<h3>sched_defs.py</h3>
+<p>scheduler global variables</p>
+</div>
+</div>
+<div class="section" id="module-hpc.sched.sched_local">
+<span id="hpc-sched-sched-local-module"></span><h2>hpc.sched.sched_local module</h2>
+<div class="section" id="sched-local-py">
+<h3>sched_local.py</h3>
+<p>Interface to a “local” scheduler, usuallly used to simulate first task on local PC.</p>
+<dl class="class">
+<dt id="hpc.sched.sched_local.LocalScheduler">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_local.</code><code class="descname">LocalScheduler</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_local.html#LocalScheduler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sched.base.SchedulerBase" title="hpc.sched.base.SchedulerBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sched.base.SchedulerBase</span></code></a></p>
+<p>Class, which reflects local scheduler interface,
+used for compatibility reasons for JobSim class</p>
+<dl class="method">
+<dt id="hpc.sched.sched_local.LocalScheduler.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_local.html#LocalScheduler.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init local scheduler</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sched.sched_mshpc">
+<span id="hpc-sched-sched-mshpc-module"></span><h2>hpc.sched.sched_mshpc module</h2>
+<div class="section" id="sched-mshpc-py">
+<h3>sched_mshpc.py</h3>
+<p>Interface to MS HPC.
+This Module reflects some scheduler interfaces from HPC into Python.</p>
+<dl class="class">
+<dt id="hpc.sched.sched_mshpc.HpcClus">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_mshpc.</code><code class="descname">HpcClus</code><span class="sig-paren">(</span><em>head</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#HpcClus"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>connection object encapsulating HPC Scheduler</p>
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcClus.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>head</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#HpcClus.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init this</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcClus.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>*_args</em><span class="sig-paren">)</span></dt>
+<dd><p>cleanup</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcClus.connect">
+<code class="descname">connect</code><span class="sig-paren">(</span><span class="sig-paren">)</span></dt>
+<dd><p>initialize connection to an HPC cluster using ICluster interface from
+<a class="reference external" href="https://learn.microsoft.com/en-us/dotnet/api/microsoft.computecluster.icluster?view=hpc-sdk-5.1.6115" target="_blank">https://learn.microsoft.com/en-us/dotnet/api/microsoft.computecluster.icluster?view=hpc-sdk-5.1.6115</a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">self</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">object</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><strong>Exception</strong> – connection exception</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcClus.name">
+<em class="property">property </em><code class="descname">name</code></dt>
+<dd><p>name of head
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.sched.sched_mshpc.HpcSched">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_mshpc.</code><code class="descname">HpcSched</code><span class="sig-paren">(</span><em>head</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#HpcSched"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>connection object encapsulating HPC Scheduler</p>
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>head</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#HpcSched.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init this</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>*_args</em><span class="sig-paren">)</span></dt>
+<dd><p>cleanup</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.connect">
+<code class="descname">connect</code><span class="sig-paren">(</span><span class="sig-paren">)</span></dt>
+<dd><p>initialize connection to an HPC scheduler using IScheduler interface from
+<a class="reference external" href="https://learn.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.ischeduler?view=hpc-sdk-5.1.6115" target="_blank">https://learn.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.ischeduler?view=hpc-sdk-5.1.6115</a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">self</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body">object</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><strong>Exception</strong> – connection exception</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.name">
+<em class="property">property </em><code class="descname">name</code></dt>
+<dd><p>name of head
+:rtype: str</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.propid">
+<em class="property">property </em><code class="descname">propid</code></dt>
+<dd><p>//docs.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.propid?view=hpc-sdk-5.1.6115</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">refer to https</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.HpcSched.props">
+<em class="property">property </em><code class="descname">props</code></dt>
+<dd><p>//docs.microsoft.com/en-us/dotnet/api/microsoft.hpc.scheduler.properties?view=hpc-sdk-5.1.6115
+for further information</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">MS-HPC scheduler properties</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Return type:</th><td class="field-body"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Scheduler.Properties</span></code></td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">refer to https</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.sched.sched_mshpc.MiniSched">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_mshpc.</code><code class="descname">MiniSched</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MiniSched"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sched.sched_mshpc.HpcSched" title="hpc.sched.sched_mshpc.HpcSched"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sched.sched_mshpc.HpcSched</span></code></a></p>
+<p>keep it backward compatible for a while backward</p>
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MiniSched.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MiniSched.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init me</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_mshpc.</code><code class="descname">MsHpcScheduler</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sched.base.SchedulerBase" title="hpc.sched.base.SchedulerBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sched.base.SchedulerBase</span></code></a></p>
+<p>Class, which reflects a bit of IScheduler Interface from Microsoft HPC.
+See <a class="reference external" href="http://msdn.microsoft.com/en-us/library/microsoft.hpc.scheduler.ischeduler(v=vs.85" target="_blank">http://msdn.microsoft.com/en-us/library/microsoft.hpc.scheduler.ischeduler(v=vs.85</a>)</p>
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>connect to scheduler and open / create a new job</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>headnode</strong> (<em>str</em>) – name of head</li>
+<li><strong>kwargs</strong> (<em>list</em>) – misc arguments for scheduler base</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
+<li><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – e.g. when not being able to connect to Microsoft HPC scheduler</li>
+<li><strong>Exception</strong> – on unknown error</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.cancel_job">
+<code class="descname">cancel_job</code><span class="sig-paren">(</span><em>message</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.cancel_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>cancel specified job. here, we remove the job from the queue,
+but the job remains in the scheduler.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>message</strong> (<em>str</em>) – message to display at HPC Job Manager</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.check_template">
+<code class="descname">check_template</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.check_template"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check if template is available</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – if Default or non-existing template is being used</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.close">
+<code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.close"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>close connection to scheduler</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.jobstate">
+<em class="property">property </em><code class="descname">jobstate</code></dt>
+<dd><p>state of job
+:rtype: int</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.submit">
+<code class="descname">submit</code><span class="sig-paren">(</span><em>_prio</em>, <em>runas</em>, <em>dbase</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.submit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>configure the job and finalize (submit) it</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>_prio</strong> (<a class="reference internal" href="hpc.html#hpc.JobPriority" title="hpc.JobPriority"><em>hpc.JobPriority</em></a>) – wished job priority</li>
+<li><strong>runas</strong> (<em>str</em>) – &lt;username&gt;:&lt;password&gt;</li>
+<li><strong>dbase</strong> (<a class="reference internal" href="hpc.rdb.html#hpc.rdb.base.BaseDB" title="hpc.rdb.base.BaseDB"><em>BaseDB</em></a>) – database connection</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_mshpc.MsHpcScheduler.wait_until_finished">
+<code class="descname">wait_until_finished</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_mshpc.html#MsHpcScheduler.wait_until_finished"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>wait until job finishes</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>timeout</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): wait timeout [s]</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Return JobState<code class="xref py py-obj docutils literal notranslate"><span class="pre">JobState</span></code>:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">final state of job</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sched.sched_rest">
+<span id="hpc-sched-sched-rest-module"></span><h2>hpc.sched.sched_rest module</h2>
+<div class="section" id="sched-rest-py">
+<h3>sched_rest.py</h3>
+<p>taken kindly from <a class="reference external" href="https://github-am.geo.conti.de/ADAS/DS-SCP/blob/master/Dalib_DataAdminLibrary/src/infrastructure/" target="_blank">https://github-am.geo.conti.de/ADAS/DS-SCP/blob/master/Dalib_DataAdminLibrary/src/infrastructure/</a>
+onprem/hpc_rest_submit.py</p>
+<p>overview: <a class="reference external" href="https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560258(v=vs.85" target="_blank">https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560258(v=vs.85</a>)
+from xml: <a class="reference external" href="https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560266(v=vs.85" target="_blank">https://docs.microsoft.com/en-us/previous-versions/windows/desktop/hh560266(v=vs.85</a>)</p>
+<dl class="class">
+<dt id="hpc.sched.sched_rest.RestScheduler">
+<em class="property">class </em><code class="descclassname">hpc.sched.sched_rest.</code><code class="descname">RestScheduler</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#hpc.sched.base.SchedulerBase" title="hpc.sched.base.SchedulerBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">hpc.sched.base.SchedulerBase</span></code></a></p>
+<p>communicate with HPC cluster through rest API
+that class is intended to replace the .NET based implementation being able to submit something from Linux as well</p>
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>headnode</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler.__init__"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>init me</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.cancel_job">
+<code class="descname">cancel_job</code><span class="sig-paren">(</span><em>message</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler.cancel_job"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>cancel specified job. here, we remove the job from the queue,
+but the job remains in the scheduler.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>message</strong> (<em>str</em>) – message to display at HPC Job Manager</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.check_template">
+<code class="descname">check_template</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler.check_template"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>check if template is available</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><a class="reference internal" href="hpc.html#hpc.HpcError" title="hpc.HpcError"><strong>hpc.HpcError</strong></a> – if Default or non-existing template is being used</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.jobstate">
+<em class="property">property </em><code class="descname">jobstate</code></dt>
+<dd><p>state of job
+:rtype: int</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Type:</th><td class="field-body">return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.submit">
+<code class="descname">submit</code><span class="sig-paren">(</span><em>*_args</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler.submit"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>configure the job and finalize (submit) it</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>_args</strong> – unused</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="hpc.sched.sched_rest.RestScheduler.wait_until_finished">
+<code class="descname">wait_until_finished</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/hpc/sched/sched_rest.html#RestScheduler.wait_until_finished"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>wait until job finishes</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Keyword Arguments:</th></tr>
+<tr class="field-odd field"><td>&#160;</td><td class="field-body"><strong>**kwargs</strong> – <ul class="simple">
+<li><em>timeout</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): wait timeout [s]</li>
+<li><em>interval</em> (<code class="docutils literal notranslate"><span class="pre">int</span></code>): interval time [s]</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Return JobState<code class="xref py py-obj docutils literal notranslate"><span class="pre">JobState</span></code>:</th></tr>
+<tr class="field-even field"><td>&#160;</td><td class="field-body">final state of job</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sched.scheduler">
+<span id="hpc-sched-scheduler-module"></span><h2>hpc.sched.scheduler module</h2>
+<div class="section" id="scheduler-py">
+<h3>scheduler.py</h3>
+<p>abstract interface scheduler.
+Currently a “local” scheduler, MS HPC (.NET based) and RestAPI scheduler is implemented.</p>
+<dl class="class">
+<dt id="hpc.sched.scheduler.Scheduler">
+<em class="property">class </em><code class="descclassname">hpc.sched.scheduler.</code><code class="descname">Scheduler</code><a class="reference internal" href="_modules/hpc/sched/scheduler.html#Scheduler"><span class="viewcode-link">[source]</span></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Scheduler interface to the outside world</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="module-hpc.sched">
+<span id="module-contents"></span><h2>Module contents</h2>
+<div class="section" id="init-py">
+<h3>__init__.py</h3>
+<p>scheduler package</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="hpc.sbmt.html" title="hpc.sbmt package"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="modules.html" >hpc</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="hpc.html" >hpc package</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

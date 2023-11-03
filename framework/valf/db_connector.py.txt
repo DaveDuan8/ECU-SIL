@@ -1,0 +1,201 @@
+# """
+# stk/valf/db_connector.py
+# ------------------------
+#
+# The component for reading mts batch play list.
+#
+# :org:           Continental AG
+# :author:        Spruck Jochen
+#
+# :version:       $Revision: 1.1 $
+# :contact:       $Author: Leidenberger, Ralf (uidq7596) $ (last change)
+# :date:          $Date: 2020/03/25 21:38:07CET $
+# """
+# # - import Python modules ---------------------------------------------------------------------------------------------
+# from sys import _getframe
+#
+# # - import STK modules ------------------------------------------------------------------------------------------------
+# # from stk.db import cat, gbl, obj, val, par
+# # from stk.db.lbl import camlabel as db_cam
+# # from stk.db.lbl import genlabel as db_gen
+# # from stk.db.db_common import ERROR_TOLERANCE_MED
+# # from stk.db.db_connect import DBConnect
+# from stk.valf import BaseComponentInterface
+# # Database modules
+# from stk.valf.signal_defs import DBCAT, DBOBJ, DBGBL, DBVAL, DBLBL, DBPAR, DBCAM  # , DBACC, DBENV, DBCL
+#
+# # - defines -----------------------------------------------------------------------------------------------------------
+# # - common DBBUS#1 Portnames
+# MASTER_DB_USR_PORT_NAME = "masterdbuser"
+# MASTER_DB_PW_PORT_NAME = "masterdbpassword"
+# MASTER_DB_SPX_PORT_NAME = "masterdbschemaprefix"
+# TABLE_DB_PX_PORT_NAME = "tableprefix"
+#
+# DATABASE_OBJECTS_CONN_PORT_NAME = "DatabaseObjectsConnections"
+# DB_FILE_PORT_NAME = "dbfile"
+#
+# # List of connectins used for option "UseAllConnections"
+# # db_cam is not supported for this option (GR)
+# # ALL_CONNECTIONS = [cat, obj, gbl, val, par, db_gen]
+#
+# # deprecated:
+# MASTER_DB_DSN_PORT_NAME = "masterdbdsn"
+# MASTER_DB_DBQ_PORT_NAME = "masterdbdbq"
+# MASTER_DB_DRV_PORT_NAME = "masterdbdrv"
+# MASTER_DB_USE_CX_PORT_NAME = "use_cx_oracle"
+# SDF_FILE_EXT = [".sdf"]
+#
+#
+# # - classes -----------------------------------------------------------------------------------------------------------
+# class DBConnector(BaseComponentInterface):
+#     """ DB Connector provides database connections for the connected observers
+#
+#         Each Observer could register the DB connections used for validation in the
+#         Initialize method. The DBConnector collects all the registrations and opens the
+#         connection. After that the DBConnector provides the connections which could be
+#         read from the Observers in their PostInitialize function.
+#
+#     """
+#     def __init__(self, data_manager, component_name, bus_name=None):
+#         """init
+#         """
+#         BaseComponentInterface.__init__(self, data_manager, component_name, bus_name[0] if bus_name else "BUS_BASE",
+#                                         "$Revision: 1.1 $")
+#
+#         self._logger.debug()
+#
+#         self._data_base_objects = []
+#         self._data_base_object_connections = []
+#         self._data_base_objects_conns_dict = {}
+#         self._db_connnector = None
+#
+#     def initialize(self):  # pylint: disable=C0103
+#         """init db connecor
+#         """
+#         self._logger.debug()
+#
+#         # get the database connections
+#         dbfile = self._get_data(DB_FILE_PORT_NAME, self._bus_name)
+#         masterdbuser = self._get_data(MASTER_DB_USR_PORT_NAME, self._bus_name)
+#         masterdbpassword = self._get_data(MASTER_DB_PW_PORT_NAME, self._bus_name)
+#         masterdbschemaprefix = None
+#
+#         if not dbfile and not masterdbuser:
+#             self._logger.error("'%s' or '%s' port was not set." % (DB_FILE_PORT_NAME, MASTER_DB_USR_PORT_NAME))
+#             return -1
+#
+#         if dbfile is None:  # Check for Oracle database connection parameters
+#             if not masterdbuser:
+#                 self._logger.error("'%s' port was not set." % MASTER_DB_USR_PORT_NAME)
+#                 return -1
+#
+#             if not masterdbpassword:
+#                 self._logger.error("'%s' port was not set." % MASTER_DB_PW_PORT_NAME)
+#                 return -1
+#
+#             masterdbschemaprefix = self._get_data(MASTER_DB_SPX_PORT_NAME, self._bus_name)
+#         else:
+#             dbfile = self._uncrepl(dbfile)
+#
+#         tableprefix = self._get_data(TABLE_DB_PX_PORT_NAME, self._bus_name)
+#
+#         # setup list with data base objects
+#         self._set_data("DataBaseObjects", self._data_base_objects, self._bus_name)
+#
+#         self._db_connnector = DBConnect(user=masterdbuser,
+#                                         pw=masterdbpassword,
+#                                         master=masterdbschemaprefix,
+#                                         tbl_prefix=tableprefix,
+#                                         db_file=dbfile,
+#                                         error_tolerance=ERROR_TOLERANCE_MED)
+#
+#         return 0
+#
+#     def post_initialize(self):  # pylint: disable=C0103
+#         self._logger.debug()
+#         obj_list = []
+#
+#         # Is specified in the .cfg file, add all connections.
+#         use_all_connections = self._get_data("UseAllConnections", self._bus_name)
+#
+#         if use_all_connections == 'True':  # supports only DEV_XXX_ADMIN schemes. ALGO_DB_USER is not supported
+#             for con in ALL_CONNECTIONS:
+#                 if con not in self._data_base_objects:
+#                     self._data_base_objects.append(con)
+#
+#         # Establish database connection to all requested database objects.
+#         for loc_data_base_object in self._data_base_objects:
+#
+#             if obj_list.__contains__(loc_data_base_object):
+#                 self._logger.debug("DB Connection duplicate request")
+#             else:
+#                 obj_list.append(loc_data_base_object)
+#                 db_connection = self._db_connnector.Connect(loc_data_base_object)
+#                 if db_connection is None:
+#                     self._logger.error("Database connection not established for '%s'." % loc_data_base_object.__name__)
+#                 else:
+#                     self._data_base_object_connections.append(db_connection)
+#
+#         self._set_data("DataBaseObjectsConnections", self._data_base_object_connections, self._bus_name)
+#
+#         # Also provide the database connections as dict.
+#         self._data_base_objects_conns_dict = {}
+#         for connection_object in self._data_base_object_connections:
+#             if isinstance(connection_object, cat.BaseRecCatalogDB):
+#                 self._data_base_objects_conns_dict[DBCAT] = connection_object
+#                 continue
+#             if isinstance(connection_object, obj.BaseObjDataDB):
+#                 self._data_base_objects_conns_dict[DBOBJ] = connection_object
+#                 continue
+#             if isinstance(connection_object, gbl.BaseGblDB):
+#                 self._data_base_objects_conns_dict[DBGBL] = connection_object
+#                 continue
+#             if isinstance(connection_object, val.BaseValResDB):
+#                 self._data_base_objects_conns_dict[DBVAL] = connection_object
+#                 continue
+#             if isinstance(connection_object, db_gen.BaseGenLabelDB):
+#                 self._data_base_objects_conns_dict[DBLBL] = connection_object
+#                 continue
+#             if isinstance(connection_object, db_cam.BaseCameraLabelDB):
+#                 self._data_base_objects_conns_dict[DBCAM] = connection_object
+#                 continue
+#             if isinstance(connection_object, par.BaseParDB):
+#                 self._data_base_objects_conns_dict[DBPAR] = connection_object
+#                 continue
+#
+#         self._set_data("DatabaseObjectsConnectionsDict", self._data_base_objects_conns_dict, self._bus_name)
+#
+#         return 0
+#
+#     def post_process_data(self):  # pylint: disable=C0103
+#         self._logger.debug(str(_getframe().f_code.co_name) + "()" + " called.")
+#
+#         # commit data to establish data base connection to all requested data base objects
+#         for db_connection in self._data_base_object_connections:
+#             if db_connection is not None:
+#                 db_connection.commit()
+#             else:
+#                 self._logger.error("Data base connection not established.")
+#
+#         return 0
+#
+#     def terminate(self):  # pylint: disable=C0103
+#         self._logger.debug(str(_getframe().f_code.co_name) + "()" + " called.")
+#         # commit data to establish data base connection to all requested data base objects
+#         for db_connection in self._data_base_object_connections:
+#             if db_connection is not None:
+#                 self._db_connnector.DisConnect(db_connection)
+#             else:
+#                 self._logger.error("Data base connection not established.")
+#
+#         return 0
+#
+#
+# """
+# CHANGE LOG:
+# -----------
+# $Log: db_connector.py.txt  $
+# Revision 1.1 2020/03/25 21:38:07CET Leidenberger, Ralf (uidq7596) 
+# Initial revision
+# Member added to project /ADAS/SW/Integration/06_Simulation_Components/SVT_SILValidationTools/05_Test_Environment/Dynamic_Tests/SVT/ecu_sil_tool/framework/valf/project.pj
+# """

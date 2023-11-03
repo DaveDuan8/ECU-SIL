@@ -1,0 +1,200 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.bpl.base</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.bpl.base</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: iso-8859-1 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">base.py</span>
+<span class="sd">-------</span>
+
+<span class="sd">Classes for BPL (BatchPlayList) Handling, supports BPL (of course), collection, ini and text files</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - import Python modules ----------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">splitext</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="kn">import</span> <span class="n">warn</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">.bpl_xml</span> <span class="kn">import</span> <span class="n">BPLXml</span>
+<span class="kn">from</span> <span class="nn">.bpl_ini</span> <span class="kn">import</span> <span class="n">BPLIni</span>
+<span class="kn">from</span> <span class="nn">.bpl_txt</span> <span class="kn">import</span> <span class="n">BPLTxt</span>
+<span class="kn">from</span> <span class="nn">.bpl_db</span> <span class="kn">import</span> <span class="n">BPLDb</span>
+<span class="kn">from</span> <span class="nn">.bpl_coll</span> <span class="kn">import</span> <span class="n">BPLColl</span>
+<span class="kn">from</span> <span class="nn">.bpl_cls</span> <span class="kn">import</span> <span class="n">BplListEntry</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">DefDict</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="n">BPL_SUPPORTS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;.bpl&quot;</span><span class="p">:</span> <span class="n">BPLXml</span><span class="p">,</span> <span class="s2">&quot;.ini&quot;</span><span class="p">:</span> <span class="n">BPLIni</span><span class="p">,</span> <span class="s2">&quot;.txt&quot;</span><span class="p">:</span> <span class="n">BPLTxt</span><span class="p">}</span>
+<span class="n">EXT_SUPPORTS</span> <span class="o">=</span> <span class="n">DefDict</span><span class="p">(</span><span class="n">BPLDb</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s2">&quot;falcon&quot;</span><span class="p">:</span> <span class="n">BPLColl</span><span class="p">,</span> <span class="s2">&quot;legacy&quot;</span><span class="p">:</span> <span class="n">BPLDb</span><span class="p">})</span>
+
+
+<span class="c1"># - classes ------------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="Bpl"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.Bpl">[docs]</a><span class="k">class</span> <span class="nc">Bpl</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Possibility to read and write Batch Play Lists or Collections supported by mts.</span>
+
+<span class="sd">    Currently \*.ini, \*.txt and \*.bpl based BatchPlayLists are supported.</span>
+<span class="sd">    The file structure is automatically selected by the ending.</span>
+
+<span class="sd">    - \*.bpl files based on xml and support section definitions for the rec files</span>
+<span class="sd">    - \*ini, \*.txt files simply list the complete path and file name</span>
+<span class="sd">    - if filepath is not a readable file: a collection from DB is used (as created with TDSM tool)</span>
+
+<span class="sd">    *structure*::</span>
+
+<span class="sd">        `BplList`  -  list (`BplListEntry`)</span>
+<span class="sd">            |</span>
+<span class="sd">            +- filepath (str)</span>
+<span class="sd">            |</span>
+<span class="sd">            +- location (str)</span>
+<span class="sd">            |</span>
+<span class="sd">            -- sectionlist (list(`Section`))</span>
+<span class="sd">                |</span>
+<span class="sd">                +- start_ts (long)</span>
+<span class="sd">                +- end_ts (long)</span>
+<span class="sd">                +- rel (bool)</span>
+
+<span class="sd">    In case of BplList read from \*.ini or \*.txt file the sectionlist is empty.</span>
+
+<span class="sd">    The location is internal only (not directly visible in Bpl files) and provides the site abbreviation</span>
+<span class="sd">    where the file is stored. Usage like if mybpllistentry.location in [&#39;LND&#39;, &#39;FFM&#39;]: print(&quot;file stored in Europe&quot;)</span>
+
+<span class="sd">    **example usage one**</span>
+
+<span class="sd">        code::</span>
+
+<span class="sd">            # Create an instance of your BPL-Reader</span>
+<span class="sd">            bpl = hpc.Bpl(r&quot;D:\testdir\MyBatchPlayList.bpl&quot;)</span>
+
+<span class="sd">            # Get whole RecFile List out from bpl file</span>
+<span class="sd">            bpllist = bpl.read()                        # type: BplList</span>
+
+<span class="sd">            # Iterate over whole list in a for loop</span>
+<span class="sd">            for bplentry in bpllist:                    # type: BplListEntry</span>
+<span class="sd">                recfilename = bplentry.filepath</span>
+<span class="sd">                storage_site = bplentry.location</span>
+<span class="sd">                for section in bplentry.sectionlist:     # type: Section</span>
+<span class="sd">                    start = section.start_ts</span>
+<span class="sd">                    end = section.end_ts</span>
+<span class="sd">                    is_relative_timestamp = section.rel</span>
+
+<span class="sd">    **example usage two**</span>
+
+<span class="sd">        code::</span>
+
+<span class="sd">            with Bpl(r&quot;D:\another\file.bpl&quot;) as bpl:  # open a bpl</span>
+<span class="sd">                for i, ent in enumerate(bpl):</span>
+<span class="sd">                    print(&quot;saving {!s}&quot;.format(ent))</span>
+<span class="sd">                    ent.save(join(job.job_folder, &quot;1_Input&quot;, &quot;bpl&quot;, &quot;part_{:0&gt;5d}.bpl&quot;.format(i))</span>
+
+<span class="sd">    **example usage three**</span>
+
+<span class="sd">        code::</span>
+
+<span class="sd">                # supported modes are &quot;w&quot; and &quot;r&quot; similar to files</span>
+<span class="sd">                # for &quot;r&quot; it&#39;s automatically read, for &quot;w&quot; it&#39;s automatically written when using with statement</span>
+<span class="sd">                with Bpl(&quot;sample.bpl&quot;, &quot;w&quot;) as bpl, BaseDB(&quot;VGA&quot;) as db:</span>
+<span class="sd">                    for i in db.executex(&quot;SELECT FILEPATH FROM CAT_DMT_FILES WHERE .....&quot;):</span>
+<span class="sd">                        bpl.append(i[0])</span>
+
+<span class="sd">    **example usage four**</span>
+
+<span class="sd">        code::</span>
+
+<span class="sd">                # go throught a Falcon based collection:</span>
+<span class="sd">                with Bpl(&quot;my_falcon_collection&quot;, collbase=&quot;falcon&quot;) as bpl:</span>
+<span class="sd">                    for ent in bpl:</span>
+<span class="sd">                        task_fact.create_task(ent)</span>
+
+<span class="sd">    The internal Bpl structure is ported from mts, but you can convert it to a dict if needed.</span>
+<span class="sd">    Similar there is a method to convert the Section to a list::</span>
+
+<span class="sd">        list_dict = bpllist.bpl2dict()</span>
+<span class="sd">        secttupel = bpllist[0].sectionlist[0].sect2list()  # tuple(&lt;start_ts&gt;, &lt;end_ts&gt;, &lt;rel&gt;)</span>
+
+<span class="sd">    Functions to create a BPL files for different usecases are available in module `bpl` .</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;init and return child class&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">BplListEntry</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">BPLXml</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="n">fname</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s2">&quot;read&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">filepath</span>
+        <span class="n">ext</span> <span class="o">=</span> <span class="n">splitext</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">fname</span><span class="p">))[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">BPL_SUPPORTS</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">BPL_SUPPORTS</span><span class="p">[</span><span class="n">ext</span><span class="p">](</span><span class="n">filepath</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">cbase</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;collbase&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cbase</span><span class="p">:</span>
+            <span class="n">warn</span><span class="p">(</span><span class="s2">&quot;&#39;collbase&#39; option to Bpl missing, assuming &#39;legacy&#39;, will be changed soon to &#39;falcon&#39; as default!&quot;</span><span class="p">,</span>
+                 <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">EXT_SUPPORTS</span><span class="p">[</span><span class="n">cbase</span><span class="p">](</span><span class="n">filepath</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;enter&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;exit&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Bpl.read"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.Bpl.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;read file&quot;&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="Bpl.write"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.Bpl.write">[docs]</a>    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;write file&quot;&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="Bpl.append"><a class="viewcode-back" href="../../../hpc.bpl.html#hpc.Bpl.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;append item&quot;&quot;&quot;</span></div></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

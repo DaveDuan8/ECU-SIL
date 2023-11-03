@@ -1,0 +1,76 @@
+
+; ----- GATEWAYS -----
+
+[INPUT]
+CfgSectionType     = CompositeComponent
+;SimCfgFile        = $UserPathCfg$\algo\joint\input$ECU_SIL$.simcfg
+SimCfgFile         = $UserPathCfg$\algo\joint\input.simcfg
+
+; ----- COMPONENTS -----
+
+[SIMCTRL]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\sim_ctrl\simctrl_sim_sub_meas.simcfg
+LoadWithErrors     = 1
+
+[RSP1]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\rsp\core\rsp1_sim_sub.simcfg
+
+[RSP2]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\rsp\core\rsp2_sim_sub_meas.simcfg
+
+[ALN]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\aln\aln_sim_sub_meas.simcfg
+
+[EM]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\em\em_sim_sub.simcfg
+
+[FCTCPAR]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\fct\fctcpar_sim_sub_meas.simcfg
+
+[FCT]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\fct\fct_sim_sub.simcfg
+
+[Fusion]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\joint\fusion_sim_sub.simcfg
+
+[VDY]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\vdy\vdy_sim_sub.simcfg
+
+[AWV]
+CfgSectionType     = CompositeComponent
+SimCfgFile         = $UserPathCfg$\algo\awv\awv_sim_sub.simcfg
+
+;[VLD]
+;CfgSectionType     = CompositeComponent
+;SimCfgFile         = $UserPathCfg$\algo\fct\vld_sub$DLL_SUFFIX$.simcfg
+
+
+; ----- CONNECTIONS -----
+[Connections]
+CfgSectionType=CompositeConnection
+SimConFile=algo_all_sub.simcon
+ComponentInstances = IC = INPUT, FCT_SEN = FCT, FCT_VEH = FCT
+
+
+; ----- EXPOSED PORTS -----
+
+[ExposedRequestPorts]
+CfgSectionType     = ExposedRequestPort
+
+[ExposedProvidePorts]
+CfgSectionType     = ExposedProvidePort
+
+[ExposedServerPorts]
+CfgSectionType     = ExposedServerPort
+
+[ExposedClientPorts]
+CfgSectionType     = ExposedClientPort

@@ -1,0 +1,24 @@
+cx_Oracle
+dill
+keyring
+lxml
+numpy
+pandas
+pefile
+pip
+psutil
+pythonnet;platform_system=='Windows'
+pytz
+pywin32;platform_system=='Windows'
+requests
+scandir
+setuptools
+simplejson
+six
+urllib3
+wheel
+# ssl # only available version: 1.6 for Py2!!
+
+# nice to have, not mandatory:
+# azure_storage_blob
+# docker_py

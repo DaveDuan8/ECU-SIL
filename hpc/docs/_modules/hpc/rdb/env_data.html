@@ -1,0 +1,921 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb.env_data</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.rdb.env_data</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">env_data.py</span>
+<span class="sd">-----------</span>
+
+<span class="sd">management of environment data</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># pylint: disable=R1260,W0212,E1129</span>
+<span class="c1"># - import Python modules ---------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
+
+<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">platform</span><span class="p">,</span> <span class="n">version</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">environ</span><span class="p">,</span> <span class="n">listdir</span><span class="p">,</span> <span class="n">makedirs</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span><span class="p">,</span> <span class="n">basename</span><span class="p">,</span> <span class="n">exists</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">random</span>
+<span class="kn">from</span> <span class="nn">re</span> <span class="kn">import</span> <span class="n">search</span><span class="p">,</span> <span class="n">sub</span>
+<span class="kn">from</span> <span class="nn">csv</span> <span class="kn">import</span> <span class="n">DictWriter</span>
+<span class="kn">from</span> <span class="nn">zlib</span> <span class="kn">import</span> <span class="n">decompress</span><span class="p">,</span> <span class="n">error</span> <span class="k">as</span> <span class="n">zliberr</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">parse</span>
+<span class="kn">from</span> <span class="nn">socket</span> <span class="kn">import</span> <span class="n">gethostname</span>
+<span class="c1"># from json import dumps</span>
+<span class="c1"># from requests import post</span>
+<span class="kn">from</span> <span class="nn">numpy</span> <span class="kn">import</span> <span class="n">cumsum</span>
+<span class="kn">from</span> <span class="nn">six</span> <span class="kn">import</span> <span class="n">iteritems</span><span class="p">,</span> <span class="n">PY3</span>
+
+<span class="c1"># - import HPC modules -------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">..version</span> <span class="kn">import</span> <span class="n">VERSION</span>
+<span class="kn">from</span> <span class="nn">..core.tds</span> <span class="kn">import</span> <span class="n">head_name</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">,</span> <span class="n">LOCATION</span><span class="p">,</span> <span class="n">daemon_cmd</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">,</span> <span class="n">VALID_NAME</span>
+<span class="kn">from</span> <span class="nn">..core</span> <span class="kn">import</span> <span class="n">UID_NAME</span>
+<span class="kn">from</span> <span class="nn">..core.md5</span> <span class="kn">import</span> <span class="n">create_from_string</span>
+<span class="kn">from</span> <span class="nn">..core.dicts</span> <span class="kn">import</span> <span class="n">JobDict</span>
+<span class="kn">from</span> <span class="nn">..core.error</span> <span class="kn">import</span> <span class="n">HpcError</span>
+<span class="kn">from</span> <span class="nn">..core.convert</span> <span class="kn">import</span> <span class="n">human_size</span>
+<span class="kn">from</span> <span class="nn">..sched.sched_mshpc</span> <span class="kn">import</span> <span class="n">HpcSched</span>
+<span class="kn">from</span> <span class="nn">..bpl</span> <span class="kn">import</span> <span class="n">Bpl</span><span class="p">,</span> <span class="n">BplListEntry</span><span class="p">,</span> <span class="n">Section</span>
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">BaseDB</span>
+<span class="kn">from</span> <span class="nn">.catalog</span> <span class="kn">import</span> <span class="n">CollManager</span><span class="p">,</span> <span class="n">Collection</span>
+
+
+<span class="c1"># - defines -----------------------------------------------------------------------------------------------------------</span>
+<span class="n">MSWIN</span> <span class="o">=</span> <span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span>
+<span class="n">TASKSTATE</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;None&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Configuring&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;Submitted&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Validating&#39;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;Queued&#39;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span> <span class="s1">&#39;Dispatching&#39;</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+             <span class="s1">&#39;Running&#39;</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span> <span class="s1">&#39;Finishing&#39;</span><span class="p">:</span> <span class="mi">64</span><span class="p">,</span> <span class="s1">&#39;Finished&#39;</span><span class="p">:</span> <span class="mi">128</span><span class="p">,</span> <span class="s1">&#39;Failed&#39;</span><span class="p">:</span> <span class="mi">256</span><span class="p">,</span> <span class="s1">&#39;Canceled&#39;</span><span class="p">:</span> <span class="mi">512</span><span class="p">,</span> <span class="s1">&#39;Canceling&#39;</span><span class="p">:</span> <span class="mi">1024</span><span class="p">,</span>
+             <span class="s1">&#39;All&#39;</span><span class="p">:</span> <span class="mi">2047</span><span class="p">}</span>
+<span class="n">MAX_STDOUT</span> <span class="o">=</span> <span class="mi">65536</span> <span class="o">*</span> <span class="mi">3</span>
+<span class="n">STDOUT_HINT</span> <span class="o">=</span> <span class="s1">&#39;&lt;span style=&quot;background-color: DarkOrange&quot;&gt;&#39;</span> <span class="o">+</span> \
+              <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;&amp;boxDR;&quot;</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxH;&quot;</span> <span class="o">*</span> <span class="mi">120</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxDL;&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;&amp;boxV;&quot;</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="mi">120</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxV;&quot;</span><span class="p">]</span> <span class="o">+</span> \
+                        <span class="p">[</span><span class="s2">&quot;&amp;boxV;</span><span class="si">{:^120}</span><span class="s2">&amp;boxV;&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;&amp;boxV;</span><span class="si">{:^120}</span><span class="s2">&amp;boxV;&quot;</span><span class="p">]</span> <span class="o">+</span> \
+                        <span class="p">[</span><span class="s2">&quot;&amp;boxV;&quot;</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="mi">120</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxV;&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;&amp;boxUR;&quot;</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxH;&quot;</span> <span class="o">*</span> <span class="mi">120</span> <span class="o">+</span> <span class="s2">&quot;&amp;boxUL;&quot;</span><span class="p">])</span> <span class="o">+</span> \
+              <span class="s1">&#39;&lt;/span&gt;&#39;</span>
+<span class="c1"># STDOUT_HINT = r&quot;exec &#39;python hpc\cmd\env_collector.py log -n {} -j {} -s {}&#39; to see full log.&quot;</span>
+
+
+<span class="c1"># - classes and functions ---------------------------------------------------------------------------------------------</span>
+<span class="k">def</span> <span class="nf">_connect</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;open db connection and call function&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_wrapconn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;iterate over connections&quot;&quot;&quot;</span>
+        <span class="n">err</span><span class="p">,</span> <span class="n">ret</span><span class="p">,</span> <span class="n">wty</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">EnvData</span><span class="o">.</span><span class="n">NO_DB</span>
+        <span class="n">noprn</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;noprn&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="p">,</span> <span class="n">maxtry</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="k">as</span> <span class="n">dbase</span><span class="p">:</span>
+                    <span class="n">ret</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dbase</span><span class="o">=</span><span class="n">dbase</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="n">wty</span> <span class="o">=</span> <span class="n">EnvData</span><span class="o">.</span><span class="n">DEFAULT_DB</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="n">HpcError</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+                <span class="c1"># err = &quot;ERR: {!s} =&gt; {!s}&quot;.format(func, ex)</span>
+                <span class="k">break</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+                <span class="n">err</span> <span class="o">=</span> <span class="s2">&quot;ERR: </span><span class="si">{!s}</span><span class="s2"> =&gt; </span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">ex</span><span class="p">)</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">random</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">noprn</span><span class="p">:</span>
+                <span class="n">err</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">err</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">wty</span><span class="p">,</span> <span class="n">ret</span>
+
+    <span class="k">return</span> <span class="n">_wrapconn</span>
+
+
+<div class="viewcode-block" id="EnvData"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData">[docs]</a><span class="k">class</span> <span class="nc">EnvData</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;supporting starter to save environment data into HPC schema&quot;&quot;&quot;</span>
+
+    <span class="n">DEFAULT_DB</span><span class="p">,</span> <span class="n">NO_DB</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+
+<div class="viewcode-block" id="EnvData.__init__"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="o">=</span><span class="s1">&#39;HPC&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        save some initial data from job into DB:</span>
+<span class="sd">        add an hpc_job and hpc_task entry</span>
+
+<span class="sd">        :param ``str`` db: database connection to be used, default: HPC schema of Oracle DB</span>
+<span class="sd">        :param ``str`` fallback_db: sqlite filename to be used if connection fails</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conn</span> <span class="o">=</span> <span class="n">db</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_taskstart</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskstop</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">(),</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_envdata</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_errs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ecnt</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;support&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;support&quot;&quot;&quot;</span>
+
+    <span class="c1"># @staticmethod</span>
+    <span class="c1"># def _ipaddr(host):</span>
+    <span class="c1">#     &quot;&quot;&quot;find out IP address&quot;&quot;&quot;</span>
+    <span class="c1">#     if MSWIN:</span>
+    <span class="c1">#         out = Popen(&#39;ping -n 1 %s&#39; % host, stdout=PIPE).communicate()[0]</span>
+    <span class="c1">#         mtc = search(r&#39;^\r\nPing(ing| wird ausgef.+hrt f.+r) %s \[(.+)\].*&#39; % host.replace(&#39;.&#39;, &#39;\\.&#39;),</span>
+    <span class="c1">#                      out.decode(&#39;latin1&#39;))</span>
+    <span class="c1">#         return None if mtc is None else mtc.group(2)</span>
+    <span class="c1">#</span>
+    <span class="c1">#     return None</span>
+
+<div class="viewcode-block" id="EnvData.append"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subdata</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;append subtask infos&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_envdata</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subdata</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="EnvData.errors"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.errors">[docs]</a>    <span class="k">def</span> <span class="nf">errors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">cnt</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;append errors from bsig checker&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_errs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ecnt</span> <span class="o">=</span> <span class="n">errors</span><span class="p">,</span> <span class="n">cnt</span></div>
+
+<div class="viewcode-block" id="EnvData.get_slave_ident"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.get_slave_ident">[docs]</a>    <span class="k">def</span> <span class="nf">get_slave_ident</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dbase</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        retrieve ident of slave computer</span>
+
+<span class="sd">        :param ``hpc.rdb.base.BaseDB`` dbase: database connection</span>
+<span class="sd">        :return: get slave ident of mine</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">selfopen</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">dbase</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dbase</span> <span class="o">=</span> <span class="n">BaseDB</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_conn</span><span class="p">)</span>
+            <span class="n">selfopen</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="n">mach</span> <span class="o">=</span> <span class="n">gethostname</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">slaveid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT SLAVEID FROM HPC_SLAVE WHERE NAME = :slave&quot;</span><span class="p">,</span> <span class="n">slave</span><span class="o">=</span><span class="n">mach</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">slaveid</span><span class="p">:</span>
+            <span class="n">slaveid</span> <span class="o">=</span> <span class="n">slaveid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">slaveid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_SLAVE (NODEID, NAME) VALUES((SELECT NODEID &quot;</span>
+                            <span class="s2">&quot;FROM HPC_NODE WHERE NODENAME = :node), :name) RETURNING SLAVEID&quot;</span><span class="p">,</span>
+                            <span class="n">node</span><span class="o">=</span><span class="n">head_name</span><span class="p">(</span><span class="s2">&quot;OTHER&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">name</span><span class="o">=</span><span class="n">mach</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">selfopen</span><span class="p">:</span>
+            <span class="n">dbase</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">slaveid</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_user_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check / insert user from / into HPC_LOGITEM</span>
+
+<span class="sd">        :param ``hpc.rdb.base.BaseDB`` dbase: DB connection</span>
+<span class="sd">        :return: ident of user</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">usridx</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT IID FROM HPC_LOGITEM WHERE NAME = :usr ORDER BY IID&quot;</span><span class="p">,</span> <span class="n">usr</span><span class="o">=</span><span class="n">UID_NAME</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usridx</span> <span class="ow">and</span> <span class="n">usridx</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">usridx</span> <span class="o">=</span> <span class="n">usridx</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;UPDATE HPC_LOGITEM SET CNT = CNT + 1 WHERE IID = :usr&quot;</span><span class="p">,</span> <span class="n">usr</span><span class="o">=</span><span class="n">usridx</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># vary rare adding of an user, import here to speed up general usage of this module</span>
+                <span class="kn">from</span> <span class="nn">win32com.client</span> <span class="kn">import</span> <span class="n">GetObject</span>  <span class="c1"># pylint: disable=import-outside-toplevel</span>
+                <span class="n">udesc</span> <span class="o">=</span> <span class="n">GetObject</span><span class="p">(</span><span class="s2">&quot;WinNT://</span><span class="si">%s</span><span class="s2">,user&quot;</span> <span class="o">%</span> <span class="n">UID_NAME</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;/&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">FullName</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_ex</span><span class="p">:</span>
+                <span class="n">udesc</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">usridx</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s1">&#39;INSERT INTO HPC_LOGITEM (NAME, &quot;DESCR&quot;, CNT) VALUES(:usr, :dsc, 1) RETURNING IID&#39;</span><span class="p">,</span>
+                           <span class="n">usr</span><span class="o">=</span><span class="n">UID_NAME</span><span class="p">,</span> <span class="n">dsc</span><span class="o">=</span><span class="n">udesc</span><span class="p">,</span> <span class="n">exc_retry</span><span class="o">=</span><span class="mi">23</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">usridx</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="n">iname</span><span class="p">,</span> <span class="n">cname</span><span class="p">,</span> <span class="n">cval</span><span class="p">,</span> <span class="n">table</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check / insert data into table returning ident by column value</span>
+
+<span class="sd">        :param ``hpc.rdb.base.BaseDB`` dbase: DB connection</span>
+<span class="sd">        :param ``str`` iname: name of ident</span>
+<span class="sd">        :param ``str`` cname: name of column of name</span>
+<span class="sd">        :param ``str`` cval: value of column</span>
+<span class="sd">        :param ``str`` table: name of table</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">{}</span><span class="s2"> FROM </span><span class="si">{}</span><span class="s2"> WHERE </span><span class="si">{}</span><span class="s2"> = :cval&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">iname</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">cname</span><span class="p">),</span> <span class="n">cval</span><span class="o">=</span><span class="n">cval</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">tid</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">tid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+                <span class="k">return</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO </span><span class="si">{}</span><span class="s2"> (</span><span class="si">{}</span><span class="s2">) VALUES(:cval) RETURNING </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">cname</span><span class="p">,</span> <span class="n">iname</span><span class="p">),</span> <span class="n">cval</span><span class="o">=</span><span class="n">cval</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_log_ident</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dbase</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check / insert machine</span>
+
+<span class="sd">        :param ``hpc.rdb.base.BaseDB`` dbase: DB connection</span>
+<span class="sd">        :return: ident of log</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mach</span> <span class="o">=</span> <span class="n">gethostname</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">logid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT IID FROM HPC_LOGITEM WHERE NAME = :name&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">mach</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">logid</span><span class="p">:</span>
+            <span class="n">logid</span> <span class="o">=</span> <span class="n">logid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+            <span class="n">logid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_LOGITEM (NAME, SLAVEID) VALUES(:name, :slaveid) RETURNING IID&quot;</span><span class="p">,</span>
+                          <span class="n">name</span><span class="o">=</span><span class="n">mach</span><span class="p">,</span> <span class="n">slaveid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_slave_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">logid</span>
+
+<div class="viewcode-block" id="EnvData.insert_job"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.insert_job">[docs]</a>    <span class="nd">@_connect</span>
+    <span class="k">def</span> <span class="nf">insert_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        insert new job entry into DB</span>
+
+<span class="sd">        :param \**dict kwargs:</span>
+<span class="sd">        :keyword kwargs:</span>
+<span class="sd">            * *jobid* ``int`` -- id of HPC job</span>
+<span class="sd">            * *jname* ``str`` -- name of job</span>
+<span class="sd">            * *headnode* ``str`` -- HPC head node name</span>
+<span class="sd">            * *dbase* ``hpc.rdb.base.BaseDB`` -- DB connection</span>
+<span class="sd">            * *submitstart* ``datetime`` -- start of submit time</span>
+<span class="sd">            * *submitstop* ``datetime`` -- stop of submit time</span>
+<span class="sd">        :return: DB&#39;s job index</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mtc</span><span class="p">,</span> <span class="n">fnc</span><span class="p">,</span> <span class="bp">cls</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="n">VALID_NAME</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jname&quot;</span><span class="p">]),</span> <span class="s2">&quot;n/a&quot;</span><span class="p">,</span> <span class="s2">&quot;n/a&quot;</span>
+        <span class="k">if</span> <span class="n">mtc</span><span class="p">:</span>
+            <span class="n">fnc</span> <span class="o">=</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">4</span><span class="p">]</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="n">mtc</span><span class="o">.</span><span class="n">groups</span><span class="p">()[</span><span class="mi">2</span><span class="p">]</span>
+
+        <span class="c1"># future</span>
+        <span class="c1"># json = {</span>
+        <span class="c1">#     &quot;dbconn&quot;: &quot;PGS_LND&quot;,</span>
+        <span class="c1">#     &quot;head&quot;: kwargs[&#39;headnode&#39;],</span>
+        <span class="c1">#     &quot;usr&quot;: UID_NAME,</span>
+        <span class="c1">#     &quot;mach&quot;: gethostname().split(&#39;.&#39;)[0].upper(),</span>
+        <span class="c1">#     &quot;project&quot;: kwargs[&quot;project&quot;],</span>
+        <span class="c1">#     &quot;template&quot;: kwargs[&quot;template&quot;],</span>
+        <span class="c1">#     &quot;fnc&quot;: &quot;ADM&quot;,</span>
+        <span class="c1">#     &quot;cls&quot;: &quot;ADM&quot;,</span>
+        <span class="c1">#     &quot;version&quot;: version,</span>
+        <span class="c1">#     &quot;jobid&quot;: kwargs.get(&#39;jobid&#39;, int(environ.get(&quot;CCP_JOBID&quot;, environ.get(&quot;JobID&quot;, 0)))),</span>
+        <span class="c1">#     &quot;jname&quot;: kwargs[&#39;jname&#39;],</span>
+        <span class="c1">#     &quot;hver&quot;: VERSION,</span>
+        <span class="c1">#     &quot;submitstart&quot;: kwargs[&#39;submitstart&#39;].strftime(&#39;%Y-%m-%dT%H:%M:%S&#39;),</span>
+        <span class="c1">#     &quot;changes&quot;: kwargs.get(&quot;changes&quot;),</span>
+        <span class="c1">#     &quot;tasks&quot;: kwargs[&quot;tasks&quot;],</span>
+        <span class="c1">#     &quot;spid&quot;: kwargs[&quot;spid&quot;]</span>
+        <span class="c1"># }</span>
+        <span class="c1">#</span>
+        <span class="c1"># res = post(f&quot;http://localhost/ins_job&quot;, dumps(json))</span>
+        <span class="c1"># print(&quot;posted {!s}\nreturned code={}, res={}&quot;.format(json, res.status_code, res.text))</span>
+
+        <span class="n">dbase</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dbase&quot;</span><span class="p">)</span>
+        <span class="n">usridx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">)</span>
+        <span class="n">logid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">)</span>
+        <span class="n">prj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="s2">&quot;PTID&quot;</span><span class="p">,</span> <span class="s2">&quot;NAME&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;project&quot;</span><span class="p">],</span> <span class="s2">&quot;HPC_PRJTMPL&quot;</span><span class="p">)</span>
+        <span class="n">tmpl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="s2">&quot;PTID&quot;</span><span class="p">,</span> <span class="s2">&quot;NAME&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;template&quot;</span><span class="p">],</span> <span class="s2">&quot;HPC_PRJTMPL&quot;</span><span class="p">)</span>
+        <span class="n">pyv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="s2">&quot;PYVERID&quot;</span><span class="p">,</span> <span class="s2">&quot;VERSTR&quot;</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="s2">&quot;HPC_PYVER&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">mtc</span><span class="p">:</span>
+            <span class="n">fnc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="s2">&quot;FCID&quot;</span><span class="p">,</span> <span class="s2">&quot;FCNAME&quot;</span><span class="p">,</span> <span class="n">fnc</span><span class="p">,</span> <span class="s2">&quot;HPC_FUNCLASS&quot;</span><span class="p">)</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="s2">&quot;FCID&quot;</span><span class="p">,</span> <span class="s2">&quot;FCNAME&quot;</span><span class="p">,</span> <span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;HPC_FUNCLASS&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fnc</span> <span class="o">=</span> <span class="bp">cls</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># add recordings</span>
+        <span class="k">if</span> <span class="n">dbase</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">SQLITE</span><span class="p">:</span>  <span class="c1"># only if sqlite</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT OR IGNORE INTO HPC_VER(VERSTR) VALUES(:hpc)&quot;</span><span class="p">,</span> <span class="n">hpc</span><span class="o">=</span><span class="n">VERSION</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;records&quot;</span><span class="p">):</span>
+                <span class="n">mids</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT MEASID FROM DMT_FILES&quot;</span><span class="p">)]</span>
+                <span class="n">upds</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;records&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+                    <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;measid&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mids</span><span class="p">:</span>
+                        <span class="n">upds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                        <span class="n">mids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;measid&quot;</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="n">upds</span><span class="p">:</span>
+                    <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO DMT_FILES (</span><span class="si">%s</span><span class="s2">) VALUES(</span><span class="si">%s</span><span class="s2">)&quot;</span>
+                          <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">upds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())),</span>
+                             <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;:</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">upds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)])),</span>
+                          <span class="n">insertmany</span><span class="o">=</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">upds</span><span class="p">])</span>
+
+        <span class="n">jid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_JOB (HPCJOBID, NODEID, IID, SID, JOBNAME, TASK_CNT, &quot;</span>
+                    <span class="s2">&quot;SUBMITSTART, PRJID, TMPLID, CHANGES, PYVERID, FNCID, CLSID, VERID, SPID) &quot;</span>
+                    <span class="s2">&quot;VALUES(:job, (SELECT NODEID FROM HPC_NODE WHERE NODENAME = :node), :usr, :sid, &quot;</span>
+                    <span class="s2">&quot;:jnm, :tct, :strt, :prj, :tmpl, :chngs, :pyv, :fnc, :cls, &quot;</span>
+                    <span class="s2">&quot;(SELECT MAX(VERID) FROM HPC_VER WHERE VERSTR IN (:hpc, &#39;unknown&#39;)), :spid) RETURNING JOBID&quot;</span><span class="p">,</span>
+                    <span class="n">job</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;jobid&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CCP_JOBID&quot;</span><span class="p">,</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;JobID&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))),</span>
+                    <span class="n">node</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;headnode&#39;</span><span class="p">],</span> <span class="n">jnm</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;jname&#39;</span><span class="p">],</span> <span class="n">usr</span><span class="o">=</span><span class="n">usridx</span><span class="p">,</span> <span class="n">hpc</span><span class="o">=</span><span class="n">VERSION</span><span class="p">,</span> <span class="n">sid</span><span class="o">=</span><span class="n">logid</span><span class="p">,</span>
+                    <span class="n">strt</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;submitstart&#39;</span><span class="p">),</span> <span class="n">prj</span><span class="o">=</span><span class="n">prj</span><span class="p">,</span> <span class="n">tmpl</span><span class="o">=</span><span class="n">tmpl</span><span class="p">,</span> <span class="n">fnc</span><span class="o">=</span><span class="n">fnc</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="bp">cls</span><span class="p">,</span>
+                    <span class="n">pyv</span><span class="o">=</span><span class="n">pyv</span><span class="p">,</span> <span class="n">tct</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;taskcnt&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">chngs</span><span class="o">=</span><span class="n">dbase</span><span class="o">.</span><span class="n">stream2blob</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;changes&quot;</span><span class="p">),</span> <span class="kc">True</span><span class="p">),</span>
+                    <span class="n">spid</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;spid&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;tasks&quot;</span><span class="p">]:</span>  <span class="c1"># let user get the exception from scheduler instead of here!</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_TASK (JOBID, HPCTASKID, SLAVEID, RECSIZE, RECDURATION) &quot;</span>
+                  <span class="s2">&quot;VALUES(:1, :2, 0, :3, :4)&quot;</span><span class="p">,</span>
+                  <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">jid</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]),)</span> <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;tasks&quot;</span><span class="p">])])</span>
+
+        <span class="k">return</span> <span class="n">jid</span></div>
+
+<div class="viewcode-block" id="EnvData.update_job"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.update_job">[docs]</a>    <span class="nd">@_connect</span>
+    <span class="k">def</span> <span class="nf">update_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0201</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        update logger and task to meas related information</span>
+
+<span class="sd">        :param \**dict kwargs:</span>
+<span class="sd">        :keyword kwargs:</span>
+<span class="sd">            * *dbase* ``hpc.rdb.base.BaseDB`` -- DB connection</span>
+<span class="sd">            * *jobid* ``int`` -- update for special job, default is last entry in db</span>
+<span class="sd">            * *logger* ``obj`` -- logger instance</span>
+<span class="sd">            * *resource* ``str`` -- resource type of job like *N*ode, *C*ore, *S*ocket, *G*pu</span>
+<span class="sd">        :return: if job could be updated</span>
+<span class="sd">        :rtype: bool</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dbase</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;dbase&#39;</span><span class="p">)</span>
+        <span class="n">jid</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;MASTERID&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;JOB_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;HPC_submit&quot;</span><span class="p">:</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;UPDATE HPC_MASTERJOB SET JOBID = :jid, STATUS = :stat WHERE MASTERID = :mid &quot;</span>
+                  <span class="s2">&quot;AND NODEID = (SELECT NODEID FROM HPC_NODE WHERE NODENAME = :loc)&quot;</span><span class="p">,</span>
+                  <span class="n">jid</span><span class="o">=</span><span class="n">jid</span><span class="p">,</span> <span class="n">stat</span><span class="o">=</span><span class="s2">&quot;HPC job submitted&quot;</span><span class="p">,</span> <span class="n">mid</span><span class="o">=</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;MASTERID&quot;</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="n">LOCATION</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;UPDATE HPC_JOB SET SUBMIT_LOG = :sout, SUBMITSTOP = :stp, RESRS = :rsrc WHERE JOBID = :jid&quot;</span><span class="p">,</span>
+                     <span class="n">jid</span><span class="o">=</span><span class="n">jid</span><span class="p">,</span> <span class="n">sout</span><span class="o">=</span><span class="n">dbase</span><span class="o">.</span><span class="n">stream2blob</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">],</span> <span class="kc">True</span><span class="p">),</span> <span class="n">rsrc</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;resource&quot;</span><span class="p">])[</span><span class="mi">0</span><span class="p">],</span>
+                     <span class="n">stp</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span></div>
+
+<div class="viewcode-block" id="EnvData.update_task"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.update_task">[docs]</a>    <span class="nd">@_connect</span>
+    <span class="k">def</span> <span class="nf">update_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pragma: no cover  # pylint: disable=R0912,R0914,R0915</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        update hpc_task table with infos.</span>
+<span class="sd">        more keywords are table&#39;s columns, e.g. exitcode</span>
+
+<span class="sd">        :param \**dict kwargs:</span>
+<span class="sd">        :keyword kwargs:</span>
+<span class="sd">            * *dbase* ``hpc.rdb.base.BaseDB`` -- DB connection</span>
+<span class="sd">            * *headnode* ``str`` -- HPC head node name</span>
+<span class="sd">            * *stdout* ``stream`` -- stdout stream</span>
+<span class="sd">        :return: requeue count from DB</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        :raises HpcError: if JobID defined as env var is not found in db</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dbase</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dbase&quot;</span><span class="p">)</span>
+        <span class="n">head</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headnode&quot;</span><span class="p">,</span> <span class="s1">&#39;OTHER&#39;</span><span class="p">)</span>
+        <span class="n">hpcjobid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;jobid&quot;</span><span class="p">,</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CCP_JOBID&quot;</span><span class="p">,</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;JobID&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">))))</span>
+
+        <span class="n">jobid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT JOBID FROM HPC_JOB WHERE HPCJOBID = :job &quot;</span>
+                      <span class="s2">&quot;AND NODEID = (SELECT NODEID FROM HPC_NODE WHERE NODENAME = :node)&quot;</span><span class="p">,</span> <span class="n">job</span><span class="o">=</span><span class="n">hpcjobid</span><span class="p">,</span> <span class="n">node</span><span class="o">=</span><span class="n">head</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">jobid</span><span class="p">:</span>
+            <span class="n">jobid</span> <span class="o">=</span> <span class="n">jobid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;no job info inside Oracle!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># get requeue number in case we got requeued</span>
+        <span class="n">hpctaskid</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;CCP_TASKID&quot;</span><span class="p">,</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;TaskID&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">taskid</span><span class="p">,</span> <span class="n">requeue</span><span class="p">,</span> <span class="n">rsz</span><span class="p">,</span> <span class="n">rdn</span><span class="p">,</span> <span class="n">starttm</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT TASKID, REQUEUE, RECSIZE, RECDURATION, &quot;</span>
+                                                       <span class="s2">&quot;CASE WHEN STARTTIME IS NULL THEN 0 ELSE 1 END &quot;</span>
+                                                       <span class="s2">&quot;FROM HPC_TASK WHERE JOBID = :job AND HPCTASKID = :task &quot;</span>
+                                                       <span class="s2">&quot;ORDER BY REQUEUE&quot;</span><span class="p">,</span> <span class="n">job</span><span class="o">=</span><span class="n">jobid</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="n">hpctaskid</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">HpcError</span><span class="p">(</span><span class="s2">&quot;no task entry inside DB!&quot;</span><span class="p">)</span>
+
+        <span class="n">sout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stdout&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sout</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">sout</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">MAX_STDOUT</span> <span class="o">+</span> <span class="mi">4096</span><span class="p">:</span>    <span class="c1"># cut out with some extra space....</span>
+                <span class="n">sout</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">sout</span> <span class="o">=</span> <span class="n">sout</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                <span class="n">fsum</span> <span class="o">=</span> <span class="n">cumsum</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sout</span><span class="p">])</span>
+                <span class="n">fidx</span> <span class="o">=</span> <span class="nb">next</span><span class="p">((</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fsum</span><span class="p">)</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">MAX_STDOUT</span> <span class="o">//</span> <span class="mi">2</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="n">ridx</span> <span class="o">=</span> <span class="n">fsum</span><span class="o">.</span><span class="n">size</span> <span class="o">-</span> <span class="nb">next</span><span class="p">((</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">fsum</span><span class="p">))</span> <span class="k">if</span> <span class="n">fsum</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">MAX_STDOUT</span> <span class="o">//</span> <span class="mi">2</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">bstr</span> <span class="o">=</span> <span class="n">fsum</span><span class="p">[</span><span class="n">ridx</span><span class="p">]</span> <span class="o">-</span> <span class="n">fsum</span><span class="p">[</span><span class="n">fidx</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">ridx</span> <span class="o">-</span> <span class="n">fidx</span><span class="p">)</span>
+                <span class="n">strp</span> <span class="o">=</span> <span class="s2">&quot;stripped out </span><span class="si">{}</span><span class="s2">B (</span><span class="si">{}</span><span class="s2">) / </span><span class="si">{}</span><span class="s2"> lines, as log was too long: </span><span class="si">{}</span><span class="s2">B (</span><span class="si">{}</span><span class="s2">)&quot;</span>\
+                    <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">bstr</span><span class="p">,</span> <span class="n">human_size</span><span class="p">(</span><span class="n">bstr</span><span class="p">),</span> <span class="n">ridx</span> <span class="o">-</span> <span class="n">fidx</span><span class="p">,</span>
+                            <span class="n">fsum</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">fsum</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">human_size</span><span class="p">(</span><span class="n">fsum</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">fsum</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+                <span class="n">sout</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sout</span><span class="p">[:</span><span class="n">fidx</span><span class="p">]</span> <span class="o">+</span>
+                                 <span class="p">[</span><span class="n">STDOUT_HINT</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">strp</span><span class="p">,</span> <span class="s2">&quot;If you need more logging, &quot;</span>
+                                                           <span class="s2">&quot;implement it on your client app!&quot;</span><span class="p">)]</span> <span class="o">+</span> <span class="n">sout</span><span class="p">[</span><span class="n">ridx</span><span class="p">:])</span>
+                <span class="c1"># STDOUT_HINT.format(head, hpcjobid, hpctaskid)</span>
+            <span class="n">sout</span> <span class="o">=</span> <span class="n">dbase</span><span class="o">.</span><span class="n">stream2blob</span><span class="p">(</span><span class="n">sout</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">slaveid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_slave_ident</span><span class="p">(</span><span class="n">dbase</span><span class="p">)</span>
+
+        <span class="n">state_sub</span> <span class="o">=</span> <span class="s2">&quot;(SELECT STATEID FROM HPC_STATE WHERE NAME = :snm)&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">starttm</span><span class="p">:</span>  <span class="c1"># never run b4</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;UPDATE HPC_TASK SET SLAVEID = :slave, STARTTIME = :stm, STOPTIME = :etm, EXITCODE = :exc, &quot;</span>
+                  <span class="s2">&quot;STDOUT = :sout, CPU_TIME = :cpt, STATEID = </span><span class="si">{}</span><span class="s2">, TASKNAME = :tnm &quot;</span>
+                  <span class="s2">&quot;WHERE TASKID = :task&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">state_sub</span><span class="p">),</span>
+                  <span class="n">task</span><span class="o">=</span><span class="n">taskid</span><span class="p">,</span> <span class="n">slave</span><span class="o">=</span><span class="n">slaveid</span><span class="p">,</span> <span class="n">stm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_taskstart</span><span class="p">,</span> <span class="n">etm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_taskstop</span><span class="p">,</span> <span class="n">exc</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exitcode&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                  <span class="n">sout</span><span class="o">=</span><span class="n">sout</span><span class="p">,</span> <span class="n">cpt</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">snm</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">],</span> <span class="n">tnm</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tname&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># tables = [&quot;HPC_TASKERRORS&quot;, &quot;HPC_ERRORS&quot;, &quot;HPC_SUBTASK&quot;, &quot;HPC_TASK_ECODE_HIST&quot;]</span>
+            <span class="c1"># if dbase.db_type[0] == BaseDB.ORACLE:</span>
+            <span class="c1">#     tables.append(&quot;HPC_TASK_LOG&quot;)</span>
+            <span class="c1"># cnts = [k[0] for k in dbase(&quot; UNION ALL &quot;.join([(&quot;SELECT COUNT(TASKID) FROM %s WHERE TASKID = :tid&quot; % i)</span>
+            <span class="c1">#                                                 for i in tables]), tid=taskid[0])]</span>
+            <span class="c1"># for tab, cnt in zip(tables, cnts):</span>
+            <span class="c1">#     if cnt &gt; 0:</span>
+            <span class="c1">#         dbase(&quot;DELETE FROM %s WHERE TASKID = :tid&quot; % tab, tid=taskid[0])</span>
+            <span class="n">requeue</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">taskid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_TASK (JOBID, HPCTASKID, REQUEUE, SLAVEID, STARTTIME, STOPTIME, &quot;</span>
+                           <span class="s2">&quot;EXITCODE, STDOUT, RECSIZE, RECDURATION, CPU_TIME, STATEID, TASKNAME) &quot;</span>
+                           <span class="s2">&quot;VALUES(:job, :task, :req, :slave, :stm, :etm, :exc, :sout, :rsz, :rdn, :cpt, &quot;</span>
+                           <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">, :tnm) RETURNING TASKID&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">state_sub</span><span class="p">),</span> <span class="n">job</span><span class="o">=</span><span class="n">jobid</span><span class="p">,</span> <span class="n">req</span><span class="o">=</span><span class="n">requeue</span><span class="p">,</span> <span class="n">slave</span><span class="o">=</span><span class="n">slaveid</span><span class="p">,</span>
+                           <span class="n">stm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_taskstart</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="n">hpctaskid</span><span class="p">,</span> <span class="n">etm</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_taskstop</span><span class="p">,</span> <span class="n">exc</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;exitcode&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                           <span class="n">sout</span><span class="o">=</span><span class="n">sout</span><span class="p">,</span> <span class="n">rsz</span><span class="o">=</span><span class="n">rsz</span><span class="p">,</span> <span class="n">rdn</span><span class="o">=</span><span class="n">rdn</span><span class="p">,</span> <span class="n">cpt</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;cpu&#39;</span><span class="p">],</span> <span class="n">snm</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">],</span> <span class="n">tnm</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tname&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">dbase</span><span class="o">.</span><span class="n">db_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">BaseDB</span><span class="o">.</span><span class="n">ORACLE</span><span class="p">:</span>  <span class="c1"># connect log errors</span>
+            <span class="n">daemon_cmd</span><span class="p">(</span><span class="s2">&quot;savelogs&quot;</span><span class="p">)</span>
+            <span class="n">lids</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT LOGID FROM HPC_LOG &quot;</span>
+                         <span class="s2">&quot;WHERE DID = (SELECT IID FROM HPC_LOGITEM WHERE SLAVEID = :slaveid) &quot;</span>
+                         <span class="s2">&quot;AND LOGTIME BETWEEN (SELECT STARTTIME FROM HPC_TASK WHERE TASKID = :taskid) &quot;</span>
+                         <span class="s2">&quot;AND (SELECT STOPTIME FROM HPC_TASK WHERE TASKID = :taskid)&quot;</span><span class="p">,</span>
+                         <span class="n">slaveid</span><span class="o">=</span><span class="n">slaveid</span><span class="p">,</span> <span class="n">taskid</span><span class="o">=</span><span class="n">taskid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">lids</span><span class="p">:</span>
+                <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_TASK_LOG (LOGID, TASKID) VALUES(:1, :2)&quot;</span><span class="p">,</span>
+                      <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">taskid</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">lids</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;errmons&quot;</span><span class="p">):</span>
+                <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_ERRMON (TASKID, ERRMON) VALUES(:1, :2)&quot;</span><span class="p">,</span>
+                      <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;errmons&quot;</span><span class="p">]])</span>
+
+        <span class="c1"># now we update sub-task info</span>
+        <span class="n">wdog_lst</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wdog&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_envdata</span><span class="p">:</span>
+            <span class="n">cfg</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">]:</span>
+                <span class="n">cfgstr</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">])</span>
+                <span class="n">cfghsh</span> <span class="o">=</span> <span class="n">create_from_string</span><span class="p">(</span><span class="n">cfgstr</span><span class="p">)</span>
+                <span class="n">sadd</span><span class="p">,</span> <span class="n">padd</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;chsh&quot;</span><span class="p">:</span> <span class="n">cfghsh</span><span class="p">}</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cfgstr</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">4000</span><span class="p">:</span>
+                    <span class="n">sadd</span> <span class="o">=</span> <span class="s2">&quot; OR (CFGHASH IS NULL AND CFG=:cfg)&quot;</span>
+                    <span class="n">padd</span><span class="p">[</span><span class="s2">&quot;cfg&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cfgstr</span>
+                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">cfg</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;SELECT CFGID FROM HPC_SIMCFG WHERE CFGHASH = :chsh</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">sadd</span><span class="p">,</span> <span class="o">**</span><span class="n">padd</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">cfg</span><span class="p">:</span>
+                        <span class="n">cfg</span> <span class="o">=</span> <span class="n">cfg</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">break</span>
+
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">cfg</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_SIMCFG (CFGHASH, CFGBIN) VALUES(:chsh, :cbin) RETURNING CFGID&quot;</span><span class="p">,</span>
+                                    <span class="n">chsh</span><span class="o">=</span><span class="n">cfghsh</span><span class="p">,</span> <span class="n">cbin</span><span class="o">=</span><span class="n">dbase</span><span class="o">.</span><span class="n">stream2blob</span><span class="p">(</span><span class="n">cfgstr</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+                        <span class="k">break</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+                        <span class="k">pass</span>
+                    <span class="n">sleep</span><span class="p">(</span><span class="mf">0.7</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">cfg</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="n">subid</span> <span class="o">=</span> <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_SUBTASK (TASKID, SUBTASKID, STARTTIME, STOPTIME, EXITCODE, COMMAND, PID, &quot;</span>
+                          <span class="s2">&quot;MEASID, APP, CFGID, DISK_IO, CPU_TIME) &quot;</span>
+                          <span class="s2">&quot;VALUES(:tid, :sid, :stm, :etm, :exc, :cmd, :pid, :meas, :app, :cfg, :dio, :cpt) &quot;</span>
+                          <span class="s2">&quot;RETURNING SUBID&quot;</span><span class="p">,</span> <span class="n">tid</span><span class="o">=</span><span class="n">taskid</span><span class="p">,</span> <span class="n">sid</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;subtaskid&quot;</span><span class="p">],</span> <span class="n">stm</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;starttime&quot;</span><span class="p">],</span> <span class="n">etm</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;stoptime&quot;</span><span class="p">],</span>
+                          <span class="n">exc</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;exitcode&quot;</span><span class="p">],</span> <span class="n">cmd</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;command&quot;</span><span class="p">],</span> <span class="n">pid</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;pid&quot;</span><span class="p">],</span> <span class="n">meas</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;measid&quot;</span><span class="p">],</span> <span class="n">app</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;app&quot;</span><span class="p">],</span> <span class="n">cfg</span><span class="o">=</span><span class="n">cfg</span><span class="p">,</span>
+                          <span class="n">dio</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;disk_io&quot;</span><span class="p">],</span> <span class="n">cpt</span><span class="o">=</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;cpu&quot;</span><span class="p">])</span>
+
+            <span class="c1"># save subtask watchdog logs</span>
+            <span class="n">wdog_stsk</span> <span class="o">=</span> <span class="n">wdog_lst</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;subtaskid&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wdog_stsk</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_SUBTASK_WDOG (SUBID, IOLOAD, IOCONF, CPULOAD, CPUCONF, MEMLOAD, VIRTLOAD, &quot;</span>
+                      <span class="s2">&quot;NETLOAD, WDOGTIME) VALUES(:sid, :iol, :ioc, :cld, :ccf, :mld, :vld, :nld, :wtm)&quot;</span><span class="p">,</span>
+                      <span class="n">insertmany</span><span class="o">=</span><span class="p">[[</span><span class="n">subid</span><span class="p">]</span> <span class="o">+</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">wdog_stsk</span><span class="p">])</span>
+
+        <span class="c1"># insert error counters</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ecnt</span><span class="p">:</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_TASKERRORS (TASKID, TYPEID, CNT) VALUES(:tid, :tpe, :cnt)&quot;</span><span class="p">,</span>
+                  <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">,)</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ecnt</span><span class="p">)])</span>
+
+        <span class="c1"># insert error items</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_errs</span><span class="p">:</span>
+            <span class="c1"># for i in self._errs:</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_ERRORS (TASKID, TYPEID, CODE, DESCR, SRC, CNT, ERRDATE, MTSTIME) &quot;</span>
+                  <span class="s2">&quot;VALUES(:tid, :tpe, :cd, :dsc, :src, :cnt, :ed, :mtm)&quot;</span><span class="p">,</span>
+                  <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;code&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;desc&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;src&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;cnt&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;mts&quot;</span><span class="p">],)</span>
+                              <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_errs</span><span class="p">])</span>
+
+        <span class="c1"># insert exitcode history</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ehist&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="s2">&quot;INSERT INTO HPC_TASK_ECODE_HIST (TASKID, EXITCODE, LOGTIME) &quot;</span>
+                  <span class="s2">&quot;VALUES(:tid, :ecd, :ltm)&quot;</span><span class="p">,</span> <span class="n">insertmany</span><span class="o">=</span><span class="p">[(</span><span class="n">taskid</span><span class="p">,</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">],)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ehist&quot;</span><span class="p">,</span> <span class="p">[])])</span>
+
+        <span class="k">return</span> <span class="n">requeue</span></div>
+
+<div class="viewcode-block" id="EnvData.end_task"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.EnvData.end_task">[docs]</a>    <span class="k">def</span> <span class="nf">end_task</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;end the task&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_taskstop</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_taskstop</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_taskstart</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="env_exporter"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_exporter">[docs]</a><span class="k">def</span> <span class="nf">env_exporter</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    export collected data into a csv file</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *headnode* ``str`` -- head node name</span>
+<span class="sd">        * *jobid* ``int`` -- HPC job id</span>
+<span class="sd">        * *sortcol* ``int`` -- field to sort results, default: TASK</span>
+<span class="sd">        * *outfile* ``str`` -- CSV output file name</span>
+<span class="sd">    :return: exitcode</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sqargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;node&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headnode&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="s1">&#39;jobid&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">],</span>
+              <span class="s1">&#39;iter&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;JOB&#39;</span><span class="p">,</span> <span class="s1">&#39;USER&#39;</span><span class="p">,</span> <span class="s1">&#39;TASK&#39;</span><span class="p">,</span> <span class="s1">&#39;NODE&#39;</span><span class="p">,</span> <span class="s1">&#39;START&#39;</span><span class="p">,</span> <span class="s1">&#39;EXITCODE&#39;</span><span class="p">]</span>
+    <span class="c1"># conversation needed for datetime</span>
+    <span class="n">conv</span> <span class="o">=</span> <span class="p">[</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    <span class="n">conv</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span> <span class="k">else</span> <span class="s2">&quot;no time&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outfile&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">outfp</span><span class="p">,</span> <span class="n">tbc</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outfile&quot;</span><span class="p">],</span> <span class="s2">&quot;w&quot;</span> <span class="k">if</span> <span class="n">PY3</span> <span class="k">else</span> <span class="s2">&quot;wb&quot;</span><span class="p">,</span> <span class="n">newline</span><span class="o">=</span><span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">outfp</span><span class="p">,</span> <span class="n">tbc</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outfile&quot;</span><span class="p">],</span> <span class="kc">False</span>
+
+    <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+        <span class="n">csvlog</span> <span class="o">=</span> <span class="n">DictWriter</span><span class="p">(</span><span class="n">outfp</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;;&#39;</span><span class="p">,</span> <span class="n">fieldnames</span><span class="o">=</span><span class="n">fields</span><span class="p">)</span>
+        <span class="n">csvlog</span><span class="o">.</span><span class="n">writeheader</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">hpc</span><span class="p">(</span><span class="s2">&quot;SELECT HPCJOBID, NVL(u.DESCR, &#39;-&#39;), HPCTASKID, s.NAME, STARTTIME, EXITCODE &quot;</span>
+                       <span class="s2">&quot;FROM HPC_JOB j INNER JOIN HPC_TASK USING(JOBID) &quot;</span>
+                       <span class="s2">&quot;INNER JOIN HPC_SLAVE s USING(SLAVEID) &quot;</span>
+                       <span class="s2">&quot;INNER JOIN HPC_LOGITEM u USING(IID) &quot;</span>
+                       <span class="s2">&quot;INNER JOIN HPC_NODE n ON n.NODEID = j.NODEID &quot;</span>
+                       <span class="s2">&quot;WHERE HPCJOBID = :jobid and NODENAME = :node &quot;</span>
+                       <span class="s2">&quot;ORDER BY </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sortcol&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="o">**</span><span class="n">sqargs</span><span class="p">):</span>
+            <span class="n">csvlog</span><span class="o">.</span><span class="n">writerow</span><span class="p">({</span><span class="n">v</span><span class="p">:</span> <span class="n">conv</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">row</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">)})</span>
+
+    <span class="k">if</span> <span class="n">tbc</span><span class="p">:</span>
+        <span class="n">outfp</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="env_log"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_log">[docs]</a><span class="k">def</span> <span class="nf">env_log</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0911,R0912</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    return STDOUT from environment data</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *db* ``str`` -- db to use</span>
+<span class="sd">        * *headnode* ``str`` -- head node name</span>
+<span class="sd">        * *jobid* ``int`` -- HPC job id</span>
+<span class="sd">        * *taskid* ``int`` -- HPC task id</span>
+<span class="sd">    :return: exitcode</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sqargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;node&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headnode&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="s1">&#39;job&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]}</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;stdout&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;taskid&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;please provide valid task id!&quot;</span>
+
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">hpc</span><span class="p">(</span><span class="s2">&quot;SELECT STDOUT, STARTTIME FROM HPC_TASK INNER JOIN HPC_JOB USING(JOBID) &quot;</span>
+                      <span class="s2">&quot;INNER JOIN HPC_NODE USING(NODEID) WHERE NODENAME = :node AND HPCJOBID = :job &quot;</span>
+                      <span class="s2">&quot;AND HPCTASKID = :task&quot;</span><span class="p">,</span> <span class="n">lob</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;taskid&quot;</span><span class="p">],</span> <span class="o">**</span><span class="n">sqargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">out</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;no STDOUT data found!&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">decompress</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">except</span> <span class="n">zliberr</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="k">if</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;task still running since </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">)</span>
+
+        <span class="n">cleared</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="n">cleared</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(.*)(&lt;span style=</span><span class="se">\&quot;</span><span class="s2">background-color: \w+</span><span class="se">\&quot;</span><span class="s2">&gt;)(.*)(&lt;/span&gt;)(.*)$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\3\5&quot;</span><span class="p">,</span> <span class="n">l</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cleared</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;submit&quot;</span><span class="p">]:</span>
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">hpc</span><span class="p">(</span><span class="s2">&quot;SELECT SUBMIT_LOG, SUBMITSTART, SUBMITSTOP FROM HPC_JOB &quot;</span>
+                      <span class="s2">&quot;INNER JOIN HPC_NODE USING(NODEID) WHERE NODENAME = :node AND HPCJOBID = :job &quot;</span><span class="p">,</span> <span class="n">lob</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">sqargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">out</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;no submit STDOUT data found!&quot;</span>
+
+        <span class="k">if</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;sorry, nothing logged!&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">decompress</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">except</span> <span class="n">zliberr</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+        <span class="n">cleared</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="n">cleared</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(.*)(&lt;span style=</span><span class="se">\&quot;</span><span class="s2">background-color: \w+</span><span class="se">\&quot;</span><span class="s2">&gt;)(.*)(&lt;/span&gt;)(.*)$&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;\1\3\5&quot;</span><span class="p">,</span> <span class="n">l</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">: submit started</span><span class="se">\n</span><span class="si">{}{}</span><span class="s2">: submit stopped&quot;</span>\
+            <span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">),</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cleared</span><span class="p">),</span>
+                    <span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;commands&quot;</span><span class="p">]:</span>
+        <span class="n">sqadd</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;HPCTASKID, &quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,)</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;taskid&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sqadd</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;AND HPCTASKID = :task &quot;</span><span class="p">,)</span>
+            <span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;task&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;taskid&quot;</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">hpc</span><span class="p">(</span><span class="s2">&quot;SELECT </span><span class="si">%s</span><span class="s2">SUBTASKID + 1, COMMAND FROM HPC_SUBTASK INNER JOIN HPC_TASK USING(TASKID) &quot;</span>
+                      <span class="s2">&quot;INNER JOIN HPC_JOB USING(JOBID) INNER JOIN HPC_NODE USING(NODEID) &quot;</span>
+                      <span class="s2">&quot;WHERE NODENAME = :node AND HPCJOBID = :job </span><span class="si">%s</span><span class="s2">&quot;</span>
+                      <span class="s2">&quot;ORDER BY HPCTASKID, SUBTASKID&quot;</span> <span class="o">%</span> <span class="n">sqadd</span><span class="p">,</span> <span class="o">**</span><span class="n">sqargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">out</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">out</span><span class="p">])</span>
+
+            <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">out</span><span class="p">])</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="s2">&quot;task not finished, having a look locally</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+        <span class="n">dbbase</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">])</span>
+        <span class="n">dbfile</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">listdir</span><span class="p">(</span><span class="n">dbbase</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">_&quot;</span> <span class="o">%</span> <span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;job&quot;</span><span class="p">])]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dbfile</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">out</span> <span class="o">+</span> <span class="p">(</span><span class="s2">&quot;no job folder exists on </span><span class="si">%s</span><span class="s2">!&quot;</span> <span class="o">%</span> <span class="n">dbbase</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">JobDict</span><span class="p">(</span><span class="n">fp</span><span class="o">=</span><span class="n">join</span><span class="p">(</span><span class="n">dbbase</span><span class="p">,</span> <span class="n">dbfile</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">job</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">out</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">j</span><span class="o">.</span><span class="n">subtask</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">j</span><span class="o">.</span><span class="n">command</span><span class="p">)))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">job</span><span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;taskid&quot;</span><span class="p">]]])</span>
+    <span class="k">return</span> <span class="s2">&quot;Nothing done!&quot;</span></div>
+
+
+<div class="viewcode-block" id="env_log_print"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_log_print">[docs]</a><span class="k">def</span> <span class="nf">env_log_print</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    print info from env_log</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *db* ``str`` -- db to use</span>
+<span class="sd">        * *headnode* ``str`` -- head node name</span>
+<span class="sd">        * *jobid* ``int`` -- HPC job id</span>
+<span class="sd">        * *taskid* ``int`` -- HPC task id</span>
+<span class="sd">    :return: exitcode</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">env_log</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">))</span>
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="env_stdout_search"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_stdout_search">[docs]</a><span class="k">def</span> <span class="nf">env_stdout_search</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    search all stdout of a certain HPC job by some pattern</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *db* ``str`` -- db to use</span>
+<span class="sd">        * *headnode* ``str`` -- head node name</span>
+<span class="sd">        * *jobid* ``int`` -- HPC job id</span>
+<span class="sd">        * *pattern* ``str`` -- regular expression pattern</span>
+<span class="sd">    :return: exitcode</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sqargs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;node&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headnode&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="s1">&#39;job&#39;</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]}</span>
+    <span class="n">cnt</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;db&quot;</span><span class="p">,</span> <span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">sqargs</span><span class="p">[</span><span class="s2">&quot;node&quot;</span><span class="p">]][</span><span class="mi">3</span><span class="p">]))</span> <span class="k">as</span> <span class="n">hpc</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">hpc</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT HPCTASKID, STDOUT FROM HPC_TASK INNER JOIN HPC_JOB USING(JOBID) &quot;</span>
+                             <span class="s2">&quot;INNER JOIN HPC_NODE USING(NODEID) WHERE NODENAME = :node AND HPCJOBID = :job &quot;</span>
+                             <span class="s2">&quot;AND EXITCODE IS NOT NULL ORDER BY HPCTASKID&quot;</span><span class="p">,</span>
+                             <span class="n">lob</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">sqargs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">spos</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">while</span> <span class="n">spos</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">):</span>
+                <span class="n">mtc</span> <span class="o">=</span> <span class="n">search</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;pattern&quot;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="n">spos</span><span class="p">:])</span>
+                <span class="k">if</span> <span class="n">mtc</span><span class="p">:</span>
+                    <span class="n">cnt</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="o">+</span> <span class="n">spos</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">out</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">:</span>
+                            <span class="k">break</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">k</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">mtc</span><span class="o">.</span><span class="n">end</span><span class="p">()</span> <span class="o">+</span> <span class="n">spos</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">)):</span>
+                        <span class="k">if</span> <span class="n">out</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">:</span>
+                            <span class="k">break</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">j</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">if</span> <span class="n">k</span> <span class="ow">and</span> <span class="n">j</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;task </span><span class="si">%d</span><span class="s2"> fits at line </span><span class="si">%3d</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span>
+                              <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">out</span><span class="p">[:</span><span class="n">mtc</span><span class="o">.</span><span class="n">start</span><span class="p">()</span> <span class="o">+</span> <span class="n">spos</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">out</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span><span class="n">j</span><span class="p">]))</span>
+                    <span class="n">spos</span> <span class="o">+=</span> <span class="n">mtc</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">spos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">cnt</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;nothing found inside job </span><span class="si">%d</span><span class="s2">!&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;found </span><span class="si">%d</span><span class="s2"> occurances inside job </span><span class="si">%d</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">cnt</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]))</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="env_export_bpl"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_export_bpl">[docs]</a><span class="k">def</span> <span class="nf">env_export_bpl</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>  <span class="c1"># pylint: disable=R0912,R0914,R0915,import-outside-toplevel</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create a bpl file from given job with only those recordings processed with a certain task state or exitcode.</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *headnode* ``str`` -- head node name</span>
+<span class="sd">        * *jobid* ``int`` -- HPC job id</span>
+<span class="sd">        * *state* ``str`` -- state of task to filter</span>
+<span class="sd">        * *exitcode* ``str`` -- filter for exit codes</span>
+<span class="sd">        * *bpl* ``str`` -- output bpl file</span>
+<span class="sd">    :return: exitcode</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># connect to server and open job</span>
+    <span class="n">head</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headnode&quot;</span><span class="p">,</span> <span class="n">DEFAULT_HEAD_NODE</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">HpcSched</span><span class="p">(</span><span class="n">head</span><span class="p">)</span> <span class="k">as</span> <span class="n">sched</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">job</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">OpenJob</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;your job cannot be opened: &#39;</span><span class="si">{!s}</span><span class="s2">&#39;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ex</span><span class="p">))</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">job_db</span><span class="p">,</span> <span class="n">db_path</span><span class="p">,</span> <span class="n">fnd</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">join</span><span class="p">(</span><span class="n">HPC_STORAGE_MAP</span><span class="p">[</span><span class="n">head</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;hpc&quot;</span><span class="p">,</span> <span class="n">head</span><span class="p">),</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">_*&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">])):</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;1_Input&quot;</span><span class="p">,</span> <span class="s2">&quot;1_Input</span><span class="se">\\</span><span class="s2">hpc&quot;</span><span class="p">,):</span>
+                <span class="n">job_db</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="s2">&quot;job.json&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">exists</span><span class="p">(</span><span class="n">job_db</span><span class="p">):</span>
+                    <span class="n">fnd</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">fnd</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;cannot find job info!&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="c1"># get the whole task list of the job filtered by either status and / or exitcode</span>
+        <span class="n">filters</span> <span class="o">=</span> <span class="n">sched</span><span class="o">.</span><span class="n">CreateFilterCollection</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;exitcode&quot;</span><span class="p">]:</span>
+            <span class="n">filters</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="n">sched</span><span class="o">.</span><span class="n">props</span><span class="o">.</span><span class="n">FilterOperator</span><span class="o">.</span><span class="n">Equal</span><span class="p">,</span> <span class="n">sched</span><span class="o">.</span><span class="n">propid</span><span class="o">.</span><span class="n">Task_ExitCode</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;exitcode&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
+            <span class="n">filters</span><span class="o">.</span><span class="n">Add</span><span class="p">(</span><span class="n">sched</span><span class="o">.</span><span class="n">props</span><span class="o">.</span><span class="n">FilterOperator</span><span class="o">.</span><span class="n">Equal</span><span class="p">,</span> <span class="n">sched</span><span class="o">.</span><span class="n">propid</span><span class="o">.</span><span class="n">Task_State</span><span class="p">,</span> <span class="n">TASKSTATE</span><span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">]])</span>
+
+        <span class="n">task_list</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">GetTaskList</span><span class="p">(</span><span class="n">filters</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">recs</span><span class="p">,</span> <span class="n">lrec</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">JobDict</span><span class="p">(</span><span class="n">fp</span><span class="o">=</span><span class="n">job_db</span><span class="p">)</span> <span class="k">as</span> <span class="n">jdb</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">task_list</span><span class="p">:</span>  <span class="c1"># pylint: disable=R1702</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">subt</span> <span class="ow">in</span> <span class="n">jdb</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">task</span><span class="o">.</span><span class="n">TaskId</span><span class="o">.</span><span class="n">JobTaskId</span><span class="p">)]:</span>
+                            <span class="k">if</span> <span class="n">subt</span><span class="o">.</span><span class="n">command</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;measapp.exe&quot;</span><span class="p">):</span>
+                                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">subt</span><span class="o">.</span><span class="n">command</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                                    <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;-lr&quot;</span><span class="p">):</span>
+                                        <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lrec</span><span class="p">:</span>
+                                            <span class="n">lrec</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+                                            <span class="n">recs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">:])</span>
+                                        <span class="k">break</span>
+                                    <span class="k">if</span> <span class="n">i</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;-lb&quot;</span><span class="p">):</span>
+                                        <span class="n">recl</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fileName&quot;</span><span class="p">)</span>
+                                                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">parse</span><span class="p">(</span><span class="n">join</span><span class="p">(</span><span class="n">db_path</span><span class="p">,</span> <span class="s2">&quot;bpl&quot;</span><span class="p">,</span> <span class="n">basename</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">3</span><span class="p">:])))</span><span class="o">.</span><span class="n">getroot</span><span class="p">()]</span>
+                                        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">recl</span><span class="p">:</span>
+                                            <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lrec</span><span class="p">:</span>
+                                                <span class="n">lrec</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+                                                <span class="n">recs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                                        <span class="k">break</span>
+                    <span class="k">except</span> <span class="ne">IndexError</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+                        <span class="k">pass</span>  <span class="c1"># now, we&#39;re on a parametric task, although False, it&#39;s still delivered by HPC</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ERROR reading from </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">job_db</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">recs</span><span class="p">:</span>
+        <span class="c1"># arrange bpl file</span>
+        <span class="n">bpl</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;bpl&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">bpl</span><span class="p">,</span> <span class="s1">&#39;read&#39;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">bpl</span> <span class="o">==</span> <span class="s2">&quot;&lt;job_id&gt;.bpl&quot;</span><span class="p">:</span>
+                <span class="n">bpl</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">.bpl&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">]</span>
+
+            <span class="c1"># create a folder for bpl extraction</span>
+            <span class="n">bpl_folder</span> <span class="o">=</span> <span class="n">dirname</span><span class="p">(</span><span class="n">bpl</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">bpl_folder</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">makedirs</span><span class="p">(</span><span class="n">bpl_folder</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">pass</span>
+
+        <span class="c1"># build xml</span>
+        <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">bpl</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">bfp</span><span class="p">:</span>
+            <span class="n">bfp</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">recs</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> recording(s) written to </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">recs</span><span class="p">),</span> <span class="n">bpl</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;no failed MTS tasks inside job </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;jobid&quot;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="env_bpl_filter"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_bpl_filter">[docs]</a><span class="k">def</span> <span class="nf">env_bpl_filter</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    filter input bpl by location and output only valid ones</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *inbpl* ``str`` -- input BPL file</span>
+<span class="sd">        * *outbpl* ``str`` -- output BPL file</span>
+<span class="sd">        * *rest* ``str`` -- left over BPL file</span>
+<span class="sd">        * *location* ``str`` -- location to use (e.g. LND for Lindau)</span>
+<span class="sd">    :return: 0</span>
+<span class="sd">    :rtype: int</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rest</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;rest&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rest</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rest</span> <span class="o">=</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">rest</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+
+    <span class="n">collname</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inbpl&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+
+    <span class="k">with</span> <span class="n">Collection</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="n">CollManager</span><span class="o">.</span><span class="n">READ</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">collname</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="n">collname</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">as</span> <span class="n">coll</span><span class="p">,</span> \
+            <span class="n">Bpl</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outbpl&quot;</span><span class="p">],</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">outbpl</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">coll</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">i</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">location</span> <span class="o">==</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]:</span>
+                    <span class="n">ble</span> <span class="o">=</span> <span class="n">BplListEntry</span><span class="p">(</span><span class="n">k</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">k</span><span class="o">.</span><span class="n">relts</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">l</span> <span class="o">!=</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+                            <span class="n">ble</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,))</span>
+                    <span class="n">outbpl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ble</span><span class="p">)</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">rest</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">rest</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">BplListEntry</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">Section</span><span class="p">(</span><span class="n">k</span><span class="o">.</span><span class="n">beginrelts</span><span class="p">,</span> <span class="n">k</span><span class="o">.</span><span class="n">endrelts</span><span class="p">,</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">True</span><span class="p">,))))</span>
+
+    <span class="k">if</span> <span class="n">rest</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rest</span><span class="o">.</span><span class="n">write</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;found </span><span class="si">%d</span><span class="s2"> recordings on </span><span class="si">%s</span><span class="s2"> location for collection </span><span class="si">%s</span><span class="s2">&quot;</span>
+          <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">outbpl</span><span class="p">),</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inbpl&quot;</span><span class="p">]))</span>
+
+    <span class="k">return</span> <span class="mi">0</span></div>
+
+
+<div class="viewcode-block" id="env_bpl_operation"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.cmd.env_collector.env_bpl_operation">[docs]</a><span class="k">def</span> <span class="nf">env_bpl_operation</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    do some operation on the bpl&#39;s given and output the result accordingly</span>
+
+<span class="sd">    :param \**dict kwargs:</span>
+<span class="sd">    :keyword kwargs:</span>
+<span class="sd">        * *inbpl* ``str`` -- input BPL file</span>
+<span class="sd">        * *outbpl* ``str`` -- output BPL file</span>
+<span class="sd">        * *arith* ``str`` -- math operation to do, e.g. (or, and, xor)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">arith</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;xor&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">^</span> <span class="n">y</span><span class="p">,</span> <span class="s2">&quot;or&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">|</span> <span class="n">y</span><span class="p">,</span> <span class="s2">&quot;and&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">&amp;</span> <span class="n">y</span><span class="p">,</span> <span class="s2">&quot;sub&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">-</span> <span class="n">y</span><span class="p">}</span>
+
+    <span class="k">with</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inbpls&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="k">as</span> <span class="n">src1</span><span class="p">,</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inbpls&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span> <span class="k">as</span> <span class="n">src2</span><span class="p">,</span> <span class="n">Bpl</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;outbpl&quot;</span><span class="p">],</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">trgt</span><span class="p">:</span>
+        <span class="n">trgt</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">arith</span><span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;arith&quot;</span><span class="p">]](</span><span class="n">src1</span><span class="p">,</span> <span class="n">src2</span><span class="p">))</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>

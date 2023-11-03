@@ -1,0 +1,310 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=cp1252" />
+    <title>hpc.rdb.sqlite_defs</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css" />
+    <link rel="index" title="Index" href="../../../genindex.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for hpc.rdb.sqlite_defs</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">sqlite_defs.py</span>
+<span class="sd">--------------</span>
+
+<span class="sd">sqlite DB definitions</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># - Python imports -----------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">unlink</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">exists</span>
+
+<span class="c1"># - import HPC things --------------------------------------------------------------------------------------------------</span>
+<span class="kn">from</span> <span class="nn">hpc.rdb.base</span> <span class="kn">import</span> <span class="n">BaseDB</span>
+
+<span class="c1"># - defines ------------------------------------------------------------------------------------------------------------</span>
+<span class="c1"># CREATE TRIGGER [DMT_FILES_SUBPATH] AFTER INSERT ON [DMT_FILES] FOR EACH ROW BEGIN UPDATE [DMT_FILES]</span>
+<span class="c1"># SET [SUBPATH] = subpath(NEW.FILEPATH), [RECFILEID] = basename(NEW.FILEPATH); END</span>
+<span class="n">SQLITE_DEF</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">CREATE TABLE [DMT_FILES] ([MEASID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FILEPATH] NVARCHAR2(300) NOT NULL, [RECFILEID] NVARCHAR2(255), [FILESIZE] INTEGER, [BEGINABSTS] INTEGER, [ENDABSTS] INTEGER, [PROJECT] NVARCHAR2(100), [STATUS] NVARCHAR2(11) NOT NULL DEFAULT &#39;transmitted&#39;, [BASEPATH] NVARCHAR2(250), [SERVERSHARE] NVARCHAR2(64), [CRC_NAME] INTEGER, [PARENT] INTEGER)</span>
+<span class="s2">CREATE UNIQUE INDEX [UQ_DMT_FILES_PATH] ON [DMT_FILES] ([FILEPATH])</span>
+<span class="s2">CREATE TABLE [HPC_ERRTYPE] ([TYPEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TYPENAME] NVARCHAR2(128) NOT NULL)</span>
+<span class="s2">CREATE UNIQUE INDEX [UQ_APPERR_TYPE_TYPENAME] ON [HPC_ERRTYPE] ([TYPENAME])</span>
+<span class="s2">CREATE TABLE [HPC_EXITCODES] ([EXITCODE] INTEGER NOT NULL PRIMARY KEY, [DESCR] VARCHAR2(128) NOT NULL, [PRIO] INTEGER NOT NULL)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_EXITCODES_PRIO_UK] ON [HPC_EXITCODES] ([PRIO])</span>
+<span class="s2">CREATE TABLE [HPC_NODE] ([NODEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODENAME] NVARCHAR2(32) NOT NULL, [CONFIG] BLOB, [LOCATION] NVARCHAR2(20) NOT NULL DEFAULT &#39;LND&#39;)</span>
+<span class="s2">CREATE UNIQUE INDEX [NODENAME_IDX] ON [HPC_NODE] ([NODENAME])</span>
+<span class="s2">CREATE TABLE [HPC_SLAVE] ([SLAVEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_SLAVE_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [NAME] NVARCHAR2(32) NOT NULL, [DTOTAL] INTEGER NOT NULL DEFAULT 0, [RAMTOTAL] INTEGER NOT NULL DEFAULT 0, [CONFIG] BLOB, [PING] TIMESTAMP, [SOCKETS] INTEGER NOT NULL DEFAULT 1, [CORES] INTEGER NOT NULL DEFAULT 1)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_SLAVE_NAME_UK] ON [HPC_SLAVE] ([NAME])</span>
+<span class="s2">CREATE TABLE [HPC_LOGITEM] ([IID] INTEGER NOT NULL PRIMARY KEY, [SLAVEID] INTEGER DEFAULT NULL CONSTRAINT [HPC_LOGITEM_NODE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE SET NULL, [NAME] NVARCHAR2(128) NOT NULL, [DESCR] NVARCHAR2(128), [CNT] INTEGER NOT NULL DEFAULT 0)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_LOGITEM_NAME_UK] ON [HPC_LOGITEM] ([NAME], [DESCR])</span>
+<span class="s2">CREATE TABLE [HPC_NETLOG] ([SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_NETLOG_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [SEGRECV] INTEGER NOT NULL, [SEGSENT] INTEGER NOT NULL, [SEGRETR] INTEGER NOT NULL)</span>
+<span class="s2">CREATE TABLE [HPC_PRJTMPL] ([PTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(32) UNIQUE)</span>
+<span class="s2">CREATE TABLE [HPC_FUNCLASS] ([FCID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [FCNAME] VARCHAR(4) UNIQUE)</span>
+<span class="s2">CREATE TABLE [HPC_STATE] ([STATEID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [NAME] VARCHAR(11) UNIQUE)</span>
+<span class="s2">CREATE TABLE [HPC_VER] ([VERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(96) UNIQUE)</span>
+<span class="s2">CREATE TABLE [HPC_PYVER] ([PYVERID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [VERSTR] VARCHAR(12) UNIQUE)</span>
+<span class="s2">CREATE TABLE [HPC_JOB] ([JOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [HPCJOBID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_JOB_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [IID] INTEGER DEFAULT NULL CONSTRAINT [HPC_JOB_USER_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SID] INTEGER DEFAULT 0 CONSTRAINT [HPC_JOB_SOURCE_PC_FK] REFERENCES [HPC_LOGITEM]([IID]) ON DELETE CASCADE, [SUBMITSTART] TIMESTAMP, [SUBMITSTOP] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] FLOAT, [SUBMIT_LOG] BLOB, [CHANGES] BLOB, [PRJID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PRJ_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [TMPLID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_TMPL_FK] REFERENCES [HPC_PRJTMPL]([PTID]), [RESRS] NVARCHAR2(1), [VERID] INTEGER CONSTRAINT [HPC_JOB_VER_FK] REFERENCES [HPC_VER]([VERID]) ON DELETE SET NULL, [PYVERID] INTEGER NOT NULL DEFAULT 0 CONSTRAINT [HPC_JOB_PYVER_FK] REFERENCES [HPC_PYVER]([PYVERID]), [JOBNAME] VARCHAR(128), [FNCID] INTEGER CONSTRAINT [HPC_JOB_FNC_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [CLSID] INTEGER CONSTRAINT [HPC_JOB_CLS_FK] REFERENCES [HPC_FUNCLASS]([FCID]), [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_JOB_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE, [TASK_CNT] INTEGER DEFAULT 0, [SPID] INTEGER DEFAULT 0)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_JOB_UK] ON [HPC_JOB] ([HPCJOBID], [NODEID])</span>
+<span class="s2">CREATE TABLE [HPC_MASTERJOB] ([MASTERJOBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [MASTERID] INTEGER NOT NULL, [NODEID] INTEGER NOT NULL CONSTRAINT [HPC_MASTERJOB_NODE_FK] REFERENCES [HPC_NODE]([NODEID]) ON DELETE CASCADE, [JOBID] INTEGER CONSTRAINT [HPC_MASTERJOB_JOB_FK] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [BUILDNO] INTEGER NOT NULL, [STATUS] NVARCHAR2(64), UNIQUE ([NODEID], [MASTERID]))</span>
+<span class="s2">CREATE TABLE [HPC_TASK] ([TASKID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [JOBID] INTEGER NOT NULL CONSTRAINT [FK_JOBID] REFERENCES [HPC_JOB]([JOBID]) ON DELETE CASCADE, [HPCTASKID] INTEGER NOT NULL, [TASKNAME] VARCHAR2(128), [REQUEUE] INTEGER NOT NULL DEFAULT 0, [EXITCODE] INTEGER CONSTRAINT [HPC_TASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL, [STDOUT] BLOB, [SLAVEID] INTEGER NOT NULL CONSTRAINT [HPC_TASK_SLAVE_FK] REFERENCES [HPC_SLAVE]([SLAVEID]) ON DELETE CASCADE DEFAULT 0, [STARTTIME] TIMESTAMP, [STOPTIME] TIMESTAMP, [RECSIZE] INTEGER, [RECDURATION] INTEGER, [CPU_TIME] FLOAT DEFAULT 0, [STATEID] INTEGER DEFAULT 0 CONSTRAINT [FK_TASK_STATE] REFERENCES [HPC_STATE]([STATEID]) ON DELETE CASCADE)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_TASK_UK] ON [HPC_TASK] ([JOBID], [REQUEUE], [HPCTASKID])</span>
+<span class="s2">CREATE TABLE [HPC_TASKERRORS] ([TASKID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] NUMBER NOT NULL CONSTRAINT [HPC_TASKERRORS_TYPE_FK] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CNT] NUMBER NOT NULL, CONSTRAINT [sqlite_autoindex_HPC_TASKERRORS_1] PRIMARY KEY ([TASKID], [TYPEID]))</span>
+<span class="s2">CREATE TABLE [HPC_SIMCFG] ([CFGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [CFG] VARCHAR2(4000), [CFGHASH] VARCHAR2(64), [CFGBIN] BLOB)</span>
+<span class="s2">CREATE TABLE [HPC_ERRORS] ([ERRORID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ERRORS_TASKID_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [TYPEID] INTEGER NOT NULL CONSTRAINT [FK_APPERROR_APPERR_TYPE] REFERENCES [HPC_ERRTYPE]([TYPEID]) ON DELETE CASCADE, [CODE] INTEGER NOT NULL, [DESCR] NVARCHAR2(512), [SRC] NVARCHAR2(512), [ERRDATE] TIMESTAMP, [CNT] INTEGER NOT NULL DEFAULT 1, [MTSTIME] INTEGER NOT NULL DEFAULT 0)</span>
+<span class="s2">CREATE TABLE [HPC_SUBTASK] ([SUBID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [SUBTASKID] INTEGER NOT NULL, [STARTTIME] TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, [STOPTIME] TIMESTAMP, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_EXIT_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE SET NULL DEFAULT 0, [COMMAND] NVARCHAR2(32), [PID] INTEGER, [MEASID] INTEGER CONSTRAINT [HPC_SUBTASK_MEAS_FK] REFERENCES [DMT_FILES]([MEASID]) ON DELETE SET NULL, [APP] NVARCHAR2(64), [CFGID] INTEGER CONSTRAINT [HPC_SUBTASK_CFG_FK] REFERENCES [HPC_SIMCFG]([CFGID]) ON DELETE SET NULL, [DISK_IO] INTEGER, [CPU_TIME] FLOAT DEFAULT 0)</span>
+<span class="s2">CREATE TABLE [HPC_SUBTASK_WDOG] ([WDOGID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [SUBID] INTEGER NOT NULL CONSTRAINT [HPC_SUBTASK_WDOG_FK] REFERENCES [HPC_SUBTASK]([SUBID]) ON DELETE CASCADE, [IOLOAD] INTEGER NOT NULL, [IOCONF] INTEGER NOT NULL, [CPULOAD] INTEGER NOT NULL, [CPUCONF] INTEGER NOT NULL, [MEMLOAD] INTEGER NOT NULL, [VIRTLOAD] INTEGER NOT NULL, [NETLOAD] INTEGER NOT NULL, [WDOGTIME] INTEGER NOT NULL)</span>
+<span class="s2">CREATE UNIQUE INDEX [HPC_SUBTASK_UK] ON [HPC_SUBTASK] ([TASKID], [SUBTASKID])</span>
+<span class="s2">CREATE TABLE [HPC_TASK_ECODE_HIST] ([HISTID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, [TASKID] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_TASK_FK] REFERENCES [HPC_TASK]([TASKID]) ON DELETE CASCADE, [EXITCODE] INTEGER NOT NULL CONSTRAINT [HPC_ECODE_HIST_ECODE_FK] REFERENCES [HPC_EXITCODES]([EXITCODE]) ON DELETE CASCADE, [LOGTIME] TIMESTAMP NOT NULL)</span>
+<span class="s2">-- now insert some data into the tables</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;OTHER&#39;, &#39;misc&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;UNIT000&#39;, &#39;misc&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LU00156VMA&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LU00160VMA&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LU00199VMA&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LU00200VMA&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LUAS003A&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LUAS004A&#39;, &#39;LND&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LSAS002A&#39;, &#39;FFM&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LSAS003A&#39;, &#39;FFM&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;LSAS095A&#39;, &#39;FFM&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;QHS6U5BA&#39;, &#39;ABH&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;QHS6U5CA&#39;, &#39;ABH&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;OZAS012A&#39;, &#39;BLR&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;OZAS013A&#39;, &#39;BLR&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;ITAS004A&#39;, &#39;SHB&#39;)</span>
+<span class="s2">insert into HPC_NODE (NODENAME, LOCATION) values (&#39;ITAS005A&#39;, &#39;SHB&#39;)</span>
+<span class="s2">insert into HPC_SLAVE (SLAVEID, NODEID, NAME) values(0, (SELECT NODEID FROM HPC_NODE WHERE NODENAME = &#39;OTHER&#39;), &#39;(missing)&#39;)</span>
+<span class="s2">insert into HPC_LOGITEM (IID, NAME) values(0, &#39;unknown/missing&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (0, &#39;Crash&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (1, &#39;Exception&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (2, &#39;Error&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (3, &#39;Alert&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (4, &#39;Warning&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (5, &#39;Information&#39;)</span>
+<span class="s2">insert into HPC_ERRTYPE (TYPEID, TYPENAME) values (6, &#39;Debug&#39;)</span>
+<span class="s2">insert into HPC_PRJTMPL (PTID, NAME) values (0, null)</span>
+<span class="s2">insert into HPC_VER (VERID, VERSTR) values(1, &#39;unknown&#39;)</span>
+<span class="s2">insert into HPC_PYVER (PYVERID, VERSTR) values(0, &#39;unknown&#39;)</span>
+<span class="s2">insert into HPC_FUNCLASS (FCID, FCNAME) values(0, &#39;n/a&#39;)</span>
+<span class="s2">insert into HPC_STATE values(0, &#39;None&#39;)</span>
+<span class="s2">insert into HPC_STATE values(1, &#39;Configuring&#39;)</span>
+<span class="s2">insert into HPC_STATE values(2, &#39;Submitted&#39;)</span>
+<span class="s2">insert into HPC_STATE values(4, &#39;Validating&#39;)</span>
+<span class="s2">insert into HPC_STATE values(8, &#39;Dispatching&#39;)</span>
+<span class="s2">insert into HPC_STATE values(16, &#39;Queued&#39;)</span>
+<span class="s2">insert into HPC_STATE values(32, &#39;Running&#39;)</span>
+<span class="s2">insert into HPC_STATE values(64, &#39;Finishing&#39;)</span>
+<span class="s2">insert into HPC_STATE values(128, &#39;Finished&#39;)</span>
+<span class="s2">insert into HPC_STATE values(256, &#39;Failed&#39;)</span>
+<span class="s2">insert into HPC_STATE values(512, &#39;Canceled&#39;)</span>
+<span class="s2">insert into HPC_STATE values(1024, &#39;Canceling&#39;)</span>
+<span class="s2">-- generate new inserts, copy / paste this:</span>
+<span class="s2">-- select &#39;insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(&#39; || to_char(exitcode) || &#39;, &#39;&#39;&#39; || descr || &#39;&#39;&#39;, &#39; || to_char(prio) || &#39;)&#39; from hpc_exitcodes where exitcode &gt;= 0 order by prio;</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(2, &#39;application: wrong argument (python)&#39;, 119)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(150, &#39;infrastructure: unspecified error found&#39;, 510)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(152, &#39;infrastructure: (robo)copy caused an error&#39;, 512)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(153, &#39;infrastructure: network name is not longer available&#39;, 513)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(154, &#39;infrastructure: failed to connect to DB&#39;, 514)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(155, &#39;infrastructure: recording is not available&#39;, 516)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(156, &#39;infrastructure: (robo)copy overwrote output data files&#39;, 517)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(157, &#39;infrastructure: recording is archived&#39;, 518)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(159, &#39;infrastructure: GPU driver or kernel module error&#39;, 519)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(146, &#39;MTS error: failed to add merge candidate&#39;, 520)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(31, &#39;infrastructure: low temp space (D:)&#39;, 521)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(41, &#39;application CPU idle&#39;, 522)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(42, &#39;application IO idle&#39;, 523)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(43, &#39;application print out idle&#39;, 524)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(46, &#39;application timeout&#39;, 525)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(49, &#39;application hang / was terminated&#39;, 526)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(50, &#39;wrapper application failure&#39;, 527)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(219, &#39;user generated error 219&#39;, 528)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(218, &#39;user generated error 218&#39;, 529)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(217, &#39;user generated error 217&#39;, 530)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(216, &#39;user generated error 216&#39;, 531)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(215, &#39;user generated error 215&#39;, 532)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(214, &#39;user generated error 214&#39;, 533)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(213, &#39;user generated error 213&#39;, 534)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(212, &#39;user generated error 212&#39;, 535)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(211, &#39;user generated error 211&#39;, 536)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(210, &#39;user generated error 210&#39;, 537)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(209, &#39;user generated error 209&#39;, 538)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(208, &#39;user generated error 208&#39;, 539)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(207, &#39;user generated error 207&#39;, 540)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(206, &#39;user generated error 206&#39;, 541)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(205, &#39;user generated error 205&#39;, 542)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(204, &#39;user generated error 204&#39;, 543)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(203, &#39;user generated error 203&#39;, 544)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(202, &#39;user generated error 202&#39;, 545)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(201, &#39;user generated error 201&#39;, 546)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(200, &#39;user generic error&#39;, 547)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(145, &#39;MTS: no error log available&#39;, 548)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(141, &#39;MTS info: output generated successfully&#39;, 549)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(112, &#39;simulation BSIG corrupt&#39;, 550)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(113, &#39;duration of recording and BSIG differ&#39;, 551)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(114, &#39;BSIG has too many time jumps&#39;, 552)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(115, &#39;no BSIGs at all produced&#39;, 553)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(47, &#39;application IPv4 retransmit rate too high&#39;, 554)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(48, &#39;application IPv6 retransmit rate too high&#39;, 555)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(51, &#39;application low virtual memory&#39;, 557)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(52, &#39;application low CPU power&#39;, 558)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(53, &#39;application high memory usage&#39;, 559)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(54, &#39;application fatal message&#39;, 560)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(60, &#39;floating point exception: invalid operation&#39;, 561)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(61, &#39;floating point exception: division by zero&#39;, 562)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(62, &#39;floating point exception: overflow&#39;, 563)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(63, &#39;floating point exception: underflow&#39;, 564)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(64, &#39;floating point exception: inexact operation&#39;, 565)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(65, &#39;floating point exception: denormal operation&#39;, 566)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(66, &#39;floating point exception: stack check&#39;, 567)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(70, &#39;MTS crash: access violation&#39;, 568)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(71, &#39;MTS crash: invalid parameter&#39;, 569)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(72, &#39;MTS crash: array bounds exceeded&#39;, 570)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(73, &#39;MTS crash: breakpoint&#39;, 571)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(74, &#39;MTS crash: float divide by zero&#39;, 572)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(75, &#39;MTS crash: invalid operation&#39;, 573)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(76, &#39;MTS crash: guard page&#39;, 574)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(77, &#39;MTS crash: illegal instruction&#39;, 575)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(78, &#39;MTS crash: integer division by zero&#39;, 576)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(79, &#39;MTS crash: integer overflow&#39;, 577)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(80, &#39;MTS crash: invalid handle&#39;, 578)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(81, &#39;MTS crash: privileged instruction&#39;, 579)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(82, &#39;MTS crash: single step&#39;, 580)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(83, &#39;MTS crash: stack buffer overrun&#39;, 581)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(84, &#39;MTS crash: fatal app exit&#39;, 582)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(85, &#39;MTS crash: thread activation context&#39;, 583)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(90, &#39;MTS exception: near scan peak error&#39;, 584)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(91, &#39;MTS exception: far scan peak error&#39;, 585)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(92, &#39;MTS exception: peak error at position x&#39;, 586)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(93, &#39;MTS exception: access violation&#39;, 587)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(94, &#39;MTS exception: inconsistent data structure&#39;, 588)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(95, &#39;MTS exception: config of MO missing&#39;, 589)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(96, &#39;MTS exception: MO code error&#39;, 590)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(97, &#39;MTS exception: BMW radome correction&#39;, 591)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(98, &#39;MTS exception: unknown exception&#39;, 592)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(99, &#39;MTS exception: unhandled exception&#39;, 593)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(110, &#39;MTS error: network unavailable&#39;, 594)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(111, &#39;MTS error: recording corrupt&#39;, 595)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(100, &#39;MTS unknown exception&#39;, 596)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(120, &#39;MTS error: unspecified&#39;, 597)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(121, &#39;MTS error: crash dump&#39;, 598)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(122, &#39;MTS error: xlog is corrupt&#39;, 599)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(123, &#39;MTS error: block terminated caching thread found&#39;, 600)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(124, &#39;MTS error: application error&#39;, 601)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(142, &#39;MTS error: GPU server execution&#39;, 602)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(143, &#39;MTS error: invalid MDF block&#39;, 603)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(125, &#39;MTS error: unknown error&#39;, 605)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(126, &#39;MTS log: exception found&#39;, 606)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(128, &#39;MTS log: alert found&#39;, 607)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(127, &#39;MTS log: error found&#39;, 608)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(129, &#39;MTS log: warning found&#39;, 609)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(130, &#39;MTS log: info found&#39;, 610)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(131, &#39;MTS log: debug found&#39;, 611)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(132, &#39;MTS log: corrupt crash log found&#39;, 612)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(133, &#39;MTS error: too old DLL detected / used&#39;, 613)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(144, &#39;MTS error: low on memory&#39;, 614)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(134, &#39;MTS error: too much memory in use&#39;, 615)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(135, &#39;MTS xlog not available&#39;, 616)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(136, &#39;MTS error: side-by-side configuration is incorrect&#39;, 617)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(138, &#39;MTS error: cannot open or read configuration&#39;, 618)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(137, &#39;MTS error: reading recording failed&#39;, 619)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(139, &#39;MTS error: recovering data&#39;, 620)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(140, &#39;MTS error: error reported&#39;, 621)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(40, &#39;application unspecified error&#39;, 622)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(20, &#39;unspecified HPC error&#39;, 623)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(21, &#39;application is not local&#39;, 624)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(22, &#39;wrong argument&#39;, 625)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(23, &#39;user canceled task&#39;, 626)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(24, &#39;general database error&#39;, 627)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(25, &#39;reading from DB failed&#39;, 628)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(26, &#39;invalid PID&#39;, 629)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(27, &#39;internal error&#39;, 630)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(28, &#39;cyclic admin job failed&#39;, 631)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(29, &#39;application not found&#39;, 632)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(30, &#39;script malfunction&#39;, 633)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(158, &#39;infrastructure: failed to create task output folders&#39;, 635)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(1, &#39;unspecified&#39;, 636)</span>
+<span class="s2">insert into HPC_EXITCODES(EXITCODE, DESCR, PRIO) values(0, &#39;OK&#39;, 999)</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+
+<span class="c1"># - functions ----------------------------------------------------------------------------------------------------------</span>
+<div class="viewcode-block" id="create_sqlite"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.sqlite_defs.create_sqlite">[docs]</a><span class="k">def</span> <span class="nf">create_sqlite</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">statements</span><span class="o">=</span><span class="n">SQLITE_DEF</span><span class="p">,</span> <span class="n">clear</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    create an sqlite file by using given statements</span>
+
+<span class="sd">    :param ``str`` filename: path and name of sqlite file to create</span>
+<span class="sd">    :param ``str`` statements: optional sql commands to create tables and fill first values,</span>
+<span class="sd">                               default: definitions compatible with Oracle HPC DB</span>
+<span class="sd">    :param ``bool`` clear: delete existing sqlite file in any case, default: use existing if available</span>
+<span class="sd">    :returns: path and name of created file</span>
+<span class="sd">    :rtype: str</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">clear</span> <span class="ow">and</span> <span class="n">exists</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+        <span class="n">unlink</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">exists</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">BaseDB</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">create</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">autocommit</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">bdb</span><span class="p">:</span>
+            <span class="n">update_stmts</span><span class="p">(</span><span class="n">bdb</span><span class="p">,</span> <span class="n">statements</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">filename</span></div>
+
+
+<div class="viewcode-block" id="update_stmts"><a class="viewcode-back" href="../../../hpc.rdb.html#hpc.rdb.sqlite_defs.update_stmts">[docs]</a><span class="k">def</span> <span class="nf">update_stmts</span><span class="p">(</span><span class="n">dbase</span><span class="p">,</span> <span class="n">statements</span><span class="o">=</span><span class="n">SQLITE_DEF</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    update / insert statements</span>
+
+<span class="sd">    :param BaseDb dbase: database connection</span>
+<span class="sd">    :param str statements: sql statements (\n separated)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">statements</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;--&quot;</span><span class="p">):</span>
+            <span class="n">dbase</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+    <span class="n">dbase</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">HPC 2.12.3 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2016, VDS.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.3.1.
+    </div>
+  </body>
+</html>
